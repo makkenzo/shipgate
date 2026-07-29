@@ -1,0 +1,16 @@
+packages:
+  - apps/*
+  - packages/*
+
+linkWorkspacePackages: false
+saveWorkspaceProtocol: rolling
+disallowWorkspaceCycles: true
+failIfNoMatch: true
+autoInstallPeers: false
+strictPeerDependencies: true
+engineStrict: true
+
+requiredScripts:
+  - build
+  - typecheck
+  - test

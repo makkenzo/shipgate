@@ -1,0 +1,23 @@
+{
+  "name": "@shipgate/web",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsc --project tsconfig.build.json --watch --preserveWatchOutput",
+    "build": "tsc --build tsconfig.build.json",
+    "typecheck": "tsc --project tsconfig.json",
+    "test": "vitest run --passWithNoTests",
+    "clean": "tsc --build tsconfig.build.json --clean",
+    "test:e2e": "playwright test --pass-with-no-tests"
+  },
+  "dependencies": {
+    "@shipgate/config": "workspace:*",
+    "@shipgate/domain": "workspace:*"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.62.0",
+    "@shipgate/testing": "workspace:*",
+    "vitest": "4.1.10"
+  }
+}

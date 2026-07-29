@@ -1,0 +1,29 @@
+{
+  "name": "shipgate",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24.18.1 <25",
+    "pnpm": ">=11.14.0 <12"
+  },
+  "scripts": {
+    "dev": "tsc --build --watch --preserveWatchOutput",
+    "build": "tsc --build",
+    "lint": "pnpm check:boundaries && biome lint . --error-on-warnings",
+    "format": "biome format --write .",
+    "format:check": "biome format .",
+    "typecheck": "pnpm --recursive --if-present run typecheck",
+    "test": "pnpm --recursive --if-present run test",
+    "test:e2e": "pnpm --recursive --if-present run test:e2e",
+    "check:boundaries": "node scripts/check-boundaries.mjs",
+    "check:cycles": "node scripts/check-boundaries.mjs && biome lint . --error-on-warnings",
+    "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm test:e2e",
+    "clean": "tsc --build --clean"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.6",
+    "@types/node": "^24.13.3",
+    "typescript": "^7.0.2"
+  }
+}
