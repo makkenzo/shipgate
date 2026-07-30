@@ -9,12 +9,6 @@ import { markJobQueued } from './store.js'
 export interface EnqueueJobOptions {
   readonly correlationId: string
   readonly causationId?: string
-  readonly runAt?: Date
-  readonly priority?: number
-  readonly queueName?: string
-  readonly jobKey?: string
-
-  readonly jobKeyMode?: 'replace' | 'preserve_run_at' | 'unsafe_dedupe'
 }
 
 export interface EnqueuedJob {
@@ -49,8 +43,6 @@ export async function enqueueJob<Name extends TaskName>(
 
   const maxAttempts = definition.retry.maxAttempts
 
-  const queueName = options.queueName ?? definition.retry.queueName ?? null
-
   return withTransaction(
     database.kysely,
     async (transaction) => {
@@ -65,26 +57,8 @@ export async function enqueueJob<Name extends TaskName>(
             payload :=
               ${JSON.stringify(jsonEnvelope)}::json,
 
-            queue_name :=
-              ${queueName}::text,
-
-            run_at :=
-              coalesce(
-                ${options.runAt ?? null}::timestamptz,
-                now()
-              ),
-
             max_attempts :=
-              ${maxAttempts}::smallint,
-
-            job_key :=
-              ${options.jobKey ?? null}::text,
-
-            priority :=
-              ${options.priority ?? 0}::smallint,
-
-            job_key_mode :=
-              ${options.jobKeyMode ?? 'replace'}::text
+              ${maxAttempts}::smallint
           )
         ).id::text as id
       `.execute(transaction)

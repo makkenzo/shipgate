@@ -11,6 +11,16 @@ const outputPath = join(outputDirectory, 'shipgate.openapi.json')
 
 const context = createApplicationContext({
   processKind: 'api',
+
+  environment: {
+    ...process.env,
+
+    /*
+     * The contract describes every implemented API operation.
+     * Runtime exposure remains controlled independently.
+     */
+    API_DIAGNOSTICS_ENABLED: 'true',
+  },
 })
 
 try {

@@ -17,8 +17,6 @@
     "@base-ui/react": "^1.6.0",
     "@fontsource-variable/geist": "^5.3.0",
     "@hey-api/client-fetch": "0.13.1",
-    "@shipgate/config": "workspace:*",
-    "@shipgate/domain": "workspace:*",
     "@tanstack/react-query": "5.101.4",
     "@tanstack/react-router": "1.170.18",
     "class-variance-authority": "^0.7.1",
@@ -32,7 +30,6 @@
   },
   "devDependencies": {
     "@hey-api/openapi-ts": "0.99.0",
-    "@shipgate/testing": "workspace:*",
     "@tailwindcss/vite": "4.3.3",
     "@tanstack/router-cli": "1.167.21",
     "@tanstack/router-plugin": "1.168.23",

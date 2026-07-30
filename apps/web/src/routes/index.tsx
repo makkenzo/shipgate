@@ -35,7 +35,11 @@ function SystemStatusPage() {
 
   const systemLoading = health.isPending || readiness.isPending
 
-  const systemOperational = health.isSuccess && readiness.isSuccess
+  const systemOperational =
+    health.isSuccess &&
+    readiness.isSuccess &&
+    readiness.data.checks.worker.status === 'ok' &&
+    readiness.data.checks.worker.activeWorkers > 0
 
   const healthError = health.error ? normalizeApiError(health.error) : undefined
 

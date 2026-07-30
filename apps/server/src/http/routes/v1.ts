@@ -11,7 +11,9 @@ interface ApiV1RoutesOptions {
 export const apiV1Routes: FastifyPluginAsyncTypebox<ApiV1RoutesOptions> = async (app, options) => {
   app.addHook('onRequest', enforceJsonContentType)
 
-  await app.register(diagnosticJobRoutes, {
-    context: options.context,
-  })
+  if (options.context.runtimeConfig.api.diagnosticsEnabled) {
+    await app.register(diagnosticJobRoutes, {
+      context: options.context,
+    })
+  }
 }

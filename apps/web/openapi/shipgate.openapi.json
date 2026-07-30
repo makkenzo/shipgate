@@ -127,12 +127,20 @@
                           "required": ["status", "activeWorkers", "staleWorkers"],
                           "properties": {
                             "status": {
-                              "type": "string",
-                              "enum": ["ok"]
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "enum": ["ok"]
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": ["unavailable"]
+                                }
+                              ]
                             },
                             "activeWorkers": {
                               "type": "integer",
-                              "minimum": 1
+                              "minimum": 0
                             },
                             "staleWorkers": {
                               "type": "integer",

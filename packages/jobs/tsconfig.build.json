@@ -14,9 +14,6 @@
   "exclude": ["src/**/*.test.ts", "src/**/*.spec.ts"],
   "references": [
     {
-      "path": "../config/tsconfig.build.json"
-    },
-    {
       "path": "../database/tsconfig.build.json"
     }
   ]

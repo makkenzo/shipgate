@@ -6,19 +6,9 @@ import { createTaskList } from './execution.js'
 import { startWorkerHeartbeat, type WorkerHeartbeat } from './heartbeat.js'
 import type { JobTaskDependencies, StructuredLogger } from './types.js'
 
-export interface JobWorkerMetrics {
-  readonly activeJobs: number
-  readonly startedJobs: number
-  readonly succeededJobs: number
-  readonly erroredAttempts: number
-  readonly permanentlyFailedJobs: number
-}
-
 export interface JobWorkerRuntime {
   readonly workerId: string
   readonly promise: Promise<void>
-
-  getMetrics(): JobWorkerMetrics
 
   stop(): Promise<void>
 }
@@ -40,35 +30,6 @@ export async function startJobWorker(options: {
 
   events.once('pool:create', ({ workerPool }) => {
     workerId = workerPool.id
-  })
-
-  const runtimeMetrics = {
-    activeJobs: 0,
-    startedJobs: 0,
-    succeededJobs: 0,
-    erroredAttempts: 0,
-    permanentlyFailedJobs: 0,
-  }
-
-  events.on('job:start', () => {
-    runtimeMetrics.activeJobs += 1
-    runtimeMetrics.startedJobs += 1
-  })
-
-  events.on('job:success', () => {
-    runtimeMetrics.succeededJobs += 1
-  })
-
-  events.on('job:error', () => {
-    runtimeMetrics.erroredAttempts += 1
-  })
-
-  events.on('job:failed', () => {
-    runtimeMetrics.permanentlyFailedJobs += 1
-  })
-
-  events.on('job:complete', () => {
-    runtimeMetrics.activeJobs = Math.max(0, runtimeMetrics.activeJobs - 1)
   })
 
   events.on('pool:fatalError', ({ error, action }) => {
@@ -133,12 +94,6 @@ export async function startJobWorker(options: {
   return {
     workerId,
     promise: runner.promise,
-
-    getMetrics() {
-      return {
-        ...runtimeMetrics,
-      }
-    },
 
     stop() {
       stopPromise ??= (async () => {

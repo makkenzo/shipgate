@@ -45,6 +45,10 @@ export async function startApi(context: ApplicationContext): Promise<StartedAppl
         docsEnabled: context.runtimeConfig.api.docsEnabled,
 
         docsPath: context.runtimeConfig.api.docsEnabled ? '/docs' : null,
+
+        diagnosticsEnabled: context.runtimeConfig.api.diagnosticsEnabled,
+
+        metricsEnabled: context.runtimeConfig.api.metricsEnabled,
       },
     },
 

@@ -82,7 +82,7 @@ export type GetReadinessResponses = {
                 status: 'ok';
             };
             worker: {
-                status: 'ok';
+                status: 'ok' | 'unavailable';
                 activeWorkers: number;
                 staleWorkers: number;
             };

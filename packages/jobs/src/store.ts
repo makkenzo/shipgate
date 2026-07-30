@@ -53,31 +53,6 @@ export async function markJobQueued(
       started_at: null,
       completed_at: null,
     })
-    .onConflict((conflict) =>
-      conflict.column('graphile_job_id').doUpdateSet({
-        task_identifier: input.taskIdentifier,
-
-        status: 'queued',
-
-        correlation_id: input.correlationId,
-
-        causation_id: input.causationId ?? null,
-
-        payload: input.payload,
-
-        attempts: 0,
-
-        max_attempts: input.maxAttempts,
-
-        result: null,
-        last_error: null,
-        started_at: null,
-        completed_at: null,
-
-        queued_at: sql`now()`,
-        updated_at: sql`now()`,
-      }),
-    )
     .execute()
 }
 
@@ -117,11 +92,11 @@ export async function markJobStarted(
         attempts: input.attempt,
 
         started_at: sql`
-            coalesce(
-              shipgate_job_execution.started_at,
-              now()
-            )
-          `,
+          coalesce(
+            shipgate_job_execution.started_at,
+            now()
+          )
+        `,
 
         completed_at: null,
         updated_at: sql`now()`,

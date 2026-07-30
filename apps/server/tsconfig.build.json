@@ -20,12 +20,6 @@
       "path": "../../packages/database/tsconfig.build.json"
     },
     {
-      "path": "../../packages/domain/tsconfig.build.json"
-    },
-    {
-      "path": "../../packages/github/tsconfig.build.json"
-    },
-    {
       "path": "../../packages/jobs/tsconfig.build.json"
     }
   ]

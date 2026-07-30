@@ -10,7 +10,7 @@ import type { JobTaskDefinition, JobTaskDependencies } from './types.js'
 
 type UntypedTaskDefinition = JobTaskDefinition<z.ZodTypeAny>
 
-export interface JobAttemptResult {
+interface JobAttemptResult {
   readonly status: 'succeeded' | 'retrying' | 'failed'
 
   readonly shouldThrow: boolean
@@ -58,9 +58,7 @@ function createTaskExecutor<Name extends TaskName>(
   }
 }
 
-export async function executeJobAttempt(
-  options: ExecuteJobAttemptOptions,
-): Promise<JobAttemptResult> {
+async function executeJobAttempt(options: ExecuteJobAttemptOptions): Promise<JobAttemptResult> {
   const { taskName, jobId, attempt, maxAttempts, dependencies, persist } = options
 
   const definition = taskDefinitions[taskName] as UntypedTaskDefinition

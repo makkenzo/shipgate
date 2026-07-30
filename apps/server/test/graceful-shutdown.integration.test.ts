@@ -99,6 +99,34 @@ describe.sequential('graceful shutdown', () => {
     },
     30_000,
   )
+
+  it('forces termination when graceful shutdown exceeds its deadline', async () => {
+    const child = spawnEntrypoint(
+      'test/fixtures/hanging-shutdown.ts',
+      createTestEnvironment(postgres.connectionString, {
+        LOG_LEVEL: 'info',
+        SHUTDOWN_TIMEOUT_MS: '1000',
+      }),
+    )
+
+    const output = collectOutput(child)
+
+    try {
+      await waitForOutput(output, '"event":"application.started"')
+
+      expect(child.kill('SIGTERM')).toBe(true)
+
+      const [code, signal] = (await once(child, 'exit')) as [number | null, NodeJS.Signals | null]
+
+      expect(signal).toBeNull()
+      expect(code).toBe(1)
+      expect(output.value).toContain('"reason":"shutdown_timeout"')
+    } finally {
+      if (child.exitCode === null) {
+        child.kill('SIGKILL')
+      }
+    }
+  }, 15_000)
 })
 
 function spawnEntrypoint(entrypoint: string, environment: NodeJS.ProcessEnv): SpawnedProcess {

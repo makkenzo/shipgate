@@ -26,7 +26,6 @@
     "clean": "tsc --build tsconfig.build.json --clean"
   },
   "dependencies": {
-    "@shipgate/config": "workspace:*",
     "@shipgate/database": "workspace:*",
     "graphile-worker": "0.17.3",
     "kysely": "0.29.4",

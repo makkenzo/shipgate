@@ -70,6 +70,11 @@ describe.sequential('PostgreSQL infrastructure', () => {
 
         status: 'pending',
       },
+      {
+        name: '20260730_000003_drop_system_metadata',
+
+        status: 'pending',
+      },
     ])
 
     const migrationResults = await migrateToLatest(database.kysely)
@@ -85,21 +90,16 @@ describe.sequential('PostgreSQL infrastructure', () => {
         direction: 'Up',
         status: 'Success',
       }),
+      expect.objectContaining({
+        migrationName: '20260730_000003_drop_system_metadata',
+        direction: 'Up',
+        status: 'Success',
+      }),
     ])
 
     const readiness = await checkDatabaseReadiness(database.kysely, 2_000)
 
     expect(readiness.ready).toBe(true)
-
-    const metadata = await database.kysely
-      .selectFrom('shipgate_system_metadata')
-      .selectAll()
-      .where('key', '=', 'migration_infrastructure')
-      .executeTakeFirstOrThrow()
-
-    expect(metadata.value).toEqual({
-      status: 'ready',
-    })
 
     const rollbackMarker = new Error('rollback transaction')
 
@@ -108,12 +108,14 @@ describe.sequential('PostgreSQL infrastructure', () => {
         database.kysely,
         async (transaction) => {
           await transaction
-            .insertInto('shipgate_system_metadata')
+            .insertInto('shipgate_worker_heartbeat')
             .values({
-              key: 'transaction_rollback_test',
-              value: {
-                inserted: true,
-              },
+              worker_id: 'transaction-rollback-test',
+              hostname: 'transaction-test',
+              pid: 1,
+              app_version: 'test',
+              started_at: new Date(),
+              heartbeat_at: new Date(),
             })
             .execute()
 
@@ -127,9 +129,9 @@ describe.sequential('PostgreSQL infrastructure', () => {
     ).rejects.toBe(rollbackMarker)
 
     const rolledBackRow = await database.kysely
-      .selectFrom('shipgate_system_metadata')
-      .select('key')
-      .where('key', '=', 'transaction_rollback_test')
+      .selectFrom('shipgate_worker_heartbeat')
+      .select('worker_id')
+      .where('worker_id', '=', 'transaction-rollback-test')
       .executeTakeFirst()
 
     expect(rolledBackRow).toBeUndefined()
@@ -166,8 +168,14 @@ describe.sequential('PostgreSQL infrastructure', () => {
 
     const firstRollback = await rollbackLastMigration(database.kysely)
     const secondRollback = await rollbackLastMigration(database.kysely)
+    const thirdRollback = await rollbackLastMigration(database.kysely)
 
-    expect([...firstRollback, ...secondRollback]).toEqual([
+    expect([...firstRollback, ...secondRollback, ...thirdRollback]).toEqual([
+      expect.objectContaining({
+        migrationName: '20260730_000003_drop_system_metadata',
+        direction: 'Down',
+        status: 'Success',
+      }),
       expect.objectContaining({
         migrationName: '20260730_000002_create_job_infrastructure',
         direction: 'Down',
@@ -186,7 +194,7 @@ describe.sequential('PostgreSQL infrastructure', () => {
 
     const firstRun = await migrateToLatest(database.kysely)
 
-    expect(firstRun).toHaveLength(2)
+    expect(firstRun).toHaveLength(3)
 
     const secondRun = await migrateToLatest(database.kysely)
 

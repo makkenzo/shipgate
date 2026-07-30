@@ -105,7 +105,7 @@ function installProcessHandlers(context: ApplicationContext): () => void {
       })
       .then((result) => {
         if (result.failed) {
-          process.exitCode = 1
+          exitAfterFailedShutdown(context)
         }
       })
   }
@@ -115,10 +115,16 @@ function installProcessHandlers(context: ApplicationContext): () => void {
 
     logFatal(context.logger, error, 'uncaughtException')
 
-    void context.shutdown.shutdown({
-      type: 'fatal',
-      origin: 'uncaughtException',
-    })
+    void context.shutdown
+      .shutdown({
+        type: 'fatal',
+        origin: 'uncaughtException',
+      })
+      .then((result) => {
+        if (result.failed) {
+          exitAfterFailedShutdown(context)
+        }
+      })
   }
 
   const onUnhandledRejection = (reason: unknown) => {
@@ -126,10 +132,16 @@ function installProcessHandlers(context: ApplicationContext): () => void {
 
     logFatal(context.logger, reason, 'unhandledRejection')
 
-    void context.shutdown.shutdown({
-      type: 'fatal',
-      origin: 'unhandledRejection',
-    })
+    void context.shutdown
+      .shutdown({
+        type: 'fatal',
+        origin: 'unhandledRejection',
+      })
+      .then((result) => {
+        if (result.failed) {
+          exitAfterFailedShutdown(context)
+        }
+      })
   }
 
   process.once('SIGTERM', onSignal)
@@ -147,6 +159,11 @@ function installProcessHandlers(context: ApplicationContext): () => void {
 
     process.off('unhandledRejection', onUnhandledRejection)
   }
+}
+
+function exitAfterFailedShutdown(context: ApplicationContext): never {
+  context.logger.flush()
+  process.exit(1)
 }
 
 function logFatal(logger: ApplicationContext['logger'], error: unknown, stage: string): void {

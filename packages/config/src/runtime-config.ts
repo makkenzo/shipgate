@@ -6,11 +6,6 @@ const logLevelSchema = z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace
 
 const databaseSslModeSchema = z.enum(['disable', 'require', 'verify-full'])
 
-const optionalString = z.preprocess(
-  (value) => (value === '' ? undefined : value),
-  z.string().trim().min(1).optional(),
-)
-
 const optionalBooleanEnvironmentSchema = z.preprocess(
   (value) => {
     if (value === '' || value === undefined) {
@@ -35,6 +30,22 @@ const corsOriginsEnvironmentSchema = z
       'http://127.0.0.1:5173',
     ].join(','),
   )
+  .transform((value, context) => {
+    const origins = parseCommaSeparatedValues(value)
+
+    for (const origin of origins) {
+      if (!isHttpOrigin(origin)) {
+        context.addIssue({
+          code: 'custom',
+          message: `Invalid HTTP origin: ${origin}`,
+        })
+
+        return z.NEVER
+      }
+    }
+
+    return origins
+  })
 
 const runtimeEnvironmentSchema = z
   .object({
@@ -64,8 +75,6 @@ const runtimeEnvironmentSchema = z
 
     DATABASE_SSL_MODE: databaseSslModeSchema.default('disable'),
 
-    GITHUB_APP_ID: optionalString,
-
     JOB_WORKER_CONCURRENCY: z.coerce.number().int().min(1).max(64).default(4),
 
     JOB_WORKER_POLL_INTERVAL_MS: z.coerce.number().int().min(100).default(2_000),
@@ -82,6 +91,10 @@ const runtimeEnvironmentSchema = z
       .default(64 * 1_024),
 
     API_DOCS_ENABLED: optionalBooleanEnvironmentSchema,
+
+    API_DIAGNOSTICS_ENABLED: optionalBooleanEnvironmentSchema,
+
+    API_METRICS_ENABLED: optionalBooleanEnvironmentSchema,
 
     API_CORS_ORIGINS: corsOriginsEnvironmentSchema,
   })
@@ -124,6 +137,8 @@ export interface RuntimeConfig {
     readonly port: number
     readonly bodyLimitBytes: number
     readonly docsEnabled: boolean
+    readonly diagnosticsEnabled: boolean
+    readonly metricsEnabled: boolean
     readonly corsOrigins: readonly string[]
   }
 
@@ -135,10 +150,6 @@ export interface RuntimeConfig {
     readonly maxLifetimeSeconds: number
     readonly readinessTimeoutMs: number
     readonly sslMode: DatabaseSslMode
-  }
-
-  readonly github: {
-    readonly appId: string | undefined
   }
 
   readonly jobs: {
@@ -170,7 +181,12 @@ export function loadRuntimeConfig(environment: NodeJS.ProcessEnv = process.env):
 
       docsEnabled: result.data.API_DOCS_ENABLED ?? result.data.NODE_ENV === 'development',
 
-      corsOrigins: parseCommaSeparatedValues(result.data.API_CORS_ORIGINS),
+      diagnosticsEnabled:
+        result.data.API_DIAGNOSTICS_ENABLED ?? result.data.NODE_ENV !== 'production',
+
+      metricsEnabled: result.data.API_METRICS_ENABLED ?? result.data.NODE_ENV !== 'production',
+
+      corsOrigins: result.data.API_CORS_ORIGINS,
     },
 
     database: {
@@ -181,10 +197,6 @@ export function loadRuntimeConfig(environment: NodeJS.ProcessEnv = process.env):
       maxLifetimeSeconds: result.data.DATABASE_MAX_LIFETIME_SECONDS,
       readinessTimeoutMs: result.data.DATABASE_READINESS_TIMEOUT_MS,
       sslMode: result.data.DATABASE_SSL_MODE,
-    },
-
-    github: {
-      appId: result.data.GITHUB_APP_ID,
     },
 
     jobs: {
@@ -201,4 +213,19 @@ function parseCommaSeparatedValues(value: string): readonly string[] {
     .split(',')
     .map((item) => item.trim())
     .filter((item) => item.length > 0)
+}
+
+function isHttpOrigin(value: string): boolean {
+  try {
+    const url = new URL(value)
+
+    return (
+      (url.protocol === 'http:' || url.protocol === 'https:') &&
+      url.origin === value &&
+      url.username === '' &&
+      url.password === ''
+    )
+  } catch {
+    return false
+  }
 }

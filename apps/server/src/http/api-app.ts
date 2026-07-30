@@ -33,7 +33,7 @@ export async function buildApiApplication(context: ApplicationContext): Promise<
 
   app.setValidatorCompiler(TypeBoxValidatorCompiler)
 
-  const metrics = createApiMetrics(context)
+  const metrics = context.runtimeConfig.api.metricsEnabled ? createApiMetrics(context) : undefined
 
   /*
    * swagger должен быть
@@ -100,9 +100,11 @@ export async function buildApiApplication(context: ApplicationContext): Promise<
     reply.header('x-request-id', request.id)
   })
 
-  app.addHook('onResponse', async (request, reply) => {
-    metrics.observeRequest(request, reply)
-  })
+  if (metrics) {
+    app.addHook('onResponse', async (request, reply) => {
+      metrics.observeRequest(request, reply)
+    })
+  }
 
   await app.register(operationalRoutes, {
     context,

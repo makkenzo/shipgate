@@ -1,4 +1,4 @@
-import { loadRuntimeConfig, loadSecrets, type RuntimeConfig, type Secrets } from '@shipgate/config'
+import { loadRuntimeConfig, loadSecrets, type RuntimeConfig } from '@shipgate/config'
 import { createDatabase, type DatabaseClient } from '@shipgate/database'
 import type { Logger } from 'pino'
 
@@ -10,7 +10,6 @@ export interface ApplicationContext {
   readonly processKind: ProcessKind
   readonly startedAt: Date
   readonly runtimeConfig: RuntimeConfig
-  readonly secrets: Secrets
   readonly logger: Logger
   readonly database: DatabaseClient
   readonly shutdown: ShutdownManager
@@ -93,7 +92,6 @@ export function createApplicationContext(
     processKind: options.processKind,
     startedAt: new Date(),
     runtimeConfig,
-    secrets,
     logger,
     database,
     shutdown,

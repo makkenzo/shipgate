@@ -3,24 +3,13 @@ import path from 'node:path'
 
 const allowedRuntimeDependencies = new Map([
   ['@shipgate/config', new Set()],
-  ['@shipgate/domain', new Set()],
   ['@shipgate/testing', new Set()],
 
-  ['@shipgate/database', new Set(['@shipgate/config', '@shipgate/domain'])],
-  ['@shipgate/github', new Set(['@shipgate/config', '@shipgate/domain'])],
-  ['@shipgate/web', new Set(['@shipgate/config', '@shipgate/domain'])],
-  ['@shipgate/jobs', new Set(['@shipgate/config', '@shipgate/database'])],
+  ['@shipgate/database', new Set()],
+  ['@shipgate/web', new Set()],
+  ['@shipgate/jobs', new Set(['@shipgate/database'])],
 
-  [
-    '@shipgate/server',
-    new Set([
-      '@shipgate/config',
-      '@shipgate/database',
-      '@shipgate/domain',
-      '@shipgate/github',
-      '@shipgate/jobs',
-    ]),
-  ],
+  ['@shipgate/server', new Set(['@shipgate/config', '@shipgate/database', '@shipgate/jobs'])],
 ])
 
 const productionFields = ['dependencies', 'optionalDependencies', 'peerDependencies']

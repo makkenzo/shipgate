@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.14.0
+          run_install: false
+
+      - name: Install Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify source, contracts, tests, and build
+        env:
+          DATABASE_URL: postgresql://shipgate:shipgate@127.0.0.1:5432/shipgate
+        run: pnpm ci
+
+      - name: Install Playwright browser
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Start production stack
+        run: pnpm compose:up
+
+      - name: Run end-to-end tests
+        run: pnpm test:e2e
+
+      - name: Export container logs
+        if: failure()
+        run: docker compose logs --no-color
+
+      - name: Stop production stack
+        if: always()
+        run: pnpm compose:down

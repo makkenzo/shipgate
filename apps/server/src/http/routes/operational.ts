@@ -11,7 +11,7 @@ import { ApiErrorSchema, HealthResponseSchema, ReadyResponseSchema } from '../sc
 interface OperationalRoutesOptions {
   readonly context: ApplicationContext
 
-  readonly metrics: ApiMetrics
+  readonly metrics: ApiMetrics | undefined
 }
 
 export const operationalRoutes: FastifyPluginAsyncTypebox<OperationalRoutesOptions> = async (
@@ -154,35 +154,6 @@ export const operationalRoutes: FastifyPluginAsyncTypebox<OperationalRoutesOptio
         })
       }
 
-      if (queueMetrics.workers.active < 1) {
-        throw new ApiHttpError({
-          statusCode: 503,
-          code: 'SERVICE_NOT_READY',
-          message: 'Service is not ready',
-
-          details: {
-            checks: {
-              database: {
-                status: 'ok',
-                latencyMs: database.latencyMs,
-              },
-
-              jobQueue: {
-                status: 'ok',
-              },
-
-              worker: {
-                status: 'unavailable',
-
-                activeWorkers: queueMetrics.workers.active,
-
-                staleWorkers: queueMetrics.workers.stale,
-              },
-            },
-          },
-        })
-      }
-
       return {
         status: 'ready' as const,
 
@@ -198,7 +169,7 @@ export const operationalRoutes: FastifyPluginAsyncTypebox<OperationalRoutesOptio
           },
 
           worker: {
-            status: 'ok' as const,
+            status: queueMetrics.workers.active > 0 ? ('ok' as const) : ('unavailable' as const),
 
             activeWorkers: queueMetrics.workers.active,
 
@@ -209,19 +180,21 @@ export const operationalRoutes: FastifyPluginAsyncTypebox<OperationalRoutesOptio
     },
   )
 
-  app.get(
-    '/metrics',
-    {
-      schema: {
-        hide: true,
+  if (metrics) {
+    app.get(
+      '/metrics',
+      {
+        schema: {
+          hide: true,
+        },
       },
-    },
-    async (_request, reply) => {
-      const output = await metrics.render()
+      async (_request, reply) => {
+        const output = await metrics.render()
 
-      return reply.type(output.contentType).send(output.body)
-    },
-  )
+        return reply.type(output.contentType).send(output.body)
+      },
+    )
+  }
 
   /*
    * Защищаем operational endpoints

@@ -24,7 +24,6 @@
     "zod": "4.4.3"
   },
   "devDependencies": {
-    "@shipgate/testing": "workspace:*",
     "vitest": "4.1.10"
   }
 }

@@ -14,14 +14,6 @@ export const workspaceAliases = [
     replacement: fileURLToPath(new URL('./packages/database/src/index.ts', import.meta.url)),
   },
   {
-    find: '@shipgate/domain',
-    replacement: fileURLToPath(new URL('./packages/domain/src/index.ts', import.meta.url)),
-  },
-  {
-    find: '@shipgate/github',
-    replacement: fileURLToPath(new URL('./packages/github/src/index.ts', import.meta.url)),
-  },
-  {
     find: '@shipgate/jobs',
     replacement: fileURLToPath(new URL('./packages/jobs/src/index.ts', import.meta.url)),
   },

@@ -1,4 +1,3 @@
-import type { DatabaseSslMode } from '@shipgate/config'
 import type { Generated, Kysely } from 'kysely'
 import type { Pool } from 'pg'
 
@@ -13,15 +12,7 @@ export type JsonValue =
       readonly [key: string]: JsonValue
     }
 
-export interface ShipgateSystemMetadataTable {
-  key: string
-  value: JsonValue
-  created_at: Generated<Date>
-}
-
 export interface DatabaseSchema {
-  shipgate_system_metadata: ShipgateSystemMetadataTable
-
   shipgate_job_execution: ShipgateJobExecutionTable
 
   shipgate_worker_heartbeat: ShipgateWorkerHeartbeatTable
@@ -34,6 +25,8 @@ export interface DatabasePoolOptions {
   readonly connectionTimeoutMs: number
   readonly maxLifetimeSeconds: number
 }
+
+export type DatabaseSslMode = 'disable' | 'require' | 'verify-full'
 
 export interface CreateDatabaseOptions {
   readonly connectionString: string

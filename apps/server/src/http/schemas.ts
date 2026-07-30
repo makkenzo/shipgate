@@ -72,10 +72,10 @@ export const ReadyResponseSchema = Type.Object(
 
         worker: Type.Object(
           {
-            status: Type.Literal('ok'),
+            status: Type.Union([Type.Literal('ok'), Type.Literal('unavailable')]),
 
             activeWorkers: Type.Integer({
-              minimum: 1,
+              minimum: 0,
             }),
 
             staleWorkers: Type.Integer({

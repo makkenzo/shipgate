@@ -22,7 +22,6 @@
     "clean": "tsc --build tsconfig.build.json --clean"
   },
   "dependencies": {
-    "@shipgate/config": "workspace:*",
     "kysely": "0.29.4",
     "pg": "8.22.0"
   },

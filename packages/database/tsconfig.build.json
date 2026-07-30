@@ -12,12 +12,5 @@
   },
   "include": ["src/**/*.ts"],
   "exclude": ["src/**/__tests__/**", "src/**/*.test.ts", "src/**/*.spec.ts"],
-  "references": [
-    {
-      "path": "../config/tsconfig.build.json"
-    },
-    {
-      "path": "../domain/tsconfig.build.json"
-    }
-  ]
+  "references": []
 }

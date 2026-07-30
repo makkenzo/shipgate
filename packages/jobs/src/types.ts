@@ -48,7 +48,6 @@ export interface JobTaskDependencies {
 
 export interface JobRetryPolicy {
   readonly maxAttempts: number
-  readonly queueName?: string
 }
 
 export interface JobTaskDefinition<Schema extends z.ZodTypeAny> {

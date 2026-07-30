@@ -162,4 +162,69 @@ describe.sequential('Fastify API', () => {
       },
     })
   })
+
+  it('does not expose internal endpoints when they are disabled', async () => {
+    const restrictedContext = createApplicationContext({
+      processKind: 'api',
+
+      environment: createTestEnvironment(postgres.connectionString, {
+        API_DIAGNOSTICS_ENABLED: 'false',
+        API_METRICS_ENABLED: 'false',
+      }),
+    })
+
+    const restrictedApp = await buildApiApplication(restrictedContext)
+
+    try {
+      await restrictedApp.ready()
+
+      const diagnosticResponse = await restrictedApp.inject({
+        method: 'POST',
+        url: '/api/v1/_diagnostics/jobs',
+        headers: {
+          'content-type': 'application/json',
+        },
+        payload: {
+          message: 'must not be accepted',
+        },
+      })
+
+      expect(diagnosticResponse.statusCode).toBe(404)
+
+      const metricsResponse = await restrictedApp.inject({
+        method: 'GET',
+        url: '/metrics',
+      })
+
+      expect(metricsResponse.statusCode).toBe(404)
+    } finally {
+      await restrictedApp.close()
+      await restrictedContext.database.destroy()
+    }
+  })
+
+  it('keeps the API ready when the independently deployed worker is unavailable', async () => {
+    await worker.stop()
+
+    const readiness = await app.inject({
+      method: 'GET',
+      url: '/ready',
+    })
+
+    expect(readiness.statusCode).toBe(200)
+    expect(readiness.json()).toMatchObject({
+      status: 'ready',
+
+      checks: {
+        database: {
+          status: 'ok',
+        },
+
+        worker: {
+          status: 'unavailable',
+          activeWorkers: 0,
+        },
+      },
+    })
+  })
 })

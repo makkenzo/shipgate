@@ -2,11 +2,6 @@ import { z } from 'zod'
 
 import { EnvironmentValidationError } from './errors.js'
 
-const optionalSecret = z.preprocess(
-  (value) => (value === '' ? undefined : value),
-  z.string().trim().min(1).optional(),
-)
-
 const databaseUrlSchema = z
   .url()
   .refine((value) => value.startsWith('postgres://') || value.startsWith('postgresql://'), {
@@ -16,18 +11,15 @@ const databaseUrlSchema = z
 const secretsEnvironmentSchema = z.object({
   DATABASE_URL: databaseUrlSchema,
 
-  DATABASE_SSL_CA: optionalSecret,
-
-  GITHUB_PRIVATE_KEY: optionalSecret,
-
-  GITHUB_WEBHOOK_SECRET: optionalSecret,
+  DATABASE_SSL_CA: z.preprocess(
+    (value) => (value === '' ? undefined : value),
+    z.string().trim().min(1).optional(),
+  ),
 })
 
 export interface Secrets {
   readonly databaseUrl: string
   readonly databaseSslCa: string | undefined
-  readonly githubPrivateKey: string | undefined
-  readonly githubWebhookSecret: string | undefined
 }
 
 export function loadSecrets(environment: NodeJS.ProcessEnv = process.env): Secrets {
@@ -40,7 +32,5 @@ export function loadSecrets(environment: NodeJS.ProcessEnv = process.env): Secre
   return {
     databaseUrl: result.data.DATABASE_URL,
     databaseSslCa: result.data.DATABASE_SSL_CA,
-    githubPrivateKey: result.data.GITHUB_PRIVATE_KEY,
-    githubWebhookSecret: result.data.GITHUB_WEBHOOK_SECRET,
   }
 }

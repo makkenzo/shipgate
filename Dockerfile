@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 
-ARG NODE_VERSION=24.18.0
+ARG NODE_VERSION=24.18.1
 
 
 FROM node:${NODE_VERSION}-bookworm-slim AS base
@@ -13,7 +13,6 @@ RUN apt-get update \
     --yes \
     --no-install-recommends \
     ca-certificates \
-    git \
   && rm -rf /var/lib/apt/lists/*
 
 RUN corepack enable
@@ -22,6 +21,13 @@ WORKDIR /workspace
 
 
 FROM base AS dependencies
+
+RUN apt-get update \
+  && apt-get install \
+    --yes \
+    --no-install-recommends \
+    git \
+  && rm -rf /var/lib/apt/lists/*
 
 COPY package.json ./
 COPY pnpm-lock.yaml ./
@@ -38,12 +44,6 @@ COPY packages/config/package.json \
 
 COPY packages/database/package.json \
   packages/database/package.json
-
-COPY packages/domain/package.json \
-  packages/domain/package.json
-
-COPY packages/github/package.json \
-  packages/github/package.json
 
 COPY packages/jobs/package.json \
   packages/jobs/package.json

@@ -52,7 +52,7 @@ describe.sequential('Graphile Worker', () => {
       },
 
       appVersion: 'test',
-      concurrency: 1,
+      concurrency: 2,
       pollIntervalMs: 100,
       heartbeatIntervalMs: 1000,
       shutdownAbortTimeoutMs: 3000,
@@ -111,6 +111,64 @@ describe.sequential('Graphile Worker', () => {
     expect(execution).toMatchObject({
       status: 'succeeded',
       attempts: 2,
+    })
+  })
+
+  it('executes concurrently enqueued jobs independently', async () => {
+    const queuedJobs = await Promise.all(
+      Array.from({ length: 4 }, async (_, index) =>
+        enqueueJob(
+          database,
+          'diagnostic_echo',
+          {
+            message: `concurrent job ${index}`,
+            outcome: 'success',
+            delayMs: 100,
+          },
+          {
+            correlationId: `worker-test-concurrent-${index}`,
+          },
+        ),
+      ),
+    )
+
+    const executions = await Promise.all(
+      queuedJobs.map(async (job) =>
+        waitForJobExecution(database, job.jobId, {
+          timeoutMs: 20_000,
+        }),
+      ),
+    )
+
+    expect(new Set(queuedJobs.map((job) => job.jobId)).size).toBe(queuedJobs.length)
+    expect(executions.every((execution) => execution.status === 'succeeded')).toBe(true)
+    expect(executions.every((execution) => execution.attempts === 1)).toBe(true)
+  })
+
+  it('acknowledges permanent failures without retrying them', async () => {
+    const queued = await enqueueJob(
+      database,
+      'diagnostic_echo',
+      {
+        message: 'permanent failure',
+        outcome: 'permanent-error',
+      },
+      {
+        correlationId: 'worker-test-permanent-failure',
+      },
+    )
+
+    const execution = await waitForJobExecution(database, queued.jobId, {
+      timeoutMs: 20_000,
+    })
+
+    expect(execution).toMatchObject({
+      status: 'failed',
+      attempts: 1,
+
+      lastError: {
+        code: 'DIAGNOSTIC_PERMANENT_FAILURE',
+      },
     })
   })
 })
