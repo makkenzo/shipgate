@@ -8,6 +8,8 @@
     "pnpm": ">=11.14.0 <12"
   },
   "scripts": {
+    "start:api": "pnpm --filter @shipgate/server start:api",
+    "start:worker": "pnpm --filter @shipgate/server start:worker",
     "dev": "tsc --build --watch --preserveWatchOutput",
     "build": "tsc --build",
     "lint": "pnpm check:boundaries && biome lint . --error-on-warnings",
@@ -25,5 +27,6 @@
     "@biomejs/biome": "2.5.6",
     "@types/node": "^24.13.3",
     "typescript": "^7.0.2"
-  }
+  },
+  "packageManager": "pnpm@11.14.0+sha512.66c1ac4c7d4762d6d7dde44c7f3e5a73591ed0a0806e751d4ed32d4f004f25b2285a906b1fd8a9e3e621df3b4e2858bf88e50e0cf626bedbe977fe434a5caf85"
 }

@@ -4,21 +4,22 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "tsc --project tsconfig.build.json --watch --preserveWatchOutput",
+    "dev": "tsc -p tsconfig.build.json --watch --preserveWatchOutput",
     "build": "tsc --build tsconfig.build.json",
-    "typecheck": "tsc --project tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run --passWithNoTests",
-    "clean": "tsc --build tsconfig.build.json --clean",
-    "test:e2e": "vitest run test/e2e --passWithNoTests"
+    "test:e2e": "vitest run test/e2e --passWithNoTests",
+    "start:api": "node --enable-source-maps dist/api.js",
+    "start:worker": "node --enable-source-maps dist/worker.js"
   },
   "dependencies": {
     "@shipgate/config": "workspace:*",
     "@shipgate/database": "workspace:*",
     "@shipgate/domain": "workspace:*",
-    "@shipgate/github": "workspace:*"
+    "@shipgate/github": "workspace:*",
+    "pino": "10.3.1"
   },
   "devDependencies": {
-    "@shipgate/testing": "workspace:*",
-    "vitest": "4.1.10"
+    "@shipgate/testing": "workspace:*"
   }
 }

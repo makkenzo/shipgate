@@ -3,6 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
+  "sideEffects": false,
   "types": "./src/index.ts",
   "exports": {
     ".": {
@@ -14,14 +15,15 @@
     "dist"
   ],
   "scripts": {
-    "dev": "tsc --project tsconfig.build.json --watch --preserveWatchOutput",
+    "dev": "tsc -p tsconfig.build.json --watch --preserveWatchOutput",
     "build": "tsc --build tsconfig.build.json",
-    "typecheck": "tsc --project tsconfig.json",
-    "test": "vitest run --passWithNoTests",
-    "clean": "tsc --build tsconfig.build.json --clean"
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "zod": "4.4.3"
   },
   "devDependencies": {
-    "@shipgate/testing": "workspace:*",
-    "vitest": "4.1.10"
+    "@shipgate/testing": "workspace:*"
   }
 }
