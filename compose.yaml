@@ -44,6 +44,8 @@ services:
       context: .
     environment:
       NODE_ENV: production
+      API_DOCS_ENABLED: 'true'
+      API_BODY_LIMIT_BYTES: 65536
       PORT: 3000
       HOST: 0.0.0.0
       DATABASE_URL: postgresql://shipgate:shipgate@postgres:5432/shipgate

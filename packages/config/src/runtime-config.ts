@@ -11,6 +11,31 @@ const optionalString = z.preprocess(
   z.string().trim().min(1).optional(),
 )
 
+const optionalBooleanEnvironmentSchema = z.preprocess(
+  (value) => {
+    if (value === '' || value === undefined) {
+      return undefined
+    }
+
+    return value
+  },
+  z
+    .enum(['true', 'false'])
+    .transform((value) => value === 'true')
+    .optional(),
+)
+
+const corsOriginsEnvironmentSchema = z
+  .string()
+  .default(
+    [
+      'http://localhost:3000',
+      'http://localhost:5173',
+      'http://127.0.0.1:3000',
+      'http://127.0.0.1:5173',
+    ].join(','),
+  )
+
 const runtimeEnvironmentSchema = z
   .object({
     NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
@@ -48,6 +73,17 @@ const runtimeEnvironmentSchema = z
     JOB_WORKER_HEARTBEAT_INTERVAL_MS: z.coerce.number().int().min(1_000).default(10_000),
 
     JOB_WORKER_HEARTBEAT_STALE_AFTER_MS: z.coerce.number().int().min(5_000).default(60_000),
+
+    API_BODY_LIMIT_BYTES: z.coerce
+      .number()
+      .int()
+      .min(1_024)
+      .max(10 * 1_024 * 1_024)
+      .default(64 * 1_024),
+
+    API_DOCS_ENABLED: optionalBooleanEnvironmentSchema,
+
+    API_CORS_ORIGINS: corsOriginsEnvironmentSchema,
   })
   .superRefine((environment, context) => {
     if (
@@ -86,6 +122,9 @@ export interface RuntimeConfig {
   readonly api: {
     readonly host: string
     readonly port: number
+    readonly bodyLimitBytes: number
+    readonly docsEnabled: boolean
+    readonly corsOrigins: readonly string[]
   }
 
   readonly database: {
@@ -126,6 +165,12 @@ export function loadRuntimeConfig(environment: NodeJS.ProcessEnv = process.env):
     api: {
       host: result.data.HOST,
       port: result.data.PORT,
+
+      bodyLimitBytes: result.data.API_BODY_LIMIT_BYTES,
+
+      docsEnabled: result.data.API_DOCS_ENABLED ?? result.data.NODE_ENV === 'development',
+
+      corsOrigins: parseCommaSeparatedValues(result.data.API_CORS_ORIGINS),
     },
 
     database: {
@@ -149,4 +194,11 @@ export function loadRuntimeConfig(environment: NodeJS.ProcessEnv = process.env):
       heartbeatStaleAfterMs: result.data.JOB_WORKER_HEARTBEAT_STALE_AFTER_MS,
     },
   }
+}
+
+function parseCommaSeparatedValues(value: string): readonly string[] {
+  return value
+    .split(',')
+    .map((item) => item.trim())
+    .filter((item) => item.length > 0)
 }
