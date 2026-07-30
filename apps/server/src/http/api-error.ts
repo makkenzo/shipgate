@@ -39,14 +39,6 @@ interface MappedApiError {
 }
 
 export function registerApiErrorHandling(app: FastifyInstance): void {
-  app.setNotFoundHandler(async (request, reply) => {
-    await sendApiError(request, reply, {
-      statusCode: 404,
-      code: 'ROUTE_NOT_FOUND',
-      message: 'Route not found',
-    })
-  })
-
   app.setErrorHandler(async (error, request, reply) => {
     const mapped = mapFastifyError(error)
 
@@ -187,4 +179,12 @@ function mapFastifyError(error: unknown): MappedApiError {
         message: 'An internal error occurred',
       }
   }
+}
+
+export async function sendApiNotFound(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+  await sendApiError(request, reply, {
+    statusCode: 404,
+    code: 'ROUTE_NOT_FOUND',
+    message: 'Route not found',
+  })
 }

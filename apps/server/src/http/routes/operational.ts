@@ -1,7 +1,7 @@
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox'
 
 import { checkDatabaseReadiness } from '@shipgate/database'
-import { isJobQueueInstalled } from '@shipgate/jobs'
+import { getQueueMetrics, isJobQueueInstalled, type QueueMetrics } from '@shipgate/jobs'
 
 import type { ApplicationContext } from '../../application-context.js'
 import { ApiHttpError } from '../api-error.js'
@@ -120,6 +120,69 @@ export const operationalRoutes: FastifyPluginAsyncTypebox<OperationalRoutesOptio
         })
       }
 
+      let queueMetrics: QueueMetrics
+
+      try {
+        queueMetrics = await getQueueMetrics(
+          context.database,
+
+          context.runtimeConfig.jobs.heartbeatStaleAfterMs,
+        )
+      } catch (cause) {
+        throw new ApiHttpError({
+          statusCode: 503,
+          code: 'SERVICE_NOT_READY',
+          message: 'Service is not ready',
+          cause,
+
+          details: {
+            checks: {
+              database: {
+                status: 'ok',
+                latencyMs: database.latencyMs,
+              },
+
+              jobQueue: {
+                status: 'unknown',
+              },
+
+              worker: {
+                status: 'unknown',
+              },
+            },
+          },
+        })
+      }
+
+      if (queueMetrics.workers.active < 1) {
+        throw new ApiHttpError({
+          statusCode: 503,
+          code: 'SERVICE_NOT_READY',
+          message: 'Service is not ready',
+
+          details: {
+            checks: {
+              database: {
+                status: 'ok',
+                latencyMs: database.latencyMs,
+              },
+
+              jobQueue: {
+                status: 'ok',
+              },
+
+              worker: {
+                status: 'unavailable',
+
+                activeWorkers: queueMetrics.workers.active,
+
+                staleWorkers: queueMetrics.workers.stale,
+              },
+            },
+          },
+        })
+      }
+
       return {
         status: 'ready' as const,
 
@@ -132,6 +195,14 @@ export const operationalRoutes: FastifyPluginAsyncTypebox<OperationalRoutesOptio
 
           jobQueue: {
             status: 'ok' as const,
+          },
+
+          worker: {
+            status: 'ok' as const,
+
+            activeWorkers: queueMetrics.workers.active,
+
+            staleWorkers: queueMetrics.workers.stale,
           },
         },
       }

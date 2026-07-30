@@ -69,6 +69,23 @@ export const ReadyResponseSchema = Type.Object(
             additionalProperties: false,
           },
         ),
+
+        worker: Type.Object(
+          {
+            status: Type.Literal('ok'),
+
+            activeWorkers: Type.Integer({
+              minimum: 1,
+            }),
+
+            staleWorkers: Type.Integer({
+              minimum: 0,
+            }),
+          },
+          {
+            additionalProperties: false,
+          },
+        ),
       },
       {
         additionalProperties: false,

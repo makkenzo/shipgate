@@ -10,8 +10,12 @@
   "scripts": {
     "start:api": "pnpm --filter @shipgate/server start:api",
     "start:worker": "pnpm --filter @shipgate/server start:worker",
-    "dev": "tsc --build --watch --preserveWatchOutput",
-    "build": "tsc --build",
+    "dev": "pnpm dev:infra && pnpm db:migrate && pnpm dev:apps",
+    "dev:infra": "docker compose up -d --wait postgres",
+    "dev:apps": "concurrently --kill-others --names api,worker,web \"pnpm --filter @shipgate/server dev:api\" \"pnpm --filter @shipgate/server dev:worker\" \"pnpm --filter @shipgate/web dev\"",
+    "dev:down": "docker compose down",
+    "dev:reset": "docker compose down -v",
+    "build": "pnpm --recursive --if-present run build",
     "lint": "pnpm check:boundaries && biome lint . --error-on-warnings",
     "format": "biome format --write .",
     "format:check": "biome format .",
@@ -21,17 +25,20 @@
     "check:boundaries": "node scripts/check-boundaries.mjs",
     "check:cycles": "node scripts/check-boundaries.mjs && biome lint . --error-on-warnings",
     "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm test:e2e",
-    "clean": "tsc --build --clean",
+    "clean": "pnpm --recursive --if-present run clean",
     "db:migrate": "pnpm --filter @shipgate/jobs build && pnpm --filter @shipgate/database build && node --env-file-if-exists=.env --enable-source-maps packages/jobs/dist/migration-cli.js up && node --env-file-if-exists=.env --enable-source-maps packages/database/dist/migration-cli.js up",
     "db:rollback": "pnpm --filter @shipgate/database build && node --env-file-if-exists=.env --enable-source-maps packages/database/dist/migration-cli.js down",
     "db:status": "pnpm --filter @shipgate/jobs build && pnpm --filter @shipgate/database build && node --env-file-if-exists=.env --enable-source-maps packages/jobs/dist/migration-cli.js status && node --env-file-if-exists=.env --enable-source-maps packages/database/dist/migration-cli.js status",
     "db:migrate:prod": "node --enable-source-maps packages/jobs/dist/migration-cli.js up && node --enable-source-maps packages/database/dist/migration-cli.js up",
-    "jobs:diagnostic": "pnpm --filter @shipgate/jobs build && node --env-file-if-exists=.env --enable-source-maps packages/jobs/dist/diagnostic-cli.js"
+    "jobs:diagnostic": "pnpm --filter @shipgate/jobs build && node --env-file-if-exists=.env --enable-source-maps packages/jobs/dist/diagnostic-cli.js",
+    "api:generate": "pnpm --filter @shipgate/server openapi:generate && pnpm --filter @shipgate/web api:generate"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.6",
     "@types/node": "^24.13.3",
-    "typescript": "^7.0.2",
+    "concurrently": "10.0.4",
+    "typescript": "npm:@typescript/typescript6@6.0.2",
+    "typescript-7": "npm:typescript@7.0.2",
     "vitest": "4.1.10"
   },
   "packageManager": "pnpm@11.14.0+sha512.66c1ac4c7d4762d6d7dde44c7f3e5a73591ed0a0806e751d4ed32d4f004f25b2285a906b1fd8a9e3e621df3b4e2858bf88e50e0cf626bedbe977fe434a5caf85"

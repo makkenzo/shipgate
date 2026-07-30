@@ -5,6 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "tsc -p tsconfig.build.json --watch --preserveWatchOutput",
+    "dev:api": "node --env-file=../../.env --import tsx --watch src/api.ts",
+    "dev:worker": "node --env-file=../../.env --import tsx --watch src/worker.ts",
+    "openapi:generate": "node --env-file=../../.env --import tsx src/openapi.ts",
     "build": "tsc --build tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run --passWithNoTests",
@@ -15,6 +18,7 @@
   "dependencies": {
     "@fastify/cors": "11.3.0",
     "@fastify/helmet": "13.1.0",
+    "@fastify/static": "10.1.2",
     "@fastify/swagger": "9.8.1",
     "@fastify/swagger-ui": "6.1.1",
     "@fastify/type-provider-typebox": "6.1.0",
@@ -30,6 +34,7 @@
   },
   "devDependencies": {
     "@shipgate/testing": "workspace:*",
+    "tsx": "4.23.1",
     "vitest": "4.1.10"
   }
 }

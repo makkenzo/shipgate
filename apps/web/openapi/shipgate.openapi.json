@@ -1,0 +1,482 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Shipgate API",
+    "description": "Shipgate HTTP API.",
+    "version": "0.0.0"
+  },
+  "components": {
+    "schemas": {}
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "operationId": "getHealth",
+        "summary": "Process liveness",
+        "tags": ["Operations"],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["status", "version", "uptimeSeconds"],
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": ["ok"]
+                    },
+                    "version": {
+                      "type": "string"
+                    },
+                    "uptimeSeconds": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  },
+                  "additionalProperties": false,
+                  "title": "HealthResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Common error response returned by the Shipgate API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["code", "message", "requestId"],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "minLength": 1,
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "details": {}
+                  },
+                  "additionalProperties": false,
+                  "title": "ApiError",
+                  "description": "Common error response returned by the Shipgate API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ready": {
+      "get": {
+        "operationId": "getReadiness",
+        "summary": "Application readiness",
+        "tags": ["Operations"],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["status", "checks"],
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": ["ready"]
+                    },
+                    "checks": {
+                      "type": "object",
+                      "required": ["database", "jobQueue", "worker"],
+                      "properties": {
+                        "database": {
+                          "type": "object",
+                          "required": ["status", "latencyMs"],
+                          "properties": {
+                            "status": {
+                              "type": "string",
+                              "enum": ["ok"]
+                            },
+                            "latencyMs": {
+                              "type": "number",
+                              "minimum": 0
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        "jobQueue": {
+                          "type": "object",
+                          "required": ["status"],
+                          "properties": {
+                            "status": {
+                              "type": "string",
+                              "enum": ["ok"]
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        "worker": {
+                          "type": "object",
+                          "required": ["status", "activeWorkers", "staleWorkers"],
+                          "properties": {
+                            "status": {
+                              "type": "string",
+                              "enum": ["ok"]
+                            },
+                            "activeWorkers": {
+                              "type": "integer",
+                              "minimum": 1
+                            },
+                            "staleWorkers": {
+                              "type": "integer",
+                              "minimum": 0
+                            }
+                          },
+                          "additionalProperties": false
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  },
+                  "additionalProperties": false,
+                  "title": "ReadyResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Common error response returned by the Shipgate API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["code", "message", "requestId"],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "minLength": 1,
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "details": {}
+                  },
+                  "additionalProperties": false,
+                  "title": "ApiError",
+                  "description": "Common error response returned by the Shipgate API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/_diagnostics/jobs": {
+      "post": {
+        "operationId": "createDiagnosticJob",
+        "summary": "Enqueue a diagnostic job",
+        "tags": ["Diagnostics"],
+        "description": "Infrastructure-only endpoint. It is not part of the Shipgate product API.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["message"],
+                "properties": {
+                  "message": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1000
+                  },
+                  "outcome": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": ["success"]
+                      },
+                      {
+                        "type": "string",
+                        "enum": ["retryable-error"]
+                      },
+                      {
+                        "type": "string",
+                        "enum": ["permanent-error"]
+                      }
+                    ]
+                  },
+                  "failUntilAttempt": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 10
+                  },
+                  "delayMs": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 30000
+                  }
+                },
+                "additionalProperties": false,
+                "title": "DiagnosticJobRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["jobId", "status", "requestId", "statusUrl"],
+                  "properties": {
+                    "jobId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": ["queued"]
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "statusUrl": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "additionalProperties": false,
+                  "title": "DiagnosticJobAccepted"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Common error response returned by the Shipgate API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["code", "message", "requestId"],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "minLength": 1,
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "details": {}
+                  },
+                  "additionalProperties": false,
+                  "title": "ApiError",
+                  "description": "Common error response returned by the Shipgate API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/_diagnostics/jobs/{jobId}": {
+      "get": {
+        "operationId": "getDiagnosticJob",
+        "summary": "Get diagnostic job state",
+        "tags": ["Diagnostics"],
+        "description": "Infrastructure-only endpoint. It is not part of the Shipgate product API.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9]+$"
+            },
+            "in": "path",
+            "name": "jobId",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "jobId",
+                    "taskIdentifier",
+                    "status",
+                    "correlationId",
+                    "causationId",
+                    "payload",
+                    "attempts",
+                    "maxAttempts",
+                    "result",
+                    "lastError",
+                    "queuedAt",
+                    "startedAt",
+                    "completedAt",
+                    "updatedAt"
+                  ],
+                  "properties": {
+                    "jobId": {
+                      "type": "string"
+                    },
+                    "taskIdentifier": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": ["queued"]
+                        },
+                        {
+                          "type": "string",
+                          "enum": ["running"]
+                        },
+                        {
+                          "type": "string",
+                          "enum": ["retrying"]
+                        },
+                        {
+                          "type": "string",
+                          "enum": ["succeeded"]
+                        },
+                        {
+                          "type": "string",
+                          "enum": ["failed"]
+                        }
+                      ]
+                    },
+                    "correlationId": {
+                      "type": "string"
+                    },
+                    "causationId": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "payload": {},
+                    "attempts": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "maxAttempts": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "result": {},
+                    "lastError": {},
+                    "queuedAt": {
+                      "type": "string"
+                    },
+                    "startedAt": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "completedAt": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "updatedAt": {
+                      "type": "string"
+                    }
+                  },
+                  "additionalProperties": false,
+                  "title": "DiagnosticJob"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Common error response returned by the Shipgate API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["code", "message", "requestId"],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "minLength": 1,
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "details": {}
+                  },
+                  "additionalProperties": false,
+                  "title": "ApiError",
+                  "description": "Common error response returned by the Shipgate API."
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "servers": [
+    {
+      "url": "/",
+      "description": "Current Shipgate origin"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Operations",
+      "description": "Application health and readiness."
+    },
+    {
+      "name": "Diagnostics",
+      "description": "Non-product infrastructure diagnostics."
+    }
+  ]
+}

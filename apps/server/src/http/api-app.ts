@@ -7,10 +7,11 @@ import Fastify, { type FastifyBaseLogger, type FastifyInstance } from 'fastify'
 
 import type { ApplicationContext } from '../application-context.js'
 import { resolveCorrelationId } from '../correlation-id.js'
-import { registerApiErrorHandling } from './api-error.js'
+import { registerApiErrorHandling, sendApiNotFound } from './api-error.js'
 import { createApiMetrics } from './metrics.js'
 import { operationalRoutes } from './routes/operational.js'
 import { apiV1Routes } from './routes/v1.js'
+import { registerSpa, sendSpaIndex, shouldServeSpa } from './spa.js'
 
 export async function buildApiApplication(context: ApplicationContext): Promise<FastifyInstance> {
   const fastifyLogger: FastifyBaseLogger = context.logger
@@ -49,6 +50,14 @@ export async function buildApiApplication(context: ApplicationContext): Promise<
 
         version: context.runtimeConfig.appVersion,
       },
+
+      servers: [
+        {
+          url: '/',
+
+          description: 'Current Shipgate origin',
+        },
+      ],
 
       tags: [
         {
@@ -121,6 +130,20 @@ export async function buildApiApplication(context: ApplicationContext): Promise<
       logLevel: 'warn',
     })
   }
+
+  const spaEnabled = context.runtimeConfig.environment === 'production'
+
+  if (spaEnabled) {
+    await registerSpa(app)
+  }
+
+  app.setNotFoundHandler(async (request, reply) => {
+    if (spaEnabled && shouldServeSpa(request)) {
+      return sendSpaIndex(reply)
+    }
+
+    await sendApiNotFound(request, reply)
+  })
 
   return app
 }
