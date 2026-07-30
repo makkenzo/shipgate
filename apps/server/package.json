@@ -17,6 +17,7 @@
     "@shipgate/database": "workspace:*",
     "@shipgate/domain": "workspace:*",
     "@shipgate/github": "workspace:*",
+    "@shipgate/jobs": "workspace:*",
     "pino": "10.3.1"
   },
   "devDependencies": {

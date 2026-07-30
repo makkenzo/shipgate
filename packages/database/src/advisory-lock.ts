@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto'
 import { setTimeout as delay } from 'node:timers/promises'
 
-import { sql, type Kysely } from 'kysely'
+import { type Kysely, sql } from 'kysely'
 
 import { normalizeDatabaseError } from './errors.js'
 
@@ -57,26 +57,46 @@ export async function withRepositoryAdvisoryLock<Database, Result>(
       signal: options.signal,
     })
 
-    let callbackError: unknown
+    let outcome:
+      | {
+          readonly type: 'success'
+          readonly value: Result
+        }
+      | {
+          readonly type: 'failure'
+          readonly error: unknown
+        }
 
     try {
-      return await callback(connection)
+      outcome = {
+        type: 'success',
+        value: await callback(connection),
+      }
     } catch (error) {
-      callbackError = error
-      throw error
-    } finally {
-      try {
-        await releaseLock(connection, key1, key2)
-      } catch (releaseError) {
-        /*
-         * Не маскируем исходную ошибку repository operation.
-         * При потере соединения PostgreSQL сам освобождает session lock.
-         */
-        if (callbackError === undefined) {
-          throw releaseError
-        }
+      outcome = {
+        type: 'failure',
+        error,
       }
     }
+
+    try {
+      await releaseLock(connection, key1, key2)
+    } catch (releaseError) {
+      /*
+       * Если callback уже упал, сохраняем
+       * исходную ошибку. PostgreSQL освободит
+       * session lock при разрыве соединения.
+       */
+      if (outcome.type === 'success') {
+        throw releaseError
+      }
+    }
+
+    if (outcome.type === 'failure') {
+      throw outcome.error
+    }
+
+    return outcome.value
   })
 }
 

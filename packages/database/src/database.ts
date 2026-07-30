@@ -20,14 +20,24 @@ export function createDatabase(options: CreateDatabaseOptions): DatabaseClient {
     ssl: createSslConfig(options.ssl),
   })
 
-  pool.on('error', (error) => {
-    const normalizedError = normalizeDatabaseError(error, 'pool.idle-client')
+  const handlePoolError = (error: Error, operation: string): void => {
+    const normalizedError = normalizeDatabaseError(error, operation)
 
     try {
       options.onPoolError(normalizedError)
     } catch (handlerError) {
       process.emitWarning(`Database pool error handler failed: ${String(handlerError)}`)
     }
+  }
+
+  pool.on('error', (error) => {
+    handlePoolError(error, 'pool.idle-client')
+  })
+
+  pool.on('connect', (client) => {
+    client.on('error', (error) => {
+      handlePoolError(error, 'pool.client')
+    })
   })
 
   const kysely = new Kysely<DatabaseSchema>({

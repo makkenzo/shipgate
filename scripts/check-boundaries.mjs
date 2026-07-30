@@ -9,10 +9,17 @@ const allowedRuntimeDependencies = new Map([
   ['@shipgate/database', new Set(['@shipgate/config', '@shipgate/domain'])],
   ['@shipgate/github', new Set(['@shipgate/config', '@shipgate/domain'])],
   ['@shipgate/web', new Set(['@shipgate/config', '@shipgate/domain'])],
+  ['@shipgate/jobs', new Set(['@shipgate/config', '@shipgate/database'])],
 
   [
     '@shipgate/server',
-    new Set(['@shipgate/config', '@shipgate/database', '@shipgate/domain', '@shipgate/github']),
+    new Set([
+      '@shipgate/config',
+      '@shipgate/database',
+      '@shipgate/domain',
+      '@shipgate/github',
+      '@shipgate/jobs',
+    ]),
   ],
 ])
 

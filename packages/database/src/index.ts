@@ -33,7 +33,10 @@ export type {
   DatabaseClient,
   DatabasePoolOptions,
   DatabaseSchema,
+  JobExecutionStatus,
   JsonPrimitive,
   JsonValue,
+  ShipgateJobExecutionTable,
   ShipgateSystemMetadataTable,
+  ShipgateWorkerHeartbeatTable,
 } from './types.js'

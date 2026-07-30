@@ -40,8 +40,28 @@ const runtimeEnvironmentSchema = z
     DATABASE_SSL_MODE: databaseSslModeSchema.default('disable'),
 
     GITHUB_APP_ID: optionalString,
+
+    JOB_WORKER_CONCURRENCY: z.coerce.number().int().min(1).max(64).default(4),
+
+    JOB_WORKER_POLL_INTERVAL_MS: z.coerce.number().int().min(100).default(2_000),
+
+    JOB_WORKER_HEARTBEAT_INTERVAL_MS: z.coerce.number().int().min(1_000).default(10_000),
+
+    JOB_WORKER_HEARTBEAT_STALE_AFTER_MS: z.coerce.number().int().min(5_000).default(60_000),
   })
   .superRefine((environment, context) => {
+    if (
+      environment.JOB_WORKER_HEARTBEAT_STALE_AFTER_MS <
+      environment.JOB_WORKER_HEARTBEAT_INTERVAL_MS * 2
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['JOB_WORKER_HEARTBEAT_STALE_AFTER_MS'],
+        message:
+          'JOB_WORKER_HEARTBEAT_STALE_AFTER_MS must be at least twice JOB_WORKER_HEARTBEAT_INTERVAL_MS',
+      })
+    }
+
     if (environment.DATABASE_POOL_MIN > environment.DATABASE_POOL_MAX) {
       context.addIssue({
         code: 'custom',
@@ -81,6 +101,13 @@ export interface RuntimeConfig {
   readonly github: {
     readonly appId: string | undefined
   }
+
+  readonly jobs: {
+    readonly concurrency: number
+    readonly pollIntervalMs: number
+    readonly heartbeatIntervalMs: number
+    readonly heartbeatStaleAfterMs: number
+  }
 }
 
 export function loadRuntimeConfig(environment: NodeJS.ProcessEnv = process.env): RuntimeConfig {
@@ -113,6 +140,13 @@ export function loadRuntimeConfig(environment: NodeJS.ProcessEnv = process.env):
 
     github: {
       appId: result.data.GITHUB_APP_ID,
+    },
+
+    jobs: {
+      concurrency: result.data.JOB_WORKER_CONCURRENCY,
+      pollIntervalMs: result.data.JOB_WORKER_POLL_INTERVAL_MS,
+      heartbeatIntervalMs: result.data.JOB_WORKER_HEARTBEAT_INTERVAL_MS,
+      heartbeatStaleAfterMs: result.data.JOB_WORKER_HEARTBEAT_STALE_AFTER_MS,
     },
   }
 }

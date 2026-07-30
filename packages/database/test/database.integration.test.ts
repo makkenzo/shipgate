@@ -2,15 +2,15 @@ import {
   AdvisoryLockTimeoutError,
   checkDatabaseReadiness,
   createDatabase,
+  type DatabaseClient,
+  type DatabaseOperationError,
   getMigrationStatus,
   migrateToLatest,
   rollbackLastMigration,
   withRepositoryAdvisoryLock,
   withTransaction,
-  type DatabaseClient,
-  type DatabaseOperationError,
 } from '@shipgate/database'
-import { startPostgresTestDatabase, type PostgresTestDatabase } from '@shipgate/testing'
+import { type PostgresTestDatabase, startPostgresTestDatabase } from '@shipgate/testing'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 describe.sequential('PostgreSQL infrastructure', () => {
@@ -54,11 +54,22 @@ describe.sequential('PostgreSQL infrastructure', () => {
   it('supports readiness, migrations, transactions and advisory locks', async () => {
     const initialStatus = await getMigrationStatus(database.kysely)
 
-    expect(initialStatus).toEqual([
-      expect.objectContaining({
+    expect(
+      initialStatus.map((migration) => ({
+        name: migration.name,
+        status: migration.status,
+      })),
+    ).toEqual([
+      {
         name: '20260730_000001_create_system_metadata',
+
         status: 'pending',
-      }),
+      },
+      {
+        name: '20260730_000002_create_job_infrastructure',
+
+        status: 'pending',
+      },
     ])
 
     const migrationResults = await migrateToLatest(database.kysely)
@@ -146,19 +157,15 @@ describe.sequential('PostgreSQL infrastructure', () => {
     releaseFirstLock?.()
     await firstLock
 
-    const rollbackResults = await rollbackLastMigration(database.kysely)
+    const firstRollback = await rollbackLastMigration(database.kysely)
 
-    expect(rollbackResults).toEqual([
-      expect.objectContaining({
-        migrationName: '20260730_000001_create_system_metadata',
-        direction: 'Down',
-        status: 'Success',
-      }),
-    ])
+    const secondRollback = await rollbackLastMigration(database.kysely)
+
+    expect([...firstRollback, ...secondRollback]).toHaveLength(2)
 
     const rolledBackStatus = await getMigrationStatus(database.kysely)
 
-    expect(rolledBackStatus[0]?.status).toBe('pending')
+    expect(rolledBackStatus.every((migration) => migration.status === 'pending')).toBe(true)
 
     await migrateToLatest(database.kysely)
 

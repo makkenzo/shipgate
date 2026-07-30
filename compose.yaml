@@ -28,9 +28,12 @@ services:
       DATABASE_SSL_MODE: disable
       DATABASE_POOL_MAX: 2
     command:
-      - node
-      - packages/database/dist/migration-cli.js
-      - up
+      - sh
+      - -c
+      - >-
+        node packages/jobs/dist/migration-cli.js up
+        &&
+        node packages/database/dist/migration-cli.js up
     depends_on:
       postgres:
         condition: service_healthy

@@ -22,15 +22,17 @@
     "check:cycles": "node scripts/check-boundaries.mjs && biome lint . --error-on-warnings",
     "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm test:e2e",
     "clean": "tsc --build --clean",
-    "db:migrate": "pnpm --filter @shipgate/database build && node --env-file-if-exists=.env --enable-source-maps packages/database/dist/migration-cli.js up",
+    "db:migrate": "pnpm --filter @shipgate/jobs build && pnpm --filter @shipgate/database build && node --env-file-if-exists=.env --enable-source-maps packages/jobs/dist/migration-cli.js up && node --env-file-if-exists=.env --enable-source-maps packages/database/dist/migration-cli.js up",
     "db:rollback": "pnpm --filter @shipgate/database build && node --env-file-if-exists=.env --enable-source-maps packages/database/dist/migration-cli.js down",
-    "db:status": "pnpm --filter @shipgate/database build && node --env-file-if-exists=.env --enable-source-maps packages/database/dist/migration-cli.js status",
-    "db:migrate:prod": "node --enable-source-maps packages/database/dist/migration-cli.js up"
+    "db:status": "pnpm --filter @shipgate/jobs build && pnpm --filter @shipgate/database build && node --env-file-if-exists=.env --enable-source-maps packages/jobs/dist/migration-cli.js status && node --env-file-if-exists=.env --enable-source-maps packages/database/dist/migration-cli.js status",
+    "db:migrate:prod": "node --enable-source-maps packages/jobs/dist/migration-cli.js up && node --enable-source-maps packages/database/dist/migration-cli.js up",
+    "jobs:diagnostic": "pnpm --filter @shipgate/jobs build && node --env-file-if-exists=.env --enable-source-maps packages/jobs/dist/diagnostic-cli.js"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.6",
     "@types/node": "^24.13.3",
-    "typescript": "^7.0.2"
+    "typescript": "^7.0.2",
+    "vitest": "4.1.10"
   },
   "packageManager": "pnpm@11.14.0+sha512.66c1ac4c7d4762d6d7dde44c7f3e5a73591ed0a0806e751d4ed32d4f004f25b2285a906b1fd8a9e3e621df3b4e2858bf88e50e0cf626bedbe977fe434a5caf85"
 }

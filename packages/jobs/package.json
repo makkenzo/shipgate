@@ -1,5 +1,5 @@
 {
-  "name": "@shipgate/database",
+  "name": "@shipgate/jobs",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -9,6 +9,10 @@
     ".": {
       "types": "./src/index.ts",
       "import": "./dist/index.js"
+    },
+    "./testing": {
+      "types": "./src/testing.ts",
+      "import": "./dist/testing.js"
     }
   },
   "files": [
@@ -23,12 +27,13 @@
   },
   "dependencies": {
     "@shipgate/config": "workspace:*",
+    "@shipgate/database": "workspace:*",
+    "graphile-worker": "0.17.3",
     "kysely": "0.29.4",
-    "pg": "8.22.0"
+    "zod": "4.4.3"
   },
   "devDependencies": {
     "@shipgate/testing": "workspace:*",
-    "@types/pg": "8.20.0",
     "vitest": "4.1.10"
   }
 }

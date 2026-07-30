@@ -1,4 +1,5 @@
 import { assertDatabaseReady } from '@shipgate/database'
+import { startJobWorker } from '@shipgate/jobs'
 
 import type { ApplicationContext } from './application-context.js'
 import type { StartedApplication } from './run-application.js'
@@ -9,16 +10,35 @@ export async function startWorker(context: ApplicationContext): Promise<StartedA
     context.runtimeConfig.database.readinessTimeoutMs,
   )
 
-  const keepAlive = setInterval(() => undefined, 60_000)
+  const worker = await startJobWorker({
+    dependencies: {
+      database: context.database,
 
-  context.shutdown.addHook('worker-runtime', () => {
-    clearInterval(keepAlive)
+      logger: context.logger,
+    },
+
+    appVersion: context.runtimeConfig.appVersion,
+
+    concurrency: context.runtimeConfig.jobs.concurrency,
+
+    pollIntervalMs: context.runtimeConfig.jobs.pollIntervalMs,
+
+    heartbeatIntervalMs: context.runtimeConfig.jobs.heartbeatIntervalMs,
+
+    shutdownAbortTimeoutMs: Math.min(5_000, context.runtimeConfig.shutdownTimeoutMs),
+  })
+
+  context.shutdown.addHook('graphile-worker', async () => {
+    await worker.stop()
   })
 
   return {
     startupFields: {
       worker: {
         state: 'ready',
+        workerId: worker.workerId,
+
+        concurrency: context.runtimeConfig.jobs.concurrency,
       },
 
       database: {
@@ -26,18 +46,6 @@ export async function startWorker(context: ApplicationContext): Promise<StartedA
       },
     },
 
-    waitUntilStopped: waitForAbort(context.shutdown.signal),
+    waitUntilStopped: worker.promise,
   }
-}
-
-async function waitForAbort(signal: AbortSignal): Promise<void> {
-  if (signal.aborted) {
-    return
-  }
-
-  await new Promise<void>((resolve) => {
-    signal.addEventListener('abort', () => resolve(), {
-      once: true,
-    })
-  })
 }

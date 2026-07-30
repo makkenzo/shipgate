@@ -24,6 +24,9 @@
     },
     {
       "path": "../../packages/github/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/jobs/tsconfig.build.json"
     }
   ]
 }

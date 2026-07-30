@@ -1,7 +1,13 @@
 import { once } from 'node:events'
-import { createServer, type Server, type ServerResponse } from 'node:http'
+import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
 import { performance } from 'node:perf_hooks'
 import { assertDatabaseReady, checkDatabaseReadiness } from '@shipgate/database'
+import {
+  diagnosticJobPayloadSchema,
+  enqueueJob,
+  getJobExecution,
+  getQueueMetrics,
+} from '@shipgate/jobs'
 import type { ApplicationContext } from './application-context.js'
 import { resolveCorrelationId } from './correlation-id.js'
 import type { StartedApplication } from './run-application.js'
@@ -23,7 +29,7 @@ export async function startHttpServer(context: ApplicationContext): Promise<Star
       response.setHeader('x-correlation-id', correlationId)
 
       try {
-        await handleRequest(context, request.method, request.url, response)
+        await handleRequest(context, request, response, correlationId)
 
         logger.info(
           {
@@ -96,11 +102,13 @@ export async function startHttpServer(context: ApplicationContext): Promise<Star
 
 async function handleRequest(
   context: ApplicationContext,
-  method: string | undefined,
-  url: string | undefined,
+  request: IncomingMessage,
   response: ServerResponse,
+  correlationId: string,
 ): Promise<void> {
-  const pathname = new URL(url ?? '/', 'http://localhost').pathname
+  const method = request.method
+
+  const pathname = new URL(request.url ?? '/', 'http://localhost').pathname
 
   if (method === 'GET' && pathname === '/health/live') {
     writeJson(response, 200, {
@@ -141,6 +149,81 @@ async function handleRequest(
         },
       },
     })
+
+    return
+  }
+
+  if (method === 'POST' && pathname === '/internal/diagnostics/jobs') {
+    const body = await readJsonBody(request)
+
+    const parsed = diagnosticJobPayloadSchema.safeParse(body)
+
+    if (!parsed.success) {
+      writeJson(response, 400, {
+        error: 'invalid_request',
+
+        issues: parsed.error.issues.map((issue) => ({
+          path: issue.path.map(String).join('.'),
+
+          message: issue.message,
+        })),
+      })
+
+      return
+    }
+
+    const job = await enqueueJob(context.database, 'diagnostic_echo', parsed.data, {
+      correlationId,
+
+      causationId: `http:${correlationId}`,
+    })
+
+    writeJson(response, 202, {
+      jobId: job.jobId,
+      status: 'queued',
+
+      statusUrl: `/internal/jobs/${job.jobId}`,
+    })
+
+    return
+  }
+
+  const jobMatch = pathname.match(/^\/internal\/jobs\/(\d+)$/)
+
+  if (method === 'GET' && jobMatch) {
+    const jobId = jobMatch[1]
+
+    if (!jobId) {
+      writeJson(response, 400, {
+        error: 'invalid_job_id',
+      })
+
+      return
+    }
+
+    const execution = await getJobExecution(context.database, jobId)
+
+    if (!execution) {
+      writeJson(response, 404, {
+        error: 'job_not_found',
+      })
+
+      return
+    }
+
+    writeJson(response, 200, execution)
+
+    return
+  }
+
+  if (method === 'GET' && pathname === '/internal/queue/metrics') {
+    const metrics = await getQueueMetrics(
+      context.database,
+
+      context.runtimeConfig.jobs.heartbeatStaleAfterMs,
+    )
+
+    writeJson(response, 200, metrics)
 
     return
   }
@@ -201,4 +284,27 @@ async function closeServer(server: Server, timeoutMs: number): Promise<void> {
 
 function toError(value: unknown): Error {
   return value instanceof Error ? value : new Error(String(value))
+}
+
+async function readJsonBody(request: IncomingMessage): Promise<unknown> {
+  const chunks: Buffer[] = []
+  let receivedBytes = 0
+
+  for await (const chunk of request) {
+    const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)
+
+    receivedBytes += buffer.length
+
+    if (receivedBytes > 16_384) {
+      throw new Error('Request body exceeds 16 KiB')
+    }
+
+    chunks.push(buffer)
+  }
+
+  if (chunks.length === 0) {
+    return {}
+  }
+
+  return JSON.parse(Buffer.concat(chunks).toString('utf8')) as unknown
 }
