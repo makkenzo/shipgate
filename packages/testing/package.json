@@ -22,5 +22,8 @@
   },
   "devDependencies": {
     "vitest": "4.1.10"
+  },
+  "dependencies": {
+    "@testcontainers/postgresql": "12.0.4"
   }
 }

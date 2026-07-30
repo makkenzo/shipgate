@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "engines": {
-    "node": ">=24.18.1 <25",
+    "node": ">=24.18.0 <25",
     "pnpm": ">=11.14.0 <12"
   },
   "scripts": {
@@ -21,7 +21,11 @@
     "check:boundaries": "node scripts/check-boundaries.mjs",
     "check:cycles": "node scripts/check-boundaries.mjs && biome lint . --error-on-warnings",
     "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm test:e2e",
-    "clean": "tsc --build --clean"
+    "clean": "tsc --build --clean",
+    "db:migrate": "pnpm --filter @shipgate/database build && node --env-file-if-exists=.env --enable-source-maps packages/database/dist/migration-cli.js up",
+    "db:rollback": "pnpm --filter @shipgate/database build && node --env-file-if-exists=.env --enable-source-maps packages/database/dist/migration-cli.js down",
+    "db:status": "pnpm --filter @shipgate/database build && node --env-file-if-exists=.env --enable-source-maps packages/database/dist/migration-cli.js status",
+    "db:migrate:prod": "node --enable-source-maps packages/database/dist/migration-cli.js up"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.6",

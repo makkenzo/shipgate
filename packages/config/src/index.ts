@@ -6,6 +6,7 @@ export {
 
 export {
   loadRuntimeConfig,
+  type DatabaseSslMode,
   type LogLevel,
   type RuntimeConfig,
   type RuntimeEnvironment,

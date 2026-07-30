@@ -1,7 +1,14 @@
+import { assertDatabaseReady } from '@shipgate/database'
+
 import type { ApplicationContext } from './application-context.js'
 import type { StartedApplication } from './run-application.js'
 
-export function startWorker(context: ApplicationContext): StartedApplication {
+export async function startWorker(context: ApplicationContext): Promise<StartedApplication> {
+  await assertDatabaseReady(
+    context.database.kysely,
+    context.runtimeConfig.database.readinessTimeoutMs,
+  )
+
   const keepAlive = setInterval(() => undefined, 60_000)
 
   context.shutdown.addHook('worker-runtime', () => {
@@ -11,6 +18,10 @@ export function startWorker(context: ApplicationContext): StartedApplication {
   return {
     startupFields: {
       worker: {
+        state: 'ready',
+      },
+
+      database: {
         state: 'ready',
       },
     },
@@ -25,6 +36,8 @@ async function waitForAbort(signal: AbortSignal): Promise<void> {
   }
 
   await new Promise<void>((resolve) => {
-    signal.addEventListener('abort', () => resolve(), { once: true })
+    signal.addEventListener('abort', () => resolve(), {
+      once: true,
+    })
   })
 }

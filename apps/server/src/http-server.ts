@@ -1,62 +1,68 @@
 import { once } from 'node:events'
 import { createServer, type Server, type ServerResponse } from 'node:http'
 import { performance } from 'node:perf_hooks'
-
+import { assertDatabaseReady, checkDatabaseReadiness } from '@shipgate/database'
 import type { ApplicationContext } from './application-context.js'
 import { resolveCorrelationId } from './correlation-id.js'
 import type { StartedApplication } from './run-application.js'
 
 export async function startHttpServer(context: ApplicationContext): Promise<StartedApplication> {
+  await assertDatabaseReady(
+    context.database.kysely,
+    context.runtimeConfig.database.readinessTimeoutMs,
+  )
+
   const server = createServer((request, response) => {
-    const startedAt = performance.now()
+    ;(async () => {
+      const startedAt = performance.now()
 
-    const correlationId = resolveCorrelationId(request.headers['x-correlation-id'])
+      const correlationId = resolveCorrelationId(request.headers['x-correlation-id'])
 
-    const logger = context.loggerFor(correlationId)
+      const logger = context.loggerFor(correlationId)
 
-    response.setHeader('x-correlation-id', correlationId)
+      response.setHeader('x-correlation-id', correlationId)
 
-    try {
-      handleRequest(request.method, request.url, response)
+      try {
+        await handleRequest(context, request.method, request.url, response)
 
-      logger.info(
-        {
-          event: 'http.request.completed',
+        logger.info(
+          {
+            event: 'http.request.completed',
 
-          http: {
-            method: request.method,
-            path: request.url,
-            statusCode: response.statusCode,
+            http: {
+              method: request.method,
+              path: request.url,
+              statusCode: response.statusCode,
+            },
+
+            durationMs: Math.round((performance.now() - startedAt) * 100) / 100,
           },
+          'HTTP request completed',
+        )
+      } catch (error) {
+        logger.error(
+          {
+            event: 'http.request.failed',
+            err: toError(error),
 
-          durationMs: Math.round((performance.now() - startedAt) * 100) / 100,
-        },
-        'HTTP request completed',
-      )
-    } catch (error) {
-      logger.error(
-        {
-          event: 'http.request.failed',
-          err: toError(error),
-
-          http: {
-            method: request.method,
-            path: request.url,
+            http: {
+              method: request.method,
+              path: request.url,
+            },
           },
-        },
-        'HTTP request failed',
-      )
+          'HTTP request failed',
+        )
 
-      if (!response.headersSent) {
-        writeJson(response, 500, {
-          error: 'internal_server_error',
-
-          correlationId,
-        })
-      } else {
-        response.destroy()
+        if (!response.headersSent) {
+          writeJson(response, 500, {
+            error: 'internal_server_error',
+            correlationId,
+          })
+        } else {
+          response.destroy()
+        }
       }
-    }
+    })()
   })
 
   const waitUntilStopped = new Promise<void>((resolve) => {
@@ -88,16 +94,52 @@ export async function startHttpServer(context: ApplicationContext): Promise<Star
   }
 }
 
-function handleRequest(
+async function handleRequest(
+  context: ApplicationContext,
   method: string | undefined,
   url: string | undefined,
   response: ServerResponse,
-): void {
+): Promise<void> {
   const pathname = new URL(url ?? '/', 'http://localhost').pathname
 
-  if (method === 'GET' && pathname === '/health') {
+  if (method === 'GET' && pathname === '/health/live') {
     writeJson(response, 200, {
       status: 'ok',
+    })
+
+    return
+  }
+
+  if (method === 'GET' && pathname === '/health/ready') {
+    const readiness = await checkDatabaseReadiness(
+      context.database.kysely,
+      context.runtimeConfig.database.readinessTimeoutMs,
+    )
+
+    if (!readiness.ready) {
+      writeJson(response, 503, {
+        status: 'not_ready',
+
+        checks: {
+          database: {
+            status: 'failed',
+            latencyMs: readiness.latencyMs,
+          },
+        },
+      })
+
+      return
+    }
+
+    writeJson(response, 200, {
+      status: 'ready',
+
+      checks: {
+        database: {
+          status: 'ok',
+          latencyMs: readiness.latencyMs,
+        },
+      },
     })
 
     return

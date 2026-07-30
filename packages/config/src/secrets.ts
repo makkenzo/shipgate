@@ -7,11 +7,16 @@ const optionalSecret = z.preprocess(
   z.string().trim().min(1).optional(),
 )
 
+const databaseUrlSchema = z
+  .url()
+  .refine((value) => value.startsWith('postgres://') || value.startsWith('postgresql://'), {
+    message: 'DATABASE_URL must use postgres:// or postgresql://',
+  })
+
 const secretsEnvironmentSchema = z.object({
-  DATABASE_URL: z.preprocess(
-    (value) => (value === '' ? undefined : value),
-    z.string().url().optional(),
-  ),
+  DATABASE_URL: databaseUrlSchema,
+
+  DATABASE_SSL_CA: optionalSecret,
 
   GITHUB_PRIVATE_KEY: optionalSecret,
 
@@ -19,7 +24,8 @@ const secretsEnvironmentSchema = z.object({
 })
 
 export interface Secrets {
-  readonly databaseUrl: string | undefined
+  readonly databaseUrl: string
+  readonly databaseSslCa: string | undefined
   readonly githubPrivateKey: string | undefined
   readonly githubWebhookSecret: string | undefined
 }
@@ -33,6 +39,7 @@ export function loadSecrets(environment: NodeJS.ProcessEnv = process.env): Secre
 
   return {
     databaseUrl: result.data.DATABASE_URL,
+    databaseSslCa: result.data.DATABASE_SSL_CA,
     githubPrivateKey: result.data.GITHUB_PRIVATE_KEY,
     githubWebhookSecret: result.data.GITHUB_WEBHOOK_SECRET,
   }

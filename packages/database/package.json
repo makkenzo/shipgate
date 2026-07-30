@@ -3,6 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
+  "sideEffects": false,
   "types": "./src/index.ts",
   "exports": {
     ".": {
@@ -14,18 +15,19 @@
     "dist"
   ],
   "scripts": {
-    "dev": "tsc --project tsconfig.build.json --watch --preserveWatchOutput",
+    "dev": "tsc -p tsconfig.build.json --watch --preserveWatchOutput",
     "build": "tsc --build tsconfig.build.json",
-    "typecheck": "tsc --project tsconfig.json",
-    "test": "vitest run --passWithNoTests",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "pnpm --filter @shipgate/testing build && pnpm build && vitest run",
     "clean": "tsc --build tsconfig.build.json --clean"
   },
   "dependencies": {
     "@shipgate/config": "workspace:*",
-    "@shipgate/domain": "workspace:*"
+    "kysely": "0.29.4",
+    "pg": "8.22.0"
   },
   "devDependencies": {
     "@shipgate/testing": "workspace:*",
-    "vitest": "4.1.10"
+    "@types/pg": "8.20.0"
   }
 }

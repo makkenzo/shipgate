@@ -1,4 +1,5 @@
 import { loadRuntimeConfig, loadSecrets, type RuntimeConfig, type Secrets } from '@shipgate/config'
+import { createDatabase, type DatabaseClient } from '@shipgate/database'
 import type { Logger } from 'pino'
 
 import { createCorrelationId, withCorrelationId } from './correlation-id.js'
@@ -11,6 +12,7 @@ export interface ApplicationContext {
   readonly runtimeConfig: RuntimeConfig
   readonly secrets: Secrets
   readonly logger: Logger
+  readonly database: DatabaseClient
   readonly shutdown: ShutdownManager
 
   createCorrelationId(): string
@@ -29,7 +31,6 @@ export function createApplicationContext(
   const environment = options.environment ?? process.env
 
   const runtimeConfig = loadRuntimeConfig(environment)
-
   const secrets = loadSecrets(environment)
 
   const logger = createLogger({
@@ -42,12 +43,59 @@ export function createApplicationContext(
     timeoutMs: runtimeConfig.shutdownTimeoutMs,
   })
 
+  const database = createDatabase({
+    connectionString: secrets.databaseUrl,
+    applicationName: `shipgate-${options.processKind}`,
+
+    ssl: {
+      mode: runtimeConfig.database.sslMode,
+      ...(secrets.databaseSslCa
+        ? {
+            ca: secrets.databaseSslCa,
+          }
+        : {}),
+    },
+
+    pool: {
+      min: runtimeConfig.database.poolMin,
+      max: runtimeConfig.database.poolMax,
+      idleTimeoutMs: runtimeConfig.database.idleTimeoutMs,
+      connectionTimeoutMs: runtimeConfig.database.connectionTimeoutMs,
+      maxLifetimeSeconds: runtimeConfig.database.maxLifetimeSeconds,
+    },
+
+    onPoolError: (error) => {
+      logger.error(
+        {
+          event: 'database.pool.error',
+          err: error,
+          database: {
+            kind: error.kind,
+            retryable: error.retryable,
+            sqlState: error.sqlState,
+          },
+        },
+        'Unexpected PostgreSQL pool error',
+      )
+    },
+  })
+
+  /*
+   * Database регистрируется раньше HTTP/worker.
+   * Shutdown hooks исполняются в обратном порядке:
+   * сначала HTTP/worker, затем pool.
+   */
+  shutdown.addHook('database', async () => {
+    await database.destroy()
+  })
+
   return {
     processKind: options.processKind,
     startedAt: new Date(),
     runtimeConfig,
     secrets,
     logger,
+    database,
     shutdown,
     createCorrelationId,
 
