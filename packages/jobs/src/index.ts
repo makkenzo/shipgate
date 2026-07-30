@@ -16,6 +16,11 @@ export {
 } from './execution.js'
 export * from './graphile-worker-types.js'
 export {
+  isWorkerHeartbeatFresh,
+  startWorkerHeartbeat,
+  type WorkerHeartbeat,
+} from './heartbeat.js'
+export {
   getQueueMetrics,
   type QueueMetrics,
 } from './metrics.js'
@@ -38,7 +43,6 @@ export {
   type JobExecutionRecord,
   waitForJobExecution,
 } from './store.js'
-
 export type {
   JobAttempt,
   JobEnvelope,

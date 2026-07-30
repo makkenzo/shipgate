@@ -80,6 +80,11 @@ describe.sequential('PostgreSQL infrastructure', () => {
         direction: 'Up',
         status: 'Success',
       }),
+      expect.objectContaining({
+        migrationName: '20260730_000002_create_job_infrastructure',
+        direction: 'Up',
+        status: 'Success',
+      }),
     ])
 
     const readiness = await checkDatabaseReadiness(database.kysely, 2_000)
@@ -147,27 +152,45 @@ describe.sequential('PostgreSQL infrastructure', () => {
 
     await firstLockAcquired
 
-    await expect(
-      withRepositoryAdvisoryLock(database.kysely, 'test-repository', async () => undefined, {
-        timeoutMs: 200,
-        retryIntervalMs: 25,
-      }),
-    ).rejects.toBeInstanceOf(AdvisoryLockTimeoutError)
-
-    releaseFirstLock?.()
-    await firstLock
+    try {
+      await expect(
+        withRepositoryAdvisoryLock(database.kysely, 'test-repository', async () => undefined, {
+          timeoutMs: 200,
+          retryIntervalMs: 25,
+        }),
+      ).rejects.toBeInstanceOf(AdvisoryLockTimeoutError)
+    } finally {
+      releaseFirstLock?.()
+      await firstLock
+    }
 
     const firstRollback = await rollbackLastMigration(database.kysely)
-
     const secondRollback = await rollbackLastMigration(database.kysely)
 
-    expect([...firstRollback, ...secondRollback]).toHaveLength(2)
+    expect([...firstRollback, ...secondRollback]).toEqual([
+      expect.objectContaining({
+        migrationName: '20260730_000002_create_job_infrastructure',
+        direction: 'Down',
+        status: 'Success',
+      }),
+      expect.objectContaining({
+        migrationName: '20260730_000001_create_system_metadata',
+        direction: 'Down',
+        status: 'Success',
+      }),
+    ])
 
     const rolledBackStatus = await getMigrationStatus(database.kysely)
 
     expect(rolledBackStatus.every((migration) => migration.status === 'pending')).toBe(true)
 
-    await migrateToLatest(database.kysely)
+    const firstRun = await migrateToLatest(database.kysely)
+
+    expect(firstRun).toHaveLength(2)
+
+    const secondRun = await migrateToLatest(database.kysely)
+
+    expect(secondRun).toEqual([])
 
     expect(poolErrors).toEqual([])
   }, 30_000)

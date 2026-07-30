@@ -1,77 +1,220 @@
 name: shipgate
 
+x-shipgate-environment:
+  &shipgate-environment
+  NODE_ENV: production
+  APP_VERSION: ${APP_VERSION:-0.0.0}
+  LOG_LEVEL: ${LOG_LEVEL:-info}
+
+  DATABASE_URL: ${COMPOSE_DATABASE_URL:-postgresql://shipgate:shipgate@postgres:5432/shipgate}
+  DATABASE_SSL_MODE: ${DATABASE_SSL_MODE:-disable}
+  DATABASE_POOL_MIN: ${DATABASE_POOL_MIN:-0}
+  DATABASE_POOL_MAX: ${DATABASE_POOL_MAX:-10}
+  DATABASE_IDLE_TIMEOUT_MS: ${DATABASE_IDLE_TIMEOUT_MS:-30000}
+  DATABASE_CONNECTION_TIMEOUT_MS: ${DATABASE_CONNECTION_TIMEOUT_MS:-5000}
+  DATABASE_MAX_LIFETIME_SECONDS: ${DATABASE_MAX_LIFETIME_SECONDS:-300}
+  DATABASE_READINESS_TIMEOUT_MS: ${DATABASE_READINESS_TIMEOUT_MS:-2000}
+
+  SHUTDOWN_TIMEOUT_MS: ${SHUTDOWN_TIMEOUT_MS:-10000}
+
+  JOB_WORKER_CONCURRENCY: ${JOB_WORKER_CONCURRENCY:-4}
+  JOB_WORKER_POLL_INTERVAL_MS: ${JOB_WORKER_POLL_INTERVAL_MS:-2000}
+  JOB_WORKER_HEARTBEAT_INTERVAL_MS: ${JOB_WORKER_HEARTBEAT_INTERVAL_MS:-10000}
+  JOB_WORKER_HEARTBEAT_STALE_AFTER_MS: ${JOB_WORKER_HEARTBEAT_STALE_AFTER_MS:-60000}
+
+  GITHUB_APP_ID: ${GITHUB_APP_ID:-}
+  GITHUB_PRIVATE_KEY: ${GITHUB_PRIVATE_KEY:-}
+  GITHUB_WEBHOOK_SECRET: ${GITHUB_WEBHOOK_SECRET:-}
+
+x-shipgate-service:
+  &shipgate-service
+  image: shipgate:local
+
+  build:
+    context: .
+    target: runtime
+
+  pull_policy: build
+
+  init: true
+  read_only: true
+
+  tmpfs:
+    - /tmp:size=64m,mode=1777
+
+  security_opt:
+    - no-new-privileges:true
+
+  cap_drop:
+    - ALL
+
+  pids_limit: 256
+  stop_grace_period: 20s
+
 services:
   postgres:
     image: postgres:18.4-alpine3.24
+
     environment:
-      POSTGRES_DB: shipgate
-      POSTGRES_USER: shipgate
-      POSTGRES_PASSWORD: shipgate
+      POSTGRES_DB: ${POSTGRES_DB:-shipgate}
+      POSTGRES_USER: ${POSTGRES_USER:-shipgate}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-shipgate}
+
     ports:
-      - "127.0.0.1:5433:5432"
+      - '${POSTGRES_HOST:-127.0.0.1}:${POSTGRES_PORT:-5433}:5432'
+
     volumes:
       - postgres-data:/var/lib/postgresql
+
     healthcheck:
       test:
         - CMD-SHELL
-        - pg_isready -U shipgate -d shipgate
-      interval: 2s
-      timeout: 2s
+        - >-
+          pg_isready
+          -U "$${POSTGRES_USER}"
+          -d "$${POSTGRES_DB}"
+      interval: 5s
+      timeout: 3s
       retries: 20
+      start_period: 10s
 
-  migrator:
-    build:
-      context: .
-    environment:
-      NODE_ENV: production
-      DATABASE_URL: postgresql://shipgate:shipgate@postgres:5432/shipgate
-      DATABASE_SSL_MODE: disable
-      DATABASE_POOL_MAX: 2
+    restart: unless-stopped
+
+    cpus: 2
+    mem_limit: 1g
+    mem_reservation: 256m
+    pids_limit: 256
+
+  shipgate-migrate:
+    <<: *shipgate-service
+
     command:
-      - sh
-      - -c
-      - >-
-        node packages/jobs/dist/migration-cli.js up
-        &&
-        node packages/database/dist/migration-cli.js up
+      - node
+      - dist/migrate.js
+
+    environment:
+      <<: *shipgate-environment
+
     depends_on:
       postgres:
         condition: service_healthy
-    restart: "no"
 
-  api:
-    build:
-      context: .
+    restart: 'no'
+
+    cpus: 1
+    mem_limit: 512m
+    mem_reservation: 128m
+
+  shipgate-api:
+    <<: *shipgate-service
+
+    command:
+      - node
+      - dist/api.js
+
     environment:
-      NODE_ENV: production
-      API_DOCS_ENABLED: 'true'
-      API_BODY_LIMIT_BYTES: 65536
-      PORT: 3000
+      <<: *shipgate-environment
+
       HOST: 0.0.0.0
-      DATABASE_URL: postgresql://shipgate:shipgate@postgres:5432/shipgate
-      DATABASE_SSL_MODE: disable
-    command:
-      - node
-      - apps/server/dist/api.js
+      PORT: 3000
+
+      API_BODY_LIMIT_BYTES: ${API_BODY_LIMIT_BYTES:-65536}
+      API_DOCS_ENABLED: ${API_DOCS_ENABLED:-false}
+
     ports:
-      - "127.0.0.1:3001:3000"
+      - '${SHIPGATE_HTTP_HOST:-127.0.0.1}:${SHIPGATE_HTTP_PORT:-3001}:3000'
+
     depends_on:
-      migrator:
+      shipgate-migrate:
         condition: service_completed_successfully
 
-  worker:
-    build:
-      context: .
-    environment:
-      NODE_ENV: production
-      DATABASE_URL: postgresql://shipgate:shipgate@postgres:5432/shipgate
-      DATABASE_SSL_MODE: disable
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - >-
+          fetch('http://127.0.0.1:3000/health')
+          .then((response) => {
+            if (!response.ok) process.exit(1)
+          })
+          .catch(() => process.exit(1))
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
+    restart: unless-stopped
+
+    cpus: 1
+    mem_limit: 512m
+    mem_reservation: 128m
+
+  shipgate-worker:
+    <<: *shipgate-service
+
     command:
       - node
-      - apps/server/dist/worker.js
+      - dist/worker.js
+
+    environment:
+      <<: *shipgate-environment
+
     depends_on:
-      migrator:
+      shipgate-migrate:
         condition: service_completed_successfully
+
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - dist/worker-healthcheck.js
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+    restart: unless-stopped
+
+    cpus: 1
+    mem_limit: 512m
+    mem_reservation: 128m
+
+  # Optional development-profile API.
+  # Production services remain the default profile.
+  shipgate-api-dev:
+    <<: *shipgate-service
+
+    profiles:
+      - development
+
+    command:
+      - node
+      - dist/api.js
+
+    environment:
+      <<: *shipgate-environment
+
+      NODE_ENV: development
+      LOG_LEVEL: debug
+
+      HOST: 0.0.0.0
+      PORT: 3000
+
+      API_DOCS_ENABLED: 'true'
+      API_CORS_ORIGINS: http://localhost:5173,http://127.0.0.1:5173
+
+    ports:
+      - '127.0.0.1:3002:3000'
+
+    depends_on:
+      shipgate-migrate:
+        condition: service_completed_successfully
+
+    restart: unless-stopped
+
+    cpus: 1
+    mem_limit: 512m
 
 volumes:
   postgres-data:

@@ -1,7 +1,7 @@
 import type { RuntimeConfig } from '@shipgate/config'
 import pino, { type Logger } from 'pino'
 
-export type ProcessKind = 'api' | 'worker'
+export type ProcessKind = 'api' | 'worker' | 'migrator'
 
 export interface LoggerOptions {
   readonly processKind: ProcessKind

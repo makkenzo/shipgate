@@ -10,3 +10,7 @@ test-results/
 !.env.example
 
 .DS_Store
+
+playwright-report/
+test-results/
+coverage/

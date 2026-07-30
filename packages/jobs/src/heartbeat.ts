@@ -81,3 +81,20 @@ export async function startWorkerHeartbeat(options: {
     },
   }
 }
+
+export async function isWorkerHeartbeatFresh(
+  database: DatabaseClient,
+  workerHostname: string,
+  staleAfterMs: number,
+): Promise<boolean> {
+  const threshold = new Date(Date.now() - staleAfterMs)
+
+  const heartbeat = await database.kysely
+    .selectFrom('shipgate_worker_heartbeat')
+    .select('worker_id')
+    .where('hostname', '=', workerHostname)
+    .where('heartbeat_at', '>=', threshold)
+    .executeTakeFirst()
+
+  return heartbeat !== undefined
+}

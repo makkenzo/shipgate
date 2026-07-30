@@ -32,7 +32,6 @@
   },
   "devDependencies": {
     "@hey-api/openapi-ts": "0.99.0",
-    "@playwright/test": "1.62.0",
     "@shipgate/testing": "workspace:*",
     "@tailwindcss/vite": "4.3.3",
     "@tanstack/router-cli": "1.167.21",

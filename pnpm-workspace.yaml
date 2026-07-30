@@ -7,8 +7,11 @@ saveWorkspaceProtocol: rolling
 disallowWorkspaceCycles: true
 failIfNoMatch: true
 autoInstallPeers: false
-strictPeerDependencies: true
 engineStrict: true
+injectWorkspacePackages: true
+
+syncInjectedDepsAfterScripts:
+  - build
 
 requiredScripts:
   - build
