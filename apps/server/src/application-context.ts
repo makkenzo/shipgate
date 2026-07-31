@@ -1,4 +1,10 @@
-import { loadRuntimeConfig, loadSecrets, type RuntimeConfig } from '@shipgate/config'
+import {
+  type GitHubSecrets,
+  loadGitHubSecrets,
+  loadRuntimeConfig,
+  loadSecrets,
+  type RuntimeConfig,
+} from '@shipgate/config'
 import { createDatabase, type DatabaseClient } from '@shipgate/database'
 import type { Logger } from 'pino'
 
@@ -12,6 +18,7 @@ export interface ApplicationContext {
   readonly runtimeConfig: RuntimeConfig
   readonly logger: Logger
   readonly database: DatabaseClient
+  readonly githubSecrets: GitHubSecrets
   readonly shutdown: ShutdownManager
 
   createCorrelationId(): string
@@ -31,6 +38,7 @@ export function createApplicationContext(
 
   const runtimeConfig = loadRuntimeConfig(environment)
   const secrets = loadSecrets(environment)
+  const githubSecrets = loadGitHubSecrets(environment)
 
   const logger = createLogger({
     processKind: options.processKind,
@@ -94,6 +102,7 @@ export function createApplicationContext(
     runtimeConfig,
     logger,
     database,
+    githubSecrets,
     shutdown,
     createCorrelationId,
 

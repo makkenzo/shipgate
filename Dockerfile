@@ -45,6 +45,9 @@ COPY packages/config/package.json \
 COPY packages/database/package.json \
   packages/database/package.json
 
+COPY packages/github/package.json \
+  packages/github/package.json
+
 COPY packages/jobs/package.json \
   packages/jobs/package.json
 

@@ -1,6 +1,8 @@
 import { EnvironmentValidationError } from '@shipgate/config'
+import { GitHubAppValidationError } from '@shipgate/github'
 
-import { createApplicationContext, type ApplicationContext } from './application-context.js'
+import { type ApplicationContext, createApplicationContext } from './application-context.js'
+import { validateGitHubAppAtStartup } from './github-startup.js'
 import { createBootstrapLogger, type ProcessKind } from './logger.js'
 
 export interface StartedApplication {
@@ -11,6 +13,7 @@ export interface StartedApplication {
 
 export interface RunApplicationOptions {
   readonly processKind: ProcessKind
+  readonly validateGitHubApp?: boolean
 
   start(context: ApplicationContext): Promise<StartedApplication> | StartedApplication
 }
@@ -50,6 +53,10 @@ export async function runApplication(options: RunApplicationOptions): Promise<vo
       },
       'Application is starting',
     )
+
+    if (options.validateGitHubApp) {
+      await validateGitHubAppAtStartup(context)
+    }
 
     const application = await options.start(context)
 
@@ -180,6 +187,15 @@ function logFatal(logger: ApplicationContext['logger'], error: unknown, stage: s
             environmentValidation: {
               scope: normalizedError.scope,
               issues: normalizedError.issues,
+            },
+          }
+        : {}),
+
+      ...(normalizedError instanceof GitHubAppValidationError
+        ? {
+            githubAppValidation: {
+              checks: normalizedError.report.checks,
+              remoteVerificationLimitations: normalizedError.report.remoteVerificationLimitations,
             },
           }
         : {}),

@@ -3,5 +3,6 @@ import { runApplication } from './run-application.js'
 
 await runApplication({
   processKind: 'api',
+  validateGitHubApp: true,
   start: startApi,
 })

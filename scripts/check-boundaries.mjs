@@ -6,10 +6,14 @@ const allowedRuntimeDependencies = new Map([
   ['@shipgate/testing', new Set()],
 
   ['@shipgate/database', new Set()],
+  ['@shipgate/github', new Set()],
   ['@shipgate/web', new Set()],
   ['@shipgate/jobs', new Set(['@shipgate/database'])],
 
-  ['@shipgate/server', new Set(['@shipgate/config', '@shipgate/database', '@shipgate/jobs'])],
+  [
+    '@shipgate/server',
+    new Set(['@shipgate/config', '@shipgate/database', '@shipgate/github', '@shipgate/jobs']),
+  ],
 ])
 
 const productionFields = ['dependencies', 'optionalDependencies', 'peerDependencies']

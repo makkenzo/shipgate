@@ -8,6 +8,9 @@
       "path": "./packages/testing/tsconfig.build.json"
     },
     {
+      "path": "./packages/github/tsconfig.build.json"
+    },
+    {
       "path": "./packages/database/tsconfig.build.json"
     },
     {

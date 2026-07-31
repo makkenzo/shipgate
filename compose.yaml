@@ -22,6 +22,21 @@ x-shipgate-environment:
   JOB_WORKER_HEARTBEAT_INTERVAL_MS: ${JOB_WORKER_HEARTBEAT_INTERVAL_MS:-10000}
   JOB_WORKER_HEARTBEAT_STALE_AFTER_MS: ${JOB_WORKER_HEARTBEAT_STALE_AFTER_MS:-60000}
 
+x-shipgate-application-environment:
+  &shipgate-application-environment
+  <<: *shipgate-environment
+
+  APP_ORIGIN: ${APP_ORIGIN:-}
+
+  GITHUB_APP_STARTUP_VALIDATION_ENABLED: ${GITHUB_APP_STARTUP_VALIDATION_ENABLED:-true}
+  GITHUB_APP_ID: ${GITHUB_APP_ID:-}
+  GITHUB_APP_PRIVATE_KEY: ${GITHUB_APP_PRIVATE_KEY:-}
+  GITHUB_APP_WEBHOOK_SECRET: ${GITHUB_APP_WEBHOOK_SECRET:-}
+  GITHUB_APP_USER_TOKENS_EXPIRE: ${GITHUB_APP_USER_TOKENS_EXPIRE:-true}
+  GITHUB_API_URL: ${GITHUB_API_URL:-https://api.github.com}
+  GITHUB_API_VERSION: ${GITHUB_API_VERSION:-2026-03-10}
+  GITHUB_API_REQUEST_TIMEOUT_MS: ${GITHUB_API_REQUEST_TIMEOUT_MS:-10000}
+
 x-shipgate-service:
   &shipgate-service
   image: shipgate:local
@@ -109,7 +124,7 @@ services:
       - dist/api.js
 
     environment:
-      <<: *shipgate-environment
+      <<: *shipgate-application-environment
 
       HOST: 0.0.0.0
       PORT: 3000
@@ -156,7 +171,7 @@ services:
       - dist/worker.js
 
     environment:
-      <<: *shipgate-environment
+      <<: *shipgate-application-environment
 
     depends_on:
       shipgate-migrate:
@@ -191,7 +206,7 @@ services:
       - dist/api.js
 
     environment:
-      <<: *shipgate-environment
+      <<: *shipgate-application-environment
 
       NODE_ENV: development
       LOG_LEVEL: debug

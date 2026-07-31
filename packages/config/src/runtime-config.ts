@@ -6,6 +6,22 @@ const logLevelSchema = z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace
 
 const databaseSslModeSchema = z.enum(['disable', 'require', 'verify-full'])
 
+const optionalPositiveIntegerEnvironmentSchema = z.preprocess(
+  (value) => (value === '' || value === undefined ? undefined : value),
+  z.coerce.number().int().positive().safe().optional(),
+)
+
+const optionalHttpsOriginEnvironmentSchema = z.preprocess(
+  (value) => (value === '' || value === undefined ? undefined : value),
+  z
+    .string()
+    .trim()
+    .refine(isHttpsOrigin, {
+      message: 'Expected an exact HTTPS origin without a path',
+    })
+    .optional(),
+)
+
 const optionalBooleanEnvironmentSchema = z.preprocess(
   (value) => {
     if (value === '' || value === undefined) {
@@ -47,6 +63,23 @@ const corsOriginsEnvironmentSchema = z
     return origins
   })
 
+const githubRuntimeEnvironmentShape = {
+  APP_ORIGIN: optionalHttpsOriginEnvironmentSchema,
+  GITHUB_APP_ID: optionalPositiveIntegerEnvironmentSchema,
+  GITHUB_APP_USER_TOKENS_EXPIRE: optionalBooleanEnvironmentSchema,
+  GITHUB_API_URL: z
+    .string()
+    .trim()
+    .refine(isHttpOrigin, {
+      message: 'GITHUB_API_URL must be an exact HTTP origin',
+    })
+    .default('https://api.github.com'),
+  GITHUB_API_VERSION: z.string().trim().min(1).default('2026-03-10'),
+  GITHUB_API_REQUEST_TIMEOUT_MS: z.coerce.number().int().min(100).default(10_000),
+}
+
+const githubRuntimeEnvironmentSchema = z.object(githubRuntimeEnvironmentShape)
+
 const runtimeEnvironmentSchema = z
   .object({
     NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
@@ -60,6 +93,10 @@ const runtimeEnvironmentSchema = z
     PORT: z.coerce.number().int().min(1).max(65_535).default(3000),
 
     SHUTDOWN_TIMEOUT_MS: z.coerce.number().int().min(1_000).default(10_000),
+
+    ...githubRuntimeEnvironmentShape,
+
+    GITHUB_APP_STARTUP_VALIDATION_ENABLED: optionalBooleanEnvironmentSchema,
 
     DATABASE_POOL_MIN: z.coerce.number().int().min(0).max(100).default(0),
 
@@ -126,11 +163,30 @@ export type LogLevel = z.infer<typeof logLevelSchema>
 
 export type DatabaseSslMode = z.infer<typeof databaseSslModeSchema>
 
+export interface GitHubRuntimeConfig {
+  readonly appOrigin: string | undefined
+  readonly appId: number | undefined
+  readonly userTokensExpire: boolean | undefined
+  readonly apiUrl: string
+  readonly apiVersion: string
+  readonly requestTimeoutMs: number
+}
+
 export interface RuntimeConfig {
   readonly environment: RuntimeEnvironment
   readonly appVersion: string
   readonly logLevel: LogLevel
   readonly shutdownTimeoutMs: number
+  readonly appOrigin: string | undefined
+
+  readonly githubApp: {
+    readonly startupValidationEnabled: boolean
+    readonly appId: number | undefined
+    readonly userTokensExpire: boolean | undefined
+    readonly apiUrl: string
+    readonly apiVersion: string
+    readonly requestTimeoutMs: number
+  }
 
   readonly api: {
     readonly host: string
@@ -160,6 +216,25 @@ export interface RuntimeConfig {
   }
 }
 
+export function loadGitHubRuntimeConfig(
+  environment: NodeJS.ProcessEnv = process.env,
+): GitHubRuntimeConfig {
+  const result = githubRuntimeEnvironmentSchema.safeParse(environment)
+
+  if (!result.success) {
+    throw new EnvironmentValidationError('runtime', result.error)
+  }
+
+  return {
+    appOrigin: result.data.APP_ORIGIN,
+    appId: result.data.GITHUB_APP_ID,
+    userTokensExpire: result.data.GITHUB_APP_USER_TOKENS_EXPIRE,
+    apiUrl: result.data.GITHUB_API_URL,
+    apiVersion: result.data.GITHUB_API_VERSION,
+    requestTimeoutMs: result.data.GITHUB_API_REQUEST_TIMEOUT_MS,
+  }
+}
+
 export function loadRuntimeConfig(environment: NodeJS.ProcessEnv = process.env): RuntimeConfig {
   const result = runtimeEnvironmentSchema.safeParse(environment)
 
@@ -172,6 +247,18 @@ export function loadRuntimeConfig(environment: NodeJS.ProcessEnv = process.env):
     appVersion: result.data.APP_VERSION,
     logLevel: result.data.LOG_LEVEL,
     shutdownTimeoutMs: result.data.SHUTDOWN_TIMEOUT_MS,
+    appOrigin: result.data.APP_ORIGIN,
+
+    githubApp: {
+      startupValidationEnabled:
+        result.data.GITHUB_APP_STARTUP_VALIDATION_ENABLED ?? result.data.NODE_ENV === 'production',
+
+      appId: result.data.GITHUB_APP_ID,
+      userTokensExpire: result.data.GITHUB_APP_USER_TOKENS_EXPIRE,
+      apiUrl: result.data.GITHUB_API_URL,
+      apiVersion: result.data.GITHUB_API_VERSION,
+      requestTimeoutMs: result.data.GITHUB_API_REQUEST_TIMEOUT_MS,
+    },
 
     api: {
       host: result.data.HOST,
@@ -215,12 +302,18 @@ function parseCommaSeparatedValues(value: string): readonly string[] {
     .filter((item) => item.length > 0)
 }
 
-function isHttpOrigin(value: string): boolean {
+function isHttpsOrigin(value: string): boolean {
+  return isHttpOrigin(value, { httpsOnly: true })
+}
+
+function isHttpOrigin(value: string, options: { readonly httpsOnly?: boolean } = {}): boolean {
   try {
     const url = new URL(value)
 
     return (
-      (url.protocol === 'http:' || url.protocol === 'https:') &&
+      (options.httpsOnly
+        ? url.protocol === 'https:'
+        : url.protocol === 'http:' || url.protocol === 'https:') &&
       url.origin === value &&
       url.username === '' &&
       url.password === ''

@@ -1,15 +1,22 @@
 export {
-  EnvironmentValidationError,
   type EnvironmentScope,
+  EnvironmentValidationError,
   type EnvironmentValidationIssue,
 } from './errors.js'
 
 export {
-  loadRuntimeConfig,
   type DatabaseSslMode,
+  type GitHubRuntimeConfig,
   type LogLevel,
+  loadGitHubRuntimeConfig,
+  loadRuntimeConfig,
   type RuntimeConfig,
   type RuntimeEnvironment,
 } from './runtime-config.js'
 
-export { loadSecrets, type Secrets } from './secrets.js'
+export {
+  type GitHubSecrets,
+  loadGitHubSecrets,
+  loadSecrets,
+  type Secrets,
+} from './secrets.js'

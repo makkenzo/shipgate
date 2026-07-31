@@ -16,10 +16,12 @@
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run --passWithNoTests",
     "test:e2e": "vitest run test/e2e --passWithNoTests",
-    "start:api": "node --enable-source-maps dist/api.js",
-    "start:worker": "node --enable-source-maps dist/worker.js",
-    "start:migrate": "node --enable-source-maps dist/migrate.js",
-    "healthcheck:worker": "node --enable-source-maps dist/worker-healthcheck.js"
+    "start:api": "node --env-file-if-exists=../../.env --enable-source-maps dist/api.js",
+    "start:worker": "node --env-file-if-exists=../../.env --enable-source-maps dist/worker.js",
+    "start:migrate": "node --env-file-if-exists=../../.env --enable-source-maps dist/migrate.js",
+    "healthcheck:worker": "node --enable-source-maps dist/worker-healthcheck.js",
+    "github:doctor": "node --env-file-if-exists=../../.env --enable-source-maps dist/github-doctor.js",
+    "github:manifest": "node --env-file-if-exists=../../.env --enable-source-maps dist/github-manifest.js"
   },
   "dependencies": {
     "@fastify/cors": "11.3.0",
@@ -30,6 +32,7 @@
     "@fastify/type-provider-typebox": "6.1.0",
     "@shipgate/config": "workspace:*",
     "@shipgate/database": "workspace:*",
+    "@shipgate/github": "workspace:*",
     "@shipgate/jobs": "workspace:*",
     "fastify": "5.10.0",
     "pino": "10.3.1",

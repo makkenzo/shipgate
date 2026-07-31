@@ -48,6 +48,8 @@ jobs:
         run: pnpm exec playwright install --with-deps chromium
 
       - name: Start production stack
+        env:
+          GITHUB_APP_STARTUP_VALIDATION_ENABLED: 'false'
         run: pnpm compose:up
 
       - name: Run end-to-end tests

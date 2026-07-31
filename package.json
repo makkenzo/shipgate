@@ -33,6 +33,8 @@
     "db:status": "pnpm --filter @shipgate/server build && node --env-file-if-exists=.env --enable-source-maps apps/server/dist/database-cli.js status",
     "db:migrate:prod": "node --enable-source-maps apps/server/dist/migrate.js",
     "jobs:diagnostic": "pnpm --filter @shipgate/server build && node --env-file-if-exists=.env --enable-source-maps apps/server/dist/diagnostic-cli.js",
+    "github:doctor": "pnpm --filter @shipgate/server build && node --env-file-if-exists=.env --enable-source-maps apps/server/dist/github-doctor.js",
+    "github:manifest": "pnpm --filter @shipgate/server build && node --env-file-if-exists=.env --enable-source-maps apps/server/dist/github-manifest.js",
     "api:generate": "pnpm --filter @shipgate/server openapi:generate && pnpm --filter @shipgate/web api:generate && biome format --write apps/web/openapi apps/web/src/api/generated",
     "api:generate:check": "pnpm api:generate && git diff --exit-code -- apps/web/openapi apps/web/src/api/generated",
     "api:generate:compiled": "pnpm --filter @shipgate/server openapi:generate:compiled && pnpm --filter @shipgate/web api:generate && biome format --write apps/web/openapi apps/web/src/api/generated",
