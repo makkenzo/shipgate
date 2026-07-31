@@ -37,6 +37,7 @@ export type {
   JobExecutionStatus,
   JsonPrimitive,
   JsonValue,
+  ShipgateGitHubUserCredentialTable,
   ShipgateJobExecutionTable,
   ShipgateWorkerHeartbeatTable,
 } from './types.js'

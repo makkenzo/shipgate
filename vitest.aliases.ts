@@ -2,6 +2,10 @@ import { fileURLToPath } from 'node:url'
 
 export const workspaceAliases = [
   {
+    find: '@shipgate/github/testing',
+    replacement: fileURLToPath(new URL('./packages/github/src/testing.ts', import.meta.url)),
+  },
+  {
     find: '@shipgate/jobs/testing',
     replacement: fileURLToPath(new URL('./packages/jobs/src/testing.ts', import.meta.url)),
   },

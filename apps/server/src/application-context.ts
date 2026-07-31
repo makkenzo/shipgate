@@ -6,9 +6,10 @@ import {
   type RuntimeConfig,
 } from '@shipgate/config'
 import { createDatabase, type DatabaseClient } from '@shipgate/database'
+import type { GitHubAuthenticationService } from '@shipgate/github'
 import type { Logger } from 'pino'
-
 import { createCorrelationId, withCorrelationId } from './correlation-id.js'
+import { createApplicationGitHubAuthentication } from './github-auth.js'
 import { createLogger, type ProcessKind } from './logger.js'
 import { createShutdownManager, type ShutdownManager } from './shutdown.js'
 
@@ -19,6 +20,7 @@ export interface ApplicationContext {
   readonly logger: Logger
   readonly database: DatabaseClient
   readonly githubSecrets: GitHubSecrets
+  readonly githubAuth: GitHubAuthenticationService
   readonly shutdown: ShutdownManager
 
   createCorrelationId(): string
@@ -96,6 +98,13 @@ export function createApplicationContext(
     await database.destroy()
   })
 
+  const githubAuth = createApplicationGitHubAuthentication({
+    runtimeConfig,
+    githubSecrets,
+    database,
+    logger,
+  })
+
   return {
     processKind: options.processKind,
     startedAt: new Date(),
@@ -103,6 +112,7 @@ export function createApplicationContext(
     logger,
     database,
     githubSecrets,
+    githubAuth,
     shutdown,
     createCorrelationId,
 

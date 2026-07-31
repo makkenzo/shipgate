@@ -19,8 +19,12 @@ export async function validateGitHubAppAtStartup(
   const report = await assertGitHubAppRegistration({
     appOrigin: context.runtimeConfig.appOrigin,
     appId: context.runtimeConfig.githubApp.appId,
+    clientId: context.runtimeConfig.githubApp.clientId,
     privateKey: context.githubSecrets.privateKey,
+    clientSecret: context.githubSecrets.clientSecret,
     webhookSecret: context.githubSecrets.webhookSecret,
+    tokenEncryptionKey: context.githubSecrets.tokenEncryptionKey,
+    tokenEncryptionKeyId: context.runtimeConfig.githubApp.tokenEncryptionKeyId,
     userTokensExpire: context.runtimeConfig.githubApp.userTokensExpire,
     apiBaseUrl: context.runtimeConfig.githubApp.apiUrl,
     apiVersion: context.runtimeConfig.githubApp.apiVersion,

@@ -49,18 +49,23 @@ describe('loadRuntimeConfig', () => {
     expect(config.githubApp.startupValidationEnabled).toBe(true)
     expect(config.githubApp.apiUrl).toBe('https://api.github.com')
     expect(config.githubApp.apiVersion).toBe('2026-03-10')
+    expect(config.githubApp.oauthUrl).toBe('https://github.com')
+    expect(config.githubApp.tokenEarlyRefreshMs).toBe(300_000)
+    expect(config.githubApp.refreshLeaseMs).toBe(60_000)
   })
 
   it('loads GitHub doctor configuration without database secrets', () => {
     const config = loadGitHubRuntimeConfig({
       APP_ORIGIN: 'https://shipgate.example',
       GITHUB_APP_ID: '123456',
+      GITHUB_APP_CLIENT_ID: 'Iv1.shipgate',
       GITHUB_APP_USER_TOKENS_EXPIRE: 'true',
     })
 
     expect(config).toMatchObject({
       appOrigin: 'https://shipgate.example',
       appId: 123456,
+      clientId: 'Iv1.shipgate',
       userTokensExpire: true,
     })
   })
@@ -69,11 +74,15 @@ describe('loadRuntimeConfig', () => {
     expect(
       loadGitHubSecrets({
         GITHUB_APP_PRIVATE_KEY: 'private-key',
+        GITHUB_APP_CLIENT_SECRET: 'client-secret',
         GITHUB_APP_WEBHOOK_SECRET: 'webhook-secret',
+        GITHUB_TOKEN_ENCRYPTION_KEY: 'encryption-key',
       }),
     ).toEqual({
       privateKey: 'private-key',
+      clientSecret: 'client-secret',
       webhookSecret: 'webhook-secret',
+      tokenEncryptionKey: 'encryption-key',
     })
   })
 
@@ -87,6 +96,23 @@ describe('loadRuntimeConfig', () => {
     expect(() =>
       loadGitHubRuntimeConfig({
         APP_ORIGIN: 'http://shipgate.example',
+      }),
+    ).toThrow(EnvironmentValidationError)
+  })
+
+  it('rejects an invalid GitHub token encryption key ID', () => {
+    expect(() =>
+      loadGitHubRuntimeConfig({
+        GITHUB_TOKEN_ENCRYPTION_KEY_ID: 'invalid key id',
+      }),
+    ).toThrow(EnvironmentValidationError)
+  })
+
+  it('rejects a refresh lease shorter than three API timeouts', () => {
+    expect(() =>
+      loadRuntimeConfig({
+        GITHUB_API_REQUEST_TIMEOUT_MS: '10000',
+        GITHUB_REFRESH_LEASE_MS: '29999',
       }),
     ).toThrow(EnvironmentValidationError)
   })

@@ -7,19 +7,19 @@ export {
   type GitHubUserAuthorizationResult,
   type GitHubUserAuthorizationService,
 } from './auth-provider.js'
-export type {
-  AppGitHubClient,
-  GitHubClient,
-  GitHubClientAuthentication,
-  GitHubClientLogger,
-  GitHubGraphql,
-  GitHubRequest,
-  GitHubResponse,
-  InstallationGitHubClient,
-  InstallationPermissionLevel,
-  InstallationPermissionName,
-  InstallationPermissions,
-  UserGitHubClient,
+export {
+  type AppGitHubClient,
+  type GitHubClient,
+  type GitHubClientAuthentication,
+  type GitHubClientLogger,
+  type GitHubGraphql,
+  type GitHubRequest,
+  type GitHubResponse,
+  type InstallationGitHubClient,
+  type InstallationPermissionLevel,
+  type InstallationPermissionName,
+  type InstallationPermissions,
+  type UserGitHubClient,
 } from './client.js'
 export { GitHubOAuthRequestError } from './oauth.js'
 export {
@@ -49,11 +49,11 @@ export {
   GitHubTokenEncryptionError,
   type GitHubTokenPurpose,
 } from './token-cipher.js'
-export type {
-  GitHubRefreshLeaseResult,
-  GitHubUserTokenStore,
-  StoredGitHubUserCredentialInput,
-  StoredGitHubUserCredentials,
+export {
+  type GitHubRefreshLeaseResult,
+  type GitHubUserTokenStore,
+  type StoredGitHubUserCredentialInput,
+  type StoredGitHubUserCredentials,
 } from './user-token-store.js'
 export {
   assertGitHubAppRegistration,

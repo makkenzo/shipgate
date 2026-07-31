@@ -24,7 +24,9 @@ const secretsEnvironmentSchema = z.object({
 
 const githubSecretsEnvironmentSchema = z.object({
   GITHUB_APP_PRIVATE_KEY: optionalSecretSchema,
+  GITHUB_APP_CLIENT_SECRET: optionalSecretSchema,
   GITHUB_APP_WEBHOOK_SECRET: optionalSecretSchema,
+  GITHUB_TOKEN_ENCRYPTION_KEY: optionalSecretSchema,
 })
 
 export interface Secrets {
@@ -34,7 +36,9 @@ export interface Secrets {
 
 export interface GitHubSecrets {
   readonly privateKey: string | undefined
+  readonly clientSecret: string | undefined
   readonly webhookSecret: string | undefined
+  readonly tokenEncryptionKey: string | undefined
 }
 
 export function loadSecrets(environment: NodeJS.ProcessEnv = process.env): Secrets {
@@ -63,6 +67,8 @@ export function loadGitHubSecrets(environment: NodeJS.ProcessEnv = process.env):
 
   return {
     privateKey: result.data.GITHUB_APP_PRIVATE_KEY,
+    clientSecret: result.data.GITHUB_APP_CLIENT_SECRET,
     webhookSecret: result.data.GITHUB_APP_WEBHOOK_SECRET,
+    tokenEncryptionKey: result.data.GITHUB_TOKEN_ENCRYPTION_KEY,
   }
 }

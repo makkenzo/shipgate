@@ -18,8 +18,12 @@ try {
   const report = await validateGitHubAppRegistration({
     appOrigin: runtimeConfig.appOrigin,
     appId: runtimeConfig.appId,
+    clientId: runtimeConfig.clientId,
     privateKey: secrets.privateKey,
+    clientSecret: secrets.clientSecret,
     webhookSecret: secrets.webhookSecret,
+    tokenEncryptionKey: secrets.tokenEncryptionKey,
+    tokenEncryptionKeyId: runtimeConfig.tokenEncryptionKeyId,
     userTokensExpire: runtimeConfig.userTokensExpire,
     apiBaseUrl: runtimeConfig.apiUrl,
     apiVersion: runtimeConfig.apiVersion,
@@ -73,9 +77,9 @@ function renderHumanReport(report: GitHubAppValidationReport): void {
   process.stdout.write(`\nResult: ${report.ok ? 'OK' : 'FAILED'} (${resultSummary})\n`)
 
   const remoteVerificationNote = [
-    'GitHub does not expose callback URLs or the user-token-expiration toggle',
-    'through an app-authenticated REST endpoint. Those settings are checked',
-    "against Shipgate's canonical registration; review remote drift in GitHub App settings.",
+    'GitHub does not expose callback URLs, the user-token-expiration toggle,',
+    'or a way to validate the client secret through an app-authenticated REST endpoint.',
+    'Review remote drift in GitHub App settings; the client secret is exercised by OAuth.',
   ].join(' ')
 
   process.stdout.write(`\nNote: ${remoteVerificationNote}\n`)

@@ -10,6 +10,9 @@ import { describe, expect, it, vi } from 'vitest'
 
 const appOrigin = 'https://shipgate.example'
 const appId = 123_456
+const clientId = 'Iv1.shipgate'
+const clientSecret = 'test-client-secret'
+const tokenEncryptionKey = Buffer.alloc(32, 7).toString('base64url')
 const webhookSecret = 'test-webhook-secret-with-entropy'
 
 const privateKey = generateKeyPairSync('rsa', {
@@ -28,8 +31,11 @@ describe('GitHub App registration validation', () => {
     const report = await validateGitHubAppRegistration({
       appOrigin,
       appId,
+      clientId,
       privateKey,
+      clientSecret,
       webhookSecret,
+      tokenEncryptionKey,
       userTokensExpire: true,
       fetchImplementation,
     })
@@ -37,7 +43,9 @@ describe('GitHub App registration validation', () => {
     expect(report.ok).toBe(true)
     expect(getCheck(report, 'crypto.private_key').status).toBe('passed')
     expect(getCheck(report, 'crypto.app_jwt').status).toBe('passed')
+    expect(getCheck(report, 'crypto.user_token_encryption').status).toBe('passed')
     expect(getCheck(report, 'github.app_id').status).toBe('passed')
+    expect(getCheck(report, 'github.client_id').status).toBe('passed')
     expect(getCheck(report, 'github.permissions').status).toBe('passed')
     expect(getCheck(report, 'github.events').status).toBe('passed')
     expect(getCheck(report, 'github.webhook_url').status).toBe('passed')
@@ -61,8 +69,11 @@ describe('GitHub App registration validation', () => {
     const report = await validateGitHubAppRegistration({
       appOrigin,
       appId,
+      clientId,
       privateKey,
+      clientSecret,
       webhookSecret,
+      tokenEncryptionKey,
       userTokensExpire: true,
       fetchImplementation,
     })
@@ -83,7 +94,7 @@ describe('GitHub App registration validation', () => {
       app: {
         id: appId,
         slug: 'shipgate',
-        client_id: 'Iv1.shipgate',
+        client_id: clientId,
         permissions: {
           ...GITHUB_APP_REPOSITORY_PERMISSIONS,
           contents: 'read',
@@ -99,8 +110,11 @@ describe('GitHub App registration validation', () => {
     const report = await validateGitHubAppRegistration({
       appOrigin,
       appId,
+      clientId,
       privateKey,
+      clientSecret,
       webhookSecret,
+      tokenEncryptionKey,
       userTokensExpire: true,
       fetchImplementation,
     })
@@ -153,14 +167,18 @@ describe('GitHub App registration validation', () => {
     const report = await validateGitHubAppRegistration({
       appOrigin,
       appId,
+      clientId,
       privateKey,
+      clientSecret,
       webhookSecret,
+      tokenEncryptionKey,
       userTokensExpire: true,
       fetchImplementation,
     })
 
     expect(report.ok).toBe(false)
     expect(getCheck(report, 'github.app_id').status).toBe('failed')
+    expect(getCheck(report, 'github.client_id').status).toBe('failed')
     expect(getCheck(report, 'github.webhook_url').status).toBe('failed')
     expect(getCheck(report, 'github.webhook_secret').status).toBe('failed')
     expect(getCheck(report, 'github.webhook_ssl').status).toBe('failed')
@@ -173,8 +191,11 @@ describe('GitHub App registration validation', () => {
     const report = await validateGitHubAppRegistration({
       appOrigin,
       appId,
+      clientId,
       privateKey,
+      clientSecret,
       webhookSecret: undefined,
+      tokenEncryptionKey,
       userTokensExpire: false,
       fetchImplementation,
     })
@@ -191,8 +212,11 @@ describe('GitHub App registration validation', () => {
     const report = await validateGitHubAppRegistration({
       appOrigin,
       appId,
+      clientId,
       privateKey: 'not a private key',
+      clientSecret,
       webhookSecret,
+      tokenEncryptionKey,
       userTokensExpire: true,
       fetchImplementation,
     })
@@ -232,7 +256,7 @@ function createGitHubFetch(
     ({
       id: appId,
       slug: 'shipgate',
-      client_id: 'Iv1.shipgate',
+      client_id: clientId,
       permissions: GITHUB_APP_REPOSITORY_PERMISSIONS,
       events: GITHUB_APP_WEBHOOK_EVENTS,
     } satisfies Readonly<Record<string, unknown>>)

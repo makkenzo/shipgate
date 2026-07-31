@@ -13,6 +13,8 @@ export type JsonValue =
     }
 
 export interface DatabaseSchema {
+  shipgate_github_user_credential: ShipgateGitHubUserCredentialTable
+
   shipgate_job_execution: ShipgateJobExecutionTable
 
   shipgate_worker_heartbeat: ShipgateWorkerHeartbeatTable
@@ -53,6 +55,19 @@ export interface DatabaseClient {
   readonly pool: Pool
 
   destroy(): Promise<void>
+}
+
+export interface ShipgateGitHubUserCredentialTable {
+  github_user_id: string
+  version: Generated<number>
+  encrypted_access_token: string
+  access_token_expires_at: Date
+  encrypted_refresh_token: string
+  refresh_token_expires_at: Date
+  refresh_lease_id: string | null
+  refresh_lease_expires_at: Date | null
+  created_at: Generated<Date>
+  updated_at: Generated<Date>
 }
 
 export type JobExecutionStatus = 'queued' | 'running' | 'retrying' | 'succeeded' | 'failed'

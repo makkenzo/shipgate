@@ -75,6 +75,11 @@ describe.sequential('PostgreSQL infrastructure', () => {
 
         status: 'pending',
       },
+      {
+        name: '20260731_000004_create_github_auth_infrastructure',
+
+        status: 'pending',
+      },
     ])
 
     const migrationResults = await migrateToLatest(database.kysely)
@@ -92,6 +97,11 @@ describe.sequential('PostgreSQL infrastructure', () => {
       }),
       expect.objectContaining({
         migrationName: '20260730_000003_drop_system_metadata',
+        direction: 'Up',
+        status: 'Success',
+      }),
+      expect.objectContaining({
+        migrationName: '20260731_000004_create_github_auth_infrastructure',
         direction: 'Up',
         status: 'Success',
       }),
@@ -169,8 +179,14 @@ describe.sequential('PostgreSQL infrastructure', () => {
     const firstRollback = await rollbackLastMigration(database.kysely)
     const secondRollback = await rollbackLastMigration(database.kysely)
     const thirdRollback = await rollbackLastMigration(database.kysely)
+    const fourthRollback = await rollbackLastMigration(database.kysely)
 
-    expect([...firstRollback, ...secondRollback, ...thirdRollback]).toEqual([
+    expect([...firstRollback, ...secondRollback, ...thirdRollback, ...fourthRollback]).toEqual([
+      expect.objectContaining({
+        migrationName: '20260731_000004_create_github_auth_infrastructure',
+        direction: 'Down',
+        status: 'Success',
+      }),
       expect.objectContaining({
         migrationName: '20260730_000003_drop_system_metadata',
         direction: 'Down',
@@ -194,7 +210,7 @@ describe.sequential('PostgreSQL infrastructure', () => {
 
     const firstRun = await migrateToLatest(database.kysely)
 
-    expect(firstRun).toHaveLength(3)
+    expect(firstRun).toHaveLength(4)
 
     const secondRun = await migrateToLatest(database.kysely)
 

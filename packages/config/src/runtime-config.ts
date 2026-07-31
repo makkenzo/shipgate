@@ -6,6 +6,11 @@ const logLevelSchema = z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace
 
 const databaseSslModeSchema = z.enum(['disable', 'require', 'verify-full'])
 
+const optionalNonEmptyStringEnvironmentSchema = z.preprocess(
+  (value) => (value === '' || value === undefined ? undefined : value),
+  z.string().trim().min(1).optional(),
+)
+
 const optionalPositiveIntegerEnvironmentSchema = z.preprocess(
   (value) => (value === '' || value === undefined ? undefined : value),
   z.coerce.number().int().positive().safe().optional(),
@@ -66,6 +71,7 @@ const corsOriginsEnvironmentSchema = z
 const githubRuntimeEnvironmentShape = {
   APP_ORIGIN: optionalHttpsOriginEnvironmentSchema,
   GITHUB_APP_ID: optionalPositiveIntegerEnvironmentSchema,
+  GITHUB_APP_CLIENT_ID: optionalNonEmptyStringEnvironmentSchema,
   GITHUB_APP_USER_TOKENS_EXPIRE: optionalBooleanEnvironmentSchema,
   GITHUB_API_URL: z
     .string()
@@ -74,11 +80,47 @@ const githubRuntimeEnvironmentShape = {
       message: 'GITHUB_API_URL must be an exact HTTP origin',
     })
     .default('https://api.github.com'),
+  GITHUB_OAUTH_URL: z
+    .string()
+    .trim()
+    .refine(isHttpOrigin, {
+      message: 'GITHUB_OAUTH_URL must be an exact HTTP origin',
+    })
+    .default('https://github.com'),
   GITHUB_API_VERSION: z.string().trim().min(1).default('2026-03-10'),
   GITHUB_API_REQUEST_TIMEOUT_MS: z.coerce.number().int().min(100).default(10_000),
+  GITHUB_TOKEN_EARLY_REFRESH_MS: z.coerce.number().int().min(1_000).default(300_000),
+  GITHUB_REFRESH_LEASE_MS: z.coerce.number().int().min(1_000).default(60_000),
+  GITHUB_REFRESH_LEASE_POLL_MS: z.coerce.number().int().min(25).default(100),
+  GITHUB_TOKEN_ENCRYPTION_KEY_ID: z
+    .string()
+    .trim()
+    .regex(/^[A-Za-z0-9._-]{1,64}$/, {
+      message: 'GITHUB_TOKEN_ENCRYPTION_KEY_ID contains unsupported characters',
+    })
+    .default('primary'),
 }
 
-const githubRuntimeEnvironmentSchema = z.object(githubRuntimeEnvironmentShape)
+const githubRuntimeEnvironmentSchema = z
+  .object(githubRuntimeEnvironmentShape)
+  .superRefine((environment, context) => {
+    if (environment.GITHUB_REFRESH_LEASE_MS < environment.GITHUB_API_REQUEST_TIMEOUT_MS * 3) {
+      context.addIssue({
+        code: 'custom',
+        path: ['GITHUB_REFRESH_LEASE_MS'],
+        message:
+          'GITHUB_REFRESH_LEASE_MS must be at least three times GITHUB_API_REQUEST_TIMEOUT_MS',
+      })
+    }
+
+    if (environment.GITHUB_REFRESH_LEASE_POLL_MS >= environment.GITHUB_REFRESH_LEASE_MS) {
+      context.addIssue({
+        code: 'custom',
+        path: ['GITHUB_REFRESH_LEASE_POLL_MS'],
+        message: 'GITHUB_REFRESH_LEASE_POLL_MS must be less than GITHUB_REFRESH_LEASE_MS',
+      })
+    }
+  })
 
 const runtimeEnvironmentSchema = z
   .object({
@@ -148,6 +190,23 @@ const runtimeEnvironmentSchema = z
       })
     }
 
+    if (environment.GITHUB_REFRESH_LEASE_MS < environment.GITHUB_API_REQUEST_TIMEOUT_MS * 3) {
+      context.addIssue({
+        code: 'custom',
+        path: ['GITHUB_REFRESH_LEASE_MS'],
+        message:
+          'GITHUB_REFRESH_LEASE_MS must be at least three times GITHUB_API_REQUEST_TIMEOUT_MS',
+      })
+    }
+
+    if (environment.GITHUB_REFRESH_LEASE_POLL_MS >= environment.GITHUB_REFRESH_LEASE_MS) {
+      context.addIssue({
+        code: 'custom',
+        path: ['GITHUB_REFRESH_LEASE_POLL_MS'],
+        message: 'GITHUB_REFRESH_LEASE_POLL_MS must be less than GITHUB_REFRESH_LEASE_MS',
+      })
+    }
+
     if (environment.DATABASE_POOL_MIN > environment.DATABASE_POOL_MAX) {
       context.addIssue({
         code: 'custom',
@@ -166,10 +225,16 @@ export type DatabaseSslMode = z.infer<typeof databaseSslModeSchema>
 export interface GitHubRuntimeConfig {
   readonly appOrigin: string | undefined
   readonly appId: number | undefined
+  readonly clientId: string | undefined
   readonly userTokensExpire: boolean | undefined
   readonly apiUrl: string
+  readonly oauthUrl: string
   readonly apiVersion: string
   readonly requestTimeoutMs: number
+  readonly tokenEarlyRefreshMs: number
+  readonly refreshLeaseMs: number
+  readonly refreshLeasePollMs: number
+  readonly tokenEncryptionKeyId: string
 }
 
 export interface RuntimeConfig {
@@ -182,10 +247,16 @@ export interface RuntimeConfig {
   readonly githubApp: {
     readonly startupValidationEnabled: boolean
     readonly appId: number | undefined
+    readonly clientId: string | undefined
     readonly userTokensExpire: boolean | undefined
     readonly apiUrl: string
+    readonly oauthUrl: string
     readonly apiVersion: string
     readonly requestTimeoutMs: number
+    readonly tokenEarlyRefreshMs: number
+    readonly refreshLeaseMs: number
+    readonly refreshLeasePollMs: number
+    readonly tokenEncryptionKeyId: string
   }
 
   readonly api: {
@@ -228,10 +299,16 @@ export function loadGitHubRuntimeConfig(
   return {
     appOrigin: result.data.APP_ORIGIN,
     appId: result.data.GITHUB_APP_ID,
+    clientId: result.data.GITHUB_APP_CLIENT_ID,
     userTokensExpire: result.data.GITHUB_APP_USER_TOKENS_EXPIRE,
     apiUrl: result.data.GITHUB_API_URL,
+    oauthUrl: result.data.GITHUB_OAUTH_URL,
     apiVersion: result.data.GITHUB_API_VERSION,
     requestTimeoutMs: result.data.GITHUB_API_REQUEST_TIMEOUT_MS,
+    tokenEarlyRefreshMs: result.data.GITHUB_TOKEN_EARLY_REFRESH_MS,
+    refreshLeaseMs: result.data.GITHUB_REFRESH_LEASE_MS,
+    refreshLeasePollMs: result.data.GITHUB_REFRESH_LEASE_POLL_MS,
+    tokenEncryptionKeyId: result.data.GITHUB_TOKEN_ENCRYPTION_KEY_ID,
   }
 }
 
@@ -254,10 +331,16 @@ export function loadRuntimeConfig(environment: NodeJS.ProcessEnv = process.env):
         result.data.GITHUB_APP_STARTUP_VALIDATION_ENABLED ?? result.data.NODE_ENV === 'production',
 
       appId: result.data.GITHUB_APP_ID,
+      clientId: result.data.GITHUB_APP_CLIENT_ID,
       userTokensExpire: result.data.GITHUB_APP_USER_TOKENS_EXPIRE,
       apiUrl: result.data.GITHUB_API_URL,
+      oauthUrl: result.data.GITHUB_OAUTH_URL,
       apiVersion: result.data.GITHUB_API_VERSION,
       requestTimeoutMs: result.data.GITHUB_API_REQUEST_TIMEOUT_MS,
+      tokenEarlyRefreshMs: result.data.GITHUB_TOKEN_EARLY_REFRESH_MS,
+      refreshLeaseMs: result.data.GITHUB_REFRESH_LEASE_MS,
+      refreshLeasePollMs: result.data.GITHUB_REFRESH_LEASE_POLL_MS,
+      tokenEncryptionKeyId: result.data.GITHUB_TOKEN_ENCRYPTION_KEY_ID,
     },
 
     api: {

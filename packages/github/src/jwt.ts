@@ -36,12 +36,27 @@ export function loadGitHubAppPrivateKey(value: string): KeyObject {
   return key
 }
 
+export interface GitHubAppJwtCredential {
+  readonly token: string
+  readonly issuedAt: Date
+  readonly expiresAt: Date
+}
+
 export function createGitHubAppJwt(options: {
   readonly appId: number
   readonly privateKey: KeyObject
   readonly now?: Date
 }): string {
-  const nowSeconds = Math.floor((options.now ?? new Date()).getTime() / 1_000)
+  return createGitHubAppJwtCredential(options).token
+}
+
+export function createGitHubAppJwtCredential(options: {
+  readonly appId: number
+  readonly privateKey: KeyObject
+  readonly now?: Date
+}): GitHubAppJwtCredential {
+  const now = options.now ?? new Date()
+  const nowSeconds = Math.floor(now.getTime() / 1_000)
 
   const header = encodeJson({
     alg: 'RS256',
@@ -66,7 +81,11 @@ export function createGitHubAppJwt(options: {
     })
   }
 
-  return `${unsignedToken}.${signature.toString('base64url')}`
+  return {
+    token: `${unsignedToken}.${signature.toString('base64url')}`,
+    issuedAt: new Date((nowSeconds - 60) * 1_000),
+    expiresAt: new Date((nowSeconds + 9 * 60) * 1_000),
+  }
 }
 
 function normalizePrivateKey(value: string): string {

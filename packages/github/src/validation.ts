@@ -4,6 +4,7 @@ import {
   type GitHubPermissionLevel,
 } from './api.js'
 import { createGitHubAppJwt, GitHubPrivateKeyError, loadGitHubAppPrivateKey } from './jwt.js'
+import { createAes256GcmGitHubTokenCipher, GitHubTokenEncryptionError } from './token-cipher.js'
 import {
   createExpectedGitHubAppRegistration,
   GITHUB_API_VERSION,
@@ -41,14 +42,22 @@ export interface GitHubAppValidationReport {
    * manifest, but remote drift can only be caught during the OAuth flow or by
    * reviewing the GitHub App settings page.
    */
-  readonly remoteVerificationLimitations: readonly ['callback_url', 'user_token_expiration']
+  readonly remoteVerificationLimitations: readonly [
+    'callback_url',
+    'user_token_expiration',
+    'client_secret',
+  ]
 }
 
 export interface ValidateGitHubAppRegistrationOptions {
   readonly appOrigin: string | undefined
   readonly appId: number | undefined
+  readonly clientId: string | undefined
   readonly privateKey: string | undefined
+  readonly clientSecret: string | undefined
   readonly webhookSecret: string | undefined
+  readonly tokenEncryptionKey: string | undefined
+  readonly tokenEncryptionKeyId?: string
   readonly userTokensExpire: boolean | undefined
   readonly apiBaseUrl?: string
   readonly apiVersion?: string
@@ -78,8 +87,15 @@ export async function validateGitHubAppRegistration(
   const expectedRegistration = validateExpectedRegistration(options.appOrigin, checks)
 
   const appId = validateAppId(options.appId, checks)
+  const clientId = validateClientId(options.clientId, checks)
 
+  validateClientSecret(options.clientSecret, checks)
   validateWebhookSecret(options.webhookSecret, checks)
+  validateTokenEncryption(
+    options.tokenEncryptionKey,
+    options.tokenEncryptionKeyId ?? 'primary',
+    checks,
+  )
   validateUserTokenExpiration(options.userTokensExpire, checks)
 
   checks.push({
@@ -181,6 +197,7 @@ export async function validateGitHubAppRegistration(
       })
 
       compareAppId(authenticatedApp.id, appId, checks)
+      compareClientId(authenticatedApp.clientId, clientId, checks)
       comparePermissions(authenticatedApp.permissions, expectedRegistration, checks)
       compareEvents(authenticatedApp.events, expectedRegistration, checks)
     } catch (error) {
@@ -242,7 +259,7 @@ export async function validateGitHubAppRegistration(
     checks,
     app,
     expectedRegistration,
-    remoteVerificationLimitations: ['callback_url', 'user_token_expiration'],
+    remoteVerificationLimitations: ['callback_url', 'user_token_expiration', 'client_secret'],
   }
 }
 
@@ -336,6 +353,109 @@ function validateAppId(
   })
 
   return appId
+}
+
+function validateClientId(
+  clientId: string | undefined,
+  checks: GitHubAppValidationCheck[],
+): string | undefined {
+  if (!clientId || clientId.trim().length === 0) {
+    checks.push({
+      id: 'config.client_id',
+      status: 'failed',
+      source: 'local',
+      message: 'GITHUB_APP_CLIENT_ID is required',
+    })
+
+    return undefined
+  }
+
+  checks.push({
+    id: 'config.client_id',
+    status: 'passed',
+    source: 'local',
+    message: `Expected GitHub App client ID is ${clientId}`,
+  })
+
+  return clientId
+}
+
+function validateClientSecret(
+  clientSecret: string | undefined,
+  checks: GitHubAppValidationCheck[],
+): void {
+  if (!clientSecret || clientSecret.trim().length === 0) {
+    checks.push({
+      id: 'config.client_secret',
+      status: 'failed',
+      source: 'local',
+      message: 'GITHUB_APP_CLIENT_SECRET must be configured',
+    })
+
+    return
+  }
+
+  checks.push({
+    id: 'config.client_secret',
+    status: 'passed',
+    source: 'local',
+    message: 'A local GitHub App client secret is configured',
+  })
+}
+
+function validateTokenEncryption(
+  encryptionKey: string | undefined,
+  encryptionKeyId: string,
+  checks: GitHubAppValidationCheck[],
+): void {
+  if (!encryptionKey) {
+    checks.push({
+      id: 'crypto.user_token_encryption',
+      status: 'failed',
+      source: 'local',
+      message: 'GITHUB_TOKEN_ENCRYPTION_KEY must be configured',
+    })
+
+    return
+  }
+
+  try {
+    const cipher = createAes256GcmGitHubTokenCipher({
+      key: encryptionKey,
+      keyId: encryptionKeyId,
+    })
+    const encryptedToken = cipher.encrypt({
+      userId: 1,
+      purpose: 'refresh',
+      token: 'shipgate-github-doctor-probe',
+    })
+    const decryptedToken = cipher.decrypt({
+      userId: 1,
+      purpose: 'refresh',
+      encryptedToken,
+    })
+
+    if (decryptedToken !== 'shipgate-github-doctor-probe') {
+      throw new GitHubTokenEncryptionError('GitHub token encryption round trip failed')
+    }
+
+    checks.push({
+      id: 'crypto.user_token_encryption',
+      status: 'passed',
+      source: 'local',
+      message: `AES-256-GCM user-token encryption is configured with key ID ${encryptionKeyId}`,
+    })
+  } catch (error) {
+    checks.push({
+      id: 'crypto.user_token_encryption',
+      status: 'failed',
+      source: 'local',
+      message:
+        error instanceof GitHubTokenEncryptionError
+          ? error.message
+          : 'GitHub token encryption configuration is invalid',
+    })
+  }
 }
 
 function validateWebhookSecret(
@@ -450,6 +570,45 @@ function compareAppId(
     status: 'passed',
     source: 'github',
     message: `GET /app returned the expected App ID ${expectedAppId}`,
+  })
+}
+
+function compareClientId(
+  actualClientId: string | undefined,
+  expectedClientId: string | undefined,
+  checks: GitHubAppValidationCheck[],
+): void {
+  if (expectedClientId === undefined) {
+    checks.push({
+      id: 'github.client_id',
+      status: 'skipped',
+      source: 'github',
+      message: 'GitHub App client ID cannot be compared until GITHUB_APP_CLIENT_ID is valid',
+    })
+
+    return
+  }
+
+  if (actualClientId !== expectedClientId) {
+    checks.push({
+      id: 'github.client_id',
+      status: 'failed',
+      source: 'github',
+      message: 'Authenticated GitHub App client ID does not match GITHUB_APP_CLIENT_ID',
+      details: {
+        expected: expectedClientId,
+        actual: actualClientId,
+      },
+    })
+
+    return
+  }
+
+  checks.push({
+    id: 'github.client_id',
+    status: 'passed',
+    source: 'github',
+    message: `GET /app returned the expected client ID ${expectedClientId}`,
   })
 }
 
@@ -758,6 +917,12 @@ function addSkippedAuthenticatedAppChecks(checks: GitHubAppValidationCheck[]): v
       status: 'skipped',
       source: 'github',
       message: 'App ID comparison requires a successful GET /app response',
+    },
+    {
+      id: 'github.client_id',
+      status: 'skipped',
+      source: 'github',
+      message: 'Client ID comparison requires a successful GET /app response',
     },
     {
       id: 'github.permissions',
