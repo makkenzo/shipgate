@@ -1,4 +1,4 @@
-import type { Generated, Kysely } from 'kysely'
+import type { ColumnType, Generated, Kysely } from 'kysely'
 import type { Pool } from 'pg'
 
 import type { DatabaseOperationError } from './errors.js'
@@ -20,6 +20,12 @@ export interface DatabaseSchema {
   sessions: SessionTable
 
   oauth_attempts: OAuthAttemptTable
+
+  github_installations: GitHubInstallationTable
+
+  github_installation_repositories: GitHubInstallationRepositoryTable
+
+  github_installation_permissions: GitHubInstallationPermissionTable
 
   shipgate_job_execution: ShipgateJobExecutionTable
 
@@ -83,7 +89,7 @@ export interface GitHubUserTable {
   display_name: string | null
   email: string | null
   html_url: string
-  installations: JsonValue
+  installations: ColumnType<JsonValue, string, string>
   installations_synced_at: Date
   created_at: Generated<Date>
   updated_at: Generated<Date>
@@ -110,6 +116,50 @@ export interface OAuthAttemptTable {
   expires_at: Date
   consumed_at: Date | null
   created_at: Generated<Date>
+}
+
+export type GitHubInstallationPermissionState = 'current' | 'stale' | 'suspended' | 'revoked'
+
+export interface GitHubInstallationTable {
+  installation_id: string
+  owner_id: string
+  owner_type: string
+  owner_login: string
+  owner_avatar_url: string | null
+  repository_selection: 'all' | 'selected'
+  suspended_at: Date | null
+  permission_state: GitHubInstallationPermissionState
+  last_successful_confirmation_at: Date | null
+  last_reconciled_at: Date
+  created_at: Generated<Date>
+  updated_at: Generated<Date>
+}
+
+export interface GitHubInstallationRepositoryTable {
+  installation_id: string
+  repository_id: string
+  owner_id: string
+  owner_login: string
+  name: string
+  full_name: string
+  private: boolean
+  archived: boolean
+  disabled: boolean
+  default_branch: string | null
+  visibility: string | null
+  last_successful_confirmation_at: Date
+  last_reconciled_at: Date
+  created_at: Generated<Date>
+  updated_at: Generated<Date>
+}
+
+export interface GitHubInstallationPermissionTable {
+  installation_id: string
+  permission_name: string
+  permission_level: 'read' | 'write'
+  last_reconciled_at: Date
+  created_at: Generated<Date>
+  updated_at: Generated<Date>
 }
 
 export type JobExecutionStatus = 'queued' | 'running' | 'retrying' | 'succeeded' | 'failed'

@@ -9,6 +9,10 @@ import { createDatabase, type DatabaseClient } from '@shipgate/database'
 import type { GitHubAuthenticationService } from '@shipgate/github'
 import type { Logger } from 'pino'
 import { createCorrelationId, withCorrelationId } from './correlation-id.js'
+import {
+  createGitHubRepositoryAccessService,
+  type GitHubRepositoryAccessService,
+} from './github-access/index.js'
 import { createApplicationGitHubAuthentication } from './github-auth.js'
 import { createLogger, type ProcessKind } from './logger.js'
 import { createShutdownManager, type ShutdownManager } from './shutdown.js'
@@ -21,6 +25,7 @@ export interface ApplicationContext {
   readonly database: DatabaseClient
   readonly githubSecrets: GitHubSecrets
   readonly githubAuth: GitHubAuthenticationService
+  readonly githubRepositoryAccess: GitHubRepositoryAccessService
   readonly shutdown: ShutdownManager
 
   createCorrelationId(): string
@@ -98,12 +103,37 @@ export function createApplicationContext(
     await database.destroy()
   })
 
+  let githubRepositoryAccess: GitHubRepositoryAccessService | undefined
   const githubAuth = createApplicationGitHubAuthentication({
     runtimeConfig,
     githubSecrets,
     database,
     logger,
+    onAccessFailure(event) {
+      if (!githubRepositoryAccess) {
+        return
+      }
+
+      switch (event.authentication.type) {
+        case 'app':
+          githubRepositoryAccess.invalidateAll()
+          break
+
+        case 'installation':
+          githubRepositoryAccess.invalidateInstallation(event.authentication.installationId)
+          break
+
+        case 'user':
+          githubRepositoryAccess.invalidateUser(event.authentication.userId)
+          break
+      }
+    },
   })
+  const repositoryAccess = createGitHubRepositoryAccessService({
+    database,
+    githubAuth,
+  })
+  githubRepositoryAccess = repositoryAccess
 
   return {
     processKind: options.processKind,
@@ -113,6 +143,7 @@ export function createApplicationContext(
     database,
     githubSecrets,
     githubAuth,
+    githubRepositoryAccess: repositoryAccess,
     shutdown,
     createCorrelationId,
 

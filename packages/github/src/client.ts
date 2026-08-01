@@ -80,6 +80,11 @@ export type GitHubClientAuthentication =
   | InstallationGitHubClient['authentication']
   | UserGitHubClient['authentication']
 
+export interface GitHubAccessFailureEvent {
+  readonly status: 401 | 403
+  readonly authentication: GitHubClientAuthentication
+}
+
 export interface CreateGitHubClientOptions {
   readonly auth: string
   readonly authentication: GitHubClientAuthentication
@@ -90,6 +95,7 @@ export interface CreateGitHubClientOptions {
   readonly logger?: GitHubClientLogger
   readonly fetchImplementation?: typeof fetch
   readonly onUnauthorized: () => Promise<void> | void
+  readonly onAccessFailure?: (event: GitHubAccessFailureEvent) => Promise<void> | void
 }
 
 export type GitHubClientFactory = (
@@ -153,7 +159,16 @@ export const createGitHubClient: GitHubClientFactory = (options) => {
   })
 
   octokit.hook.error('request', async (error) => {
-    if (getStatus(error) === 401) {
+    const status = getStatus(error)
+
+    if (status === 401 || status === 403) {
+      await options.onAccessFailure?.({
+        status,
+        authentication: options.authentication,
+      })
+    }
+
+    if (status === 401) {
       await options.onUnauthorized()
     }
 

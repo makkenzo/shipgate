@@ -1,6 +1,7 @@
 export {
-  createGitHubClient,
   type CreateGitHubClientOptions,
+  createGitHubClient,
+  type GitHubAccessFailureEvent,
   type GitHubClientFactory,
   prepareGitHubRestRequest,
 } from './client.js'

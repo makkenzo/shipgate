@@ -52,9 +52,13 @@ export const GitHubLoginQuerySchema = Type.Object(
 export const GitHubCallbackQuerySchema = Type.Object(
   {
     code: Type.Optional(Type.String({ minLength: 1, maxLength: 1024 })),
-    state: Type.String({ minLength: 1, maxLength: 1024 }),
+    state: Type.Optional(Type.String({ minLength: 1, maxLength: 1024 })),
     error: Type.Optional(Type.String({ minLength: 1, maxLength: 256 })),
     error_description: Type.Optional(Type.String({ minLength: 1, maxLength: 1024 })),
+    installation_id: Type.Optional(Type.String({ pattern: '^[1-9][0-9]*$' })),
+    setup_action: Type.Optional(
+      Type.Union([Type.Literal('install'), Type.Literal('update'), Type.Literal('request')]),
+    ),
   },
   {
     additionalProperties: false,

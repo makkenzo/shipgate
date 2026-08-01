@@ -3,6 +3,7 @@ import type { DatabaseClient } from '@shipgate/database'
 import {
   createAes256GcmGitHubTokenCipher,
   createGitHubAuthenticationService,
+  type GitHubAccessFailureEvent,
   GitHubAuthenticationError,
   type GitHubAuthenticationService,
   type GitHubClientLogger,
@@ -16,6 +17,7 @@ export function createApplicationGitHubAuthentication(options: {
   readonly githubSecrets: GitHubSecrets
   readonly database: DatabaseClient
   readonly logger: Logger
+  readonly onAccessFailure?: (event: GitHubAccessFailureEvent) => Promise<void> | void
 }): GitHubAuthenticationService {
   const { githubApp } = options.runtimeConfig
   const { githubSecrets } = options
@@ -65,6 +67,9 @@ export function createApplicationGitHubAuthentication(options: {
       }),
       userTokenStore,
       logger: createOctokitLogger(options.logger),
+      ...(options.onAccessFailure !== undefined
+        ? { onAccessFailure: options.onAccessFailure }
+        : {}),
     })
 
   return createLazyGitHubAuthenticationService(createService)

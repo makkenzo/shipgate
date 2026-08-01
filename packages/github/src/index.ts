@@ -1,6 +1,6 @@
 export {
-  createGitHubAuthenticationService,
   type CreateGitHubAuthenticationServiceOptions,
+  createGitHubAuthenticationService,
   type GitHubAuthenticationService,
   type GitHubAuthInvalidator,
   type GitHubAuthProvider,
@@ -9,6 +9,7 @@ export {
 } from './auth-provider.js'
 export type {
   AppGitHubClient,
+  GitHubAccessFailureEvent,
   GitHubClient,
   GitHubClientAuthentication,
   GitHubClientLogger,
@@ -21,7 +22,6 @@ export type {
   InstallationPermissions,
   UserGitHubClient,
 } from './client.js'
-export { GitHubOAuthRequestError } from './oauth.js'
 export {
   GitHubAuthenticationError,
   GitHubInstallationScopeError,
@@ -29,6 +29,7 @@ export {
   GitHubUserReauthorizationRequiredError,
   GitHubUserTokenRotationError,
 } from './errors.js'
+export { GitHubOAuthRequestError } from './oauth.js'
 export {
   createExpectedGitHubAppRegistration,
   createGitHubAppManifest,

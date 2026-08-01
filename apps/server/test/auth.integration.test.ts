@@ -2,8 +2,10 @@ import { createHash } from 'node:crypto'
 
 import { migrateToLatest } from '@shipgate/database'
 import type {
+  AppGitHubClient,
   GitHubAuthenticationService,
   GitHubResponse,
+  InstallationGitHubClient,
   UserGitHubClient,
 } from '@shipgate/github'
 import {
@@ -15,6 +17,7 @@ import type { FastifyInstance } from 'fastify'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 
 import { type ApplicationContext, createApplicationContext } from '../src/application-context.js'
+import { createGitHubRepositoryAccessService } from '../src/github-access/index.js'
 import { buildApiApplication } from '../src/http/api-app.js'
 
 describe.sequential('GitHub login and Shipgate sessions', () => {
@@ -48,6 +51,10 @@ describe.sequential('GitHub login and Shipgate sessions', () => {
     context = {
       ...baseContext,
       githubAuth,
+      githubRepositoryAccess: createGitHubRepositoryAccessService({
+        database: baseContext.database,
+        githubAuth,
+      }),
     }
 
     app = await buildApiApplication(context)
@@ -58,6 +65,35 @@ describe.sequential('GitHub login and Shipgate sessions', () => {
     await app.close()
     await baseContext.database.destroy()
     await postgres.stop()
+  })
+
+  it('turns a GitHub post-installation redirect into a stateful OAuth flow', async () => {
+    const setup = await app.inject({
+      method: 'GET',
+      url: '/api/v1/auth/github/callback?installation_id=123&setup_action=install',
+    })
+
+    expect(setup.statusCode).toBe(302)
+
+    const loginUrl = new URL(requireHeader(setup.headers.location, 'location'))
+
+    expect(loginUrl.pathname).toBe('/api/v1/auth/github')
+    expect(loginUrl.searchParams.get('returnTo')).toBe(
+      '/api/v1/auth/session?installation_action=install&installation_id=123',
+    )
+
+    const started = await app.inject({
+      method: 'GET',
+      url: `${loginUrl.pathname}${loginUrl.search}`,
+    })
+
+    expect(started.statusCode).toBe(302)
+
+    const authorizeUrl = new URL(requireHeader(started.headers.location, 'location'))
+
+    expect(authorizeUrl.pathname).toBe('/login/oauth/authorize')
+    expect(authorizeUrl.searchParams.get('state')).toBeTruthy()
+    expect(authorizeUrl.searchParams.get('code_challenge')).toBeTruthy()
   })
 
   it('uses one-time state and PKCE, persists the session, and enforces CSRF', async () => {
@@ -228,8 +264,10 @@ describe.sequential('GitHub login and Shipgate sessions', () => {
 function createFakeGitHubAuthentication(
   context: ApplicationContext,
   spies: {
-    readonly authorizeUser: ReturnType<typeof vi.fn>
-    readonly disconnectUser: ReturnType<typeof vi.fn>
+    readonly authorizeUser: (
+      input: Parameters<GitHubAuthenticationService['authorizeUser']>[0],
+    ) => void
+    readonly disconnectUser: (userId: number) => void
   },
 ): GitHubAuthenticationService {
   const userClient = {
@@ -272,19 +310,80 @@ function createFakeGitHubAuthentication(
         })
       }
 
+      if (route === 'GET /user/installations/{installation_id}/repositories') {
+        return createGitHubResponse<Data>({
+          total_count: 1,
+          repositories: [createRepository({ pull: true, push: true })],
+        })
+      }
+
       return createGitHubResponse<Data>({})
     },
     async graphql<Data = unknown>() {
       return {} as Data
     },
   } satisfies UserGitHubClient
+  const appClient = {
+    authentication: {
+      type: 'app' as const,
+      appId: 123_456,
+    },
+    async request<Data = unknown>(route: string): Promise<GitHubResponse<Data>> {
+      if (route === 'GET /app/installations/{installation_id}') {
+        return createGitHubResponse<Data>({
+          id: 123,
+          account: {
+            id: 99,
+            login: 'octocat',
+            type: 'User',
+            avatar_url: 'https://avatars.example/octocat.png',
+          },
+          target_type: 'User',
+          repository_selection: 'selected',
+          permissions: {
+            metadata: 'read',
+            contents: 'write',
+          },
+          suspended_at: null,
+        })
+      }
+
+      return createGitHubResponse<Data>({})
+    },
+    async graphql<Data = unknown>() {
+      return {} as Data
+    },
+  } satisfies AppGitHubClient
+  const installationClient = {
+    authentication: {
+      type: 'installation' as const,
+      installationId: 123,
+      repositoryIds: undefined,
+      permissions: {
+        metadata: 'read' as const,
+      },
+    },
+    async request<Data = unknown>(route: string): Promise<GitHubResponse<Data>> {
+      if (route === 'GET /installation/repositories') {
+        return createGitHubResponse<Data>({
+          total_count: 1,
+          repositories: [createRepository({ pull: true, push: true })],
+        })
+      }
+
+      return createGitHubResponse<Data>({})
+    },
+    async graphql<Data = unknown>() {
+      return {} as Data
+    },
+  } satisfies InstallationGitHubClient
 
   return {
     async getAppClient() {
-      throw new Error('Not used in auth integration test')
+      return appClient
     },
     async getInstallationClient() {
-      throw new Error('Not used in auth integration test')
+      return installationClient
     },
     async getUserClient() {
       return userClient
@@ -358,6 +457,24 @@ async function login(app: FastifyInstance): Promise<{
   return {
     cookieHeader: toCookieHeader(cookies),
     csrfToken: readCookie(cookies, '__Host-shipgate_csrf'),
+  }
+}
+
+function createRepository(permissions: Readonly<Record<string, boolean>>) {
+  return {
+    id: 456,
+    name: 'shipgate',
+    full_name: 'octocat/shipgate',
+    private: true,
+    archived: false,
+    disabled: false,
+    default_branch: 'main',
+    visibility: 'private',
+    owner: {
+      id: 99,
+      login: 'octocat',
+    },
+    permissions,
   }
 }
 

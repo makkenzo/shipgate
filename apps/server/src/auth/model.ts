@@ -35,19 +35,21 @@ export interface AuthenticatedSession {
 
 export function serializeInstallations(
   installations: readonly GitHubInstallationSummary[],
-): JsonValue {
-  return installations.map((installation) => ({
-    id: installation.id,
-    account: {
-      id: installation.account.id,
-      login: installation.account.login,
-      type: installation.account.type,
-      avatarUrl: installation.account.avatarUrl,
-    },
-    repositorySelection: installation.repositorySelection,
-    permissions: installation.permissions,
-    suspendedAt: installation.suspendedAt,
-  }))
+): string {
+  return JSON.stringify(
+    installations.map((installation) => ({
+      id: installation.id,
+      account: {
+        id: installation.account.id,
+        login: installation.account.login,
+        type: installation.account.type,
+        avatarUrl: installation.account.avatarUrl,
+      },
+      repositorySelection: installation.repositorySelection,
+      permissions: installation.permissions,
+      suspendedAt: installation.suspendedAt,
+    })),
+  )
 }
 
 export function parseInstallations(value: JsonValue): readonly GitHubInstallationSummary[] {

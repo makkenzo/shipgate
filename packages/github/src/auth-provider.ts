@@ -1,9 +1,10 @@
-import { randomUUID, type KeyObject } from 'node:crypto'
+import { type KeyObject, randomUUID } from 'node:crypto'
 import { setTimeout as delay } from 'node:timers/promises'
 
 import {
   type AppGitHubClient,
   createGitHubClient,
+  type GitHubAccessFailureEvent,
   type GitHubClientFactory,
   type GitHubClientLogger,
   type InstallationGitHubClient,
@@ -100,6 +101,7 @@ export interface CreateGitHubAuthenticationServiceOptions {
   readonly refreshLeasePollMs?: number
   readonly logger?: GitHubClientLogger
   readonly fetchImplementation?: typeof fetch
+  readonly onAccessFailure?: (event: GitHubAccessFailureEvent) => Promise<void> | void
   readonly clientFactory?: GitHubClientFactory
   readonly oauthClient?: GitHubOAuthClient
   readonly now?: () => Date
@@ -137,6 +139,7 @@ class DefaultGitHubAuthenticationService implements GitHubAuthenticationService 
   readonly #refreshLeasePollMs: number
   readonly #logger: GitHubClientLogger | undefined
   readonly #fetchImplementation: typeof fetch | undefined
+  readonly #onAccessFailure: ((event: GitHubAccessFailureEvent) => Promise<void> | void) | undefined
   readonly #clientFactory: GitHubClientFactory
   readonly #oauthClient: GitHubOAuthClient
   readonly #now: () => Date
@@ -192,6 +195,7 @@ class DefaultGitHubAuthenticationService implements GitHubAuthenticationService 
     this.#refreshLeasePollMs = refreshLeasePollMs
     this.#logger = options.logger
     this.#fetchImplementation = options.fetchImplementation
+    this.#onAccessFailure = options.onAccessFailure
     this.#clientFactory = options.clientFactory ?? createGitHubClient
     this.#now = options.now ?? (() => new Date())
     this.#createLeaseId = options.createLeaseId ?? randomUUID
@@ -408,6 +412,7 @@ class DefaultGitHubAuthenticationService implements GitHubAuthenticationService 
       ...(this.#fetchImplementation !== undefined
         ? { fetchImplementation: this.#fetchImplementation }
         : {}),
+      ...(this.#onAccessFailure !== undefined ? { onAccessFailure: this.#onAccessFailure } : {}),
       onUnauthorized: () => {
         this.#appClient = undefined
       },
@@ -472,6 +477,7 @@ class DefaultGitHubAuthenticationService implements GitHubAuthenticationService 
       ...(this.#fetchImplementation !== undefined
         ? { fetchImplementation: this.#fetchImplementation }
         : {}),
+      ...(this.#onAccessFailure !== undefined ? { onAccessFailure: this.#onAccessFailure } : {}),
       onUnauthorized: () => {
         this.invalidateInstallation(installationId)
       },
@@ -724,6 +730,9 @@ class DefaultGitHubAuthenticationService implements GitHubAuthenticationService 
       ...(this.#logger !== undefined ? { logger: this.#logger } : {}),
       ...(this.#fetchImplementation !== undefined
         ? { fetchImplementation: this.#fetchImplementation }
+        : {}),
+      ...(userId > 0 && this.#onAccessFailure !== undefined
+        ? { onAccessFailure: this.#onAccessFailure }
         : {}),
       onUnauthorized,
     }) as UserGitHubClient

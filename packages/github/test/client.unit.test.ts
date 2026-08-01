@@ -1,6 +1,6 @@
 import { GitHubAuthenticationError } from '@shipgate/github'
-import { prepareGitHubRestRequest } from '@shipgate/github/testing'
-import { describe, expect, it } from 'vitest'
+import { createGitHubClient, prepareGitHubRestRequest } from '@shipgate/github/testing'
+import { describe, expect, it, vi } from 'vitest'
 
 describe('GitHub client request boundary', () => {
   it('enforces the API target, version, user agent boundary and safe retries', () => {
@@ -78,4 +78,53 @@ describe('GitHub client request boundary', () => {
       ).toThrow(GitHubAuthenticationError)
     }
   })
+
+  it.each([401, 403] as const)(
+    'reports GitHub %s to the access-cache invalidator',
+    async (status) => {
+      const onUnauthorized = vi.fn()
+      const onAccessFailure = vi.fn()
+      const client = createGitHubClient({
+        auth: 'user-token',
+        authentication: {
+          type: 'user',
+          userId: 42,
+        },
+        apiBaseUrl: 'https://api.github.com',
+        apiVersion: '2026-03-10',
+        requestTimeoutMs: 10_000,
+        userAgent: 'shipgate/test',
+        fetchImplementation: vi.fn(async () =>
+          Response.json(
+            {
+              message: status === 401 ? 'Bad credentials' : 'Forbidden',
+            },
+            {
+              status,
+            },
+          ),
+        ) as unknown as typeof fetch,
+        onUnauthorized,
+        onAccessFailure,
+      })
+
+      await expect(client.request('GET /user')).rejects.toMatchObject({
+        status,
+      })
+
+      if (status === 401) {
+        expect(onUnauthorized).toHaveBeenCalled()
+      } else {
+        expect(onUnauthorized).not.toHaveBeenCalled()
+      }
+
+      expect(onAccessFailure).toHaveBeenCalledWith({
+        status,
+        authentication: {
+          type: 'user',
+          userId: 42,
+        },
+      })
+    },
+  )
 })

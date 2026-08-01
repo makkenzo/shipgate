@@ -1,10 +1,10 @@
 import { type FastifyPluginAsyncTypebox, Type } from '@fastify/type-provider-typebox'
-import type { FastifyReply } from 'fastify'
 import {
   GitHubOAuthRequestError,
   GitHubUserAuthorizationNotFoundError,
   GitHubUserReauthorizationRequiredError,
 } from '@shipgate/github'
+import type { FastifyReply } from 'fastify'
 
 import type { ApplicationContext } from '../../application-context.js'
 import {
@@ -23,14 +23,15 @@ import {
   revokeSession,
   revokeUserSessions,
 } from '../../auth/store.js'
+import { GitHubRepositoryAccessVerificationError } from '../../github-access/index.js'
 import { ApiHttpError } from '../api-error.js'
-import { ApiErrorSchema } from '../schemas.js'
 import {
   AuthSessionResponseSchema,
   EmptyMutationBodySchema,
   GitHubCallbackQuerySchema,
   GitHubLoginQuerySchema,
 } from '../auth-schemas.js'
+import { ApiErrorSchema } from '../schemas.js'
 import { requireAuthenticatedSession, requireCsrfProtection } from '../session-middleware.js'
 
 interface AuthRoutesOptions {
@@ -102,6 +103,33 @@ export const authRoutes: FastifyPluginAsyncTypebox<AuthRoutesOptions> = async (a
     },
     async (request, reply) => {
       const configuration = getAuthConfiguration(context)
+
+      if (!request.query.state) {
+        if (request.query.setup_action) {
+          request.log.info(
+            {
+              event: 'security.auth.installation_redirect_received',
+              setupAction: request.query.setup_action,
+              installationId: request.query.installation_id,
+            },
+            'Received GitHub App post-installation redirect',
+          )
+
+          return redirectInstallationSetupToLogin(reply, configuration.appOrigin, {
+            setupAction: request.query.setup_action,
+            ...(request.query.installation_id
+              ? { installationId: request.query.installation_id }
+              : {}),
+          })
+        }
+
+        throw new ApiHttpError({
+          statusCode: 400,
+          code: 'MISSING_OAUTH_STATE',
+          message: 'GitHub callback did not include OAuth state',
+        })
+      }
+
       const attempt = await consumeOAuthAttempt({
         database: context.database,
         state: request.query.state,
@@ -158,10 +186,20 @@ export const authRoutes: FastifyPluginAsyncTypebox<AuthRoutesOptions> = async (a
         authorizedUserId = authorization.userId
 
         const client = await context.githubAuth.getUserClient(authorization.userId)
-        const user = await loadGitHubUserIdentity(client)
+        const identity = await loadGitHubUserIdentity(client)
 
-        if (user.githubUserId !== authorization.userId) {
+        if (identity.githubUserId !== authorization.userId) {
           throw new Error('GitHub user identity changed during authorization')
+        }
+
+        const installations = await context.githubRepositoryAccess.reconcileUserInstallations({
+          githubUserId: identity.githubUserId,
+          userClient: client,
+          installations: identity.installations,
+        })
+        const user = {
+          ...identity,
+          installations,
         }
 
         const previousSessionToken = parseCookies(request.headers.cookie)[SESSION_COOKIE_NAME]
@@ -399,6 +437,27 @@ function normalizeReturnTo(value: string | undefined, appOrigin: string): string
   return `${url.pathname}${url.search}${url.hash}`
 }
 
+function redirectInstallationSetupToLogin(
+  reply: FastifyReply,
+  appOrigin: string,
+  input: {
+    readonly installationId?: string
+    readonly setupAction: 'install' | 'update' | 'request'
+  },
+): FastifyReply {
+  const returnTo = new URL('/api/v1/auth/session', appOrigin)
+  returnTo.searchParams.set('installation_action', input.setupAction)
+
+  if (input.installationId) {
+    returnTo.searchParams.set('installation_id', input.installationId)
+  }
+
+  const login = new URL('/api/v1/auth/github', appOrigin)
+  login.searchParams.set('returnTo', `${returnTo.pathname}${returnTo.search}`)
+
+  return reply.code(302).header('cache-control', 'no-store').header('location', login.href).send()
+}
+
 function redirectWithAuthResult(
   reply: FastifyReply,
   appOrigin: string,
@@ -447,6 +506,10 @@ function classifyGitHubAuthFailure(error: unknown): string {
     return error.code ?? 'github_oauth_error'
   }
 
+  if (error instanceof GitHubRepositoryAccessVerificationError) {
+    return `repository_access_verification_failed:${error.stage}`
+  }
+
   return 'unexpected_error'
 }
 
@@ -471,6 +534,20 @@ function mapGitHubAuthError(error: unknown): ApiHttpError {
       details: {
         githubCode: error.code,
         githubRequestId: error.requestId,
+      },
+      cause: error,
+    })
+  }
+
+  if (error instanceof GitHubRepositoryAccessVerificationError) {
+    return new ApiHttpError({
+      statusCode: 502,
+      code: 'GITHUB_REPOSITORY_ACCESS_VERIFICATION_FAILED',
+      message: 'GitHub repository access could not be verified',
+      details: {
+        stage: error.stage,
+        installationId: error.installationId,
+        ...(error.status !== undefined ? { githubStatus: error.status } : {}),
       },
       cause: error,
     })
