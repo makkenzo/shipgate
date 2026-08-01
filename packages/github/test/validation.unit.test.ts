@@ -236,7 +236,7 @@ describe('GitHub App registration validation', () => {
         url: `${appOrigin}/api/v1/github/webhooks`,
         active: true,
       },
-      callback_urls: [`${appOrigin}/api/v1/github/oauth/callback`],
+      callback_urls: [`${appOrigin}/api/v1/auth/github/callback`],
       request_oauth_on_install: true,
       public: false,
       default_permissions: GITHUB_APP_REPOSITORY_PERMISSIONS,

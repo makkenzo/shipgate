@@ -1,3 +1,5 @@
+import { Buffer } from 'node:buffer'
+
 import { createGitHubOAuthClient, type GitHubOAuthRequestError } from '@shipgate/github/testing'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -7,7 +9,9 @@ function createClient(fetchImplementation: typeof fetch) {
   return createGitHubOAuthClient({
     clientId: 'Iv1.shipgate',
     clientSecret: 'client-secret',
+    apiBaseUrl: 'https://api.github.com',
     oauthBaseUrl: 'https://github.com',
+    apiVersion: '2026-03-10',
     requestTimeoutMs: 10_000,
     userAgent: 'shipgate/test',
     fetchImplementation,
@@ -46,7 +50,8 @@ describe('GitHub OAuth client', () => {
 
     const exchanged = await client.exchangeAuthorizationCode({
       code: 'authorization-code',
-      redirectUri: 'https://shipgate.example/api/v1/github/oauth/callback',
+      redirectUri: 'https://shipgate.example/api/v1/auth/github/callback',
+      codeVerifier: 'a'.repeat(64),
     })
     const refreshed = await client.refreshUserToken('old-refresh-token')
 
@@ -69,8 +74,9 @@ describe('GitHub OAuth client', () => {
     expect(exchangeBody).toBeInstanceOf(URLSearchParams)
     expect(String(exchangeBody)).toContain('code=authorization-code')
     expect(String(exchangeBody)).toContain(
-      'redirect_uri=https%3A%2F%2Fshipgate.example%2Fapi%2Fv1%2Fgithub%2Foauth%2Fcallback',
+      'redirect_uri=https%3A%2F%2Fshipgate.example%2Fapi%2Fv1%2Fauth%2Fgithub%2Fcallback',
     )
+    expect(String(exchangeBody)).toContain(`code_verifier=${'a'.repeat(64)}`)
     expect(refreshBody).toBeInstanceOf(URLSearchParams)
     expect(String(refreshBody)).toContain('grant_type=refresh_token')
     expect(String(refreshBody)).toContain('refresh_token=old-refresh-token')
@@ -78,6 +84,41 @@ describe('GitHub OAuth client', () => {
       accept: 'application/json',
       'content-type': 'application/x-www-form-urlencoded',
       'user-agent': 'shipgate/test',
+    })
+  })
+
+  it('revokes the GitHub App authorization with client credentials', async () => {
+    const requests: Array<{ readonly url: string; readonly init: RequestInit }> = []
+    const fetchImplementation = vi.fn(
+      async (input: Parameters<typeof fetch>[0], init?: RequestInit) => {
+        requests.push({
+          url: String(input),
+          init: init ?? {},
+        })
+
+        return new Response(null, {
+          status: 204,
+        })
+      },
+    ) as typeof fetch
+    const client = createClient(fetchImplementation)
+
+    await client.revokeUserAuthorization('access-token')
+
+    expect(requests).toHaveLength(1)
+    expect(requests[0]?.url).toBe('https://api.github.com/applications/Iv1.shipgate/grant')
+    expect(requests[0]?.init).toMatchObject({
+      method: 'DELETE',
+      headers: {
+        accept: 'application/vnd.github+json',
+        authorization: `Basic ${Buffer.from('Iv1.shipgate:client-secret', 'utf8').toString(
+          'base64',
+        )}`,
+        'content-type': 'application/json',
+        'user-agent': 'shipgate/test',
+        'x-github-api-version': '2026-03-10',
+      },
+      body: JSON.stringify({ access_token: 'access-token' }),
     })
   })
 

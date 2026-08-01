@@ -11,7 +11,7 @@ export function createDatabaseGitHubUserTokenStore(database: DatabaseClient): Gi
   return {
     async get(userId) {
       const row = await database.kysely
-        .selectFrom('shipgate_github_user_credential')
+        .selectFrom('github_user_credentials')
         .selectAll()
         .where('github_user_id', '=', serializeUserId(userId))
         .executeTakeFirst()
@@ -21,11 +21,11 @@ export function createDatabaseGitHubUserTokenStore(database: DatabaseClient): Gi
 
     async upsert(input) {
       const row = await database.kysely
-        .insertInto('shipgate_github_user_credential')
+        .insertInto('github_user_credentials')
         .values(toInsertValues(input))
         .onConflict((conflict) =>
           conflict.column('github_user_id').doUpdateSet({
-            version: sql<number>`shipgate_github_user_credential.version + 1`,
+            version: sql<number>`github_user_credentials.version + 1`,
             encrypted_access_token: input.encryptedAccessToken,
             access_token_expires_at: input.accessTokenExpiresAt,
             encrypted_refresh_token: input.encryptedRefreshToken,
@@ -43,7 +43,7 @@ export function createDatabaseGitHubUserTokenStore(database: DatabaseClient): Gi
 
     async tryAcquireRefreshLease(input) {
       const acquired = await database.kysely
-        .updateTable('shipgate_github_user_credential')
+        .updateTable('github_user_credentials')
         .set({
           refresh_lease_id: input.leaseId,
           refresh_lease_expires_at: input.leaseExpiresAt,
@@ -65,7 +65,7 @@ export function createDatabaseGitHubUserTokenStore(database: DatabaseClient): Gi
       }
 
       const existing = await database.kysely
-        .selectFrom('shipgate_github_user_credential')
+        .selectFrom('github_user_credentials')
         .select('github_user_id')
         .where('github_user_id', '=', serializeUserId(input.userId))
         .executeTakeFirst()
@@ -75,7 +75,7 @@ export function createDatabaseGitHubUserTokenStore(database: DatabaseClient): Gi
 
     async completeRefresh(input) {
       const row = await database.kysely
-        .updateTable('shipgate_github_user_credential')
+        .updateTable('github_user_credentials')
         .set({
           version: sql<number>`version + 1`,
           encrypted_access_token: input.credentials.encryptedAccessToken,
@@ -97,7 +97,7 @@ export function createDatabaseGitHubUserTokenStore(database: DatabaseClient): Gi
 
     async releaseRefreshLease(input) {
       await database.kysely
-        .updateTable('shipgate_github_user_credential')
+        .updateTable('github_user_credentials')
         .set({
           refresh_lease_id: null,
           refresh_lease_expires_at: null,
@@ -111,7 +111,7 @@ export function createDatabaseGitHubUserTokenStore(database: DatabaseClient): Gi
 
     async delete(userId) {
       await database.kysely
-        .deleteFrom('shipgate_github_user_credential')
+        .deleteFrom('github_user_credentials')
         .where('github_user_id', '=', serializeUserId(userId))
         .execute()
     },

@@ -85,11 +85,11 @@ export async function buildApiApplication(context: ApplicationContext): Promise<
 
       methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
 
-      allowedHeaders: ['content-type', 'authorization', 'x-request-id'],
+      allowedHeaders: ['content-type', 'authorization', 'x-csrf-token', 'x-request-id'],
 
       exposedHeaders: ['x-request-id'],
 
-      credentials: false,
+      credentials: true,
       maxAge: 600,
     })
   }

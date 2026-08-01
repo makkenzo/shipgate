@@ -18,6 +18,8 @@ describe('loadRuntimeConfig', () => {
     expect(config.api.metricsEnabled).toBe(true)
     expect(config.database.poolMax).toBe(10)
     expect(config.jobs.concurrency).toBe(4)
+    expect(config.auth.sessionTtlSeconds).toBe(604_800)
+    expect(config.auth.oauthAttemptTtlSeconds).toBe(600)
   })
 
   it('uses secure production defaults for internal HTTP endpoints', () => {
@@ -113,6 +115,20 @@ describe('loadRuntimeConfig', () => {
       loadRuntimeConfig({
         GITHUB_API_REQUEST_TIMEOUT_MS: '10000',
         GITHUB_REFRESH_LEASE_MS: '29999',
+      }),
+    ).toThrow(EnvironmentValidationError)
+  })
+
+  it('rejects unsafe auth lifetimes', () => {
+    expect(() =>
+      loadRuntimeConfig({
+        AUTH_SESSION_TTL_SECONDS: '60',
+      }),
+    ).toThrow(EnvironmentValidationError)
+
+    expect(() =>
+      loadRuntimeConfig({
+        AUTH_OAUTH_ATTEMPT_TTL_SECONDS: '3600',
       }),
     ).toThrow(EnvironmentValidationError)
   })

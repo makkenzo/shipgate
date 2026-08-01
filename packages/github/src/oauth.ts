@@ -1,3 +1,5 @@
+import { Buffer } from 'node:buffer'
+
 export interface GitHubOAuthToken {
   readonly accessToken: string
   readonly accessTokenExpiresAt: Date
@@ -10,9 +12,12 @@ export interface GitHubOAuthClient {
   exchangeAuthorizationCode(input: {
     readonly code: string
     readonly redirectUri?: string
+    readonly codeVerifier?: string
   }): Promise<GitHubOAuthToken>
 
   refreshUserToken(refreshToken: string): Promise<GitHubOAuthToken>
+
+  revokeUserAuthorization(accessToken: string): Promise<void>
 }
 
 export class GitHubOAuthRequestError extends Error {
@@ -43,7 +48,9 @@ export class GitHubOAuthRequestError extends Error {
 export function createGitHubOAuthClient(options: {
   readonly clientId: string
   readonly clientSecret: string
+  readonly apiBaseUrl: string
   readonly oauthBaseUrl: string
+  readonly apiVersion: string
   readonly requestTimeoutMs: number
   readonly userAgent: string
   readonly fetchImplementation?: typeof fetch
@@ -52,6 +59,10 @@ export function createGitHubOAuthClient(options: {
   const fetchImplementation = options.fetchImplementation ?? globalThis.fetch
   const now = options.now ?? (() => new Date())
   const tokenUrl = new URL('/login/oauth/access_token', options.oauthBaseUrl)
+  const revokeUrl = new URL(
+    `/applications/${encodeURIComponent(options.clientId)}/grant`,
+    options.apiBaseUrl,
+  )
 
   const requestToken = async (parameters: URLSearchParams): Promise<GitHubOAuthToken> => {
     let response: Response
@@ -112,6 +123,10 @@ export function createGitHubOAuthClient(options: {
         throw new GitHubOAuthRequestError('GitHub authorization code must not be empty')
       }
 
+      if (input.codeVerifier !== undefined) {
+        assertCodeVerifier(input.codeVerifier)
+      }
+
       const parameters = new URLSearchParams({
         client_id: options.clientId,
         client_secret: options.clientSecret,
@@ -120,6 +135,10 @@ export function createGitHubOAuthClient(options: {
 
       if (input.redirectUri !== undefined) {
         parameters.set('redirect_uri', input.redirectUri)
+      }
+
+      if (input.codeVerifier !== undefined) {
+        parameters.set('code_verifier', input.codeVerifier)
       }
 
       return requestToken(parameters)
@@ -137,6 +156,52 @@ export function createGitHubOAuthClient(options: {
           grant_type: 'refresh_token',
           refresh_token: refreshToken,
         }),
+      )
+    },
+
+    async revokeUserAuthorization(accessToken) {
+      if (accessToken.length === 0) {
+        throw new GitHubOAuthRequestError('GitHub access token must not be empty')
+      }
+
+      let response: Response
+
+      try {
+        response = await fetchImplementation(revokeUrl, {
+          method: 'DELETE',
+          headers: {
+            accept: 'application/vnd.github+json',
+            authorization: `Basic ${Buffer.from(
+              `${options.clientId}:${options.clientSecret}`,
+              'utf8',
+            ).toString('base64')}`,
+            'content-type': 'application/json',
+            'user-agent': options.userAgent,
+            'x-github-api-version': options.apiVersion,
+          },
+          body: JSON.stringify({
+            access_token: accessToken,
+          }),
+          signal: AbortSignal.timeout(options.requestTimeoutMs),
+        })
+      } catch (cause) {
+        throw new GitHubOAuthRequestError('Unable to reach GitHub authorization endpoint', {
+          cause,
+        })
+      }
+
+      if (response.status === 204 || response.status === 404) {
+        return
+      }
+
+      const requestId = response.headers.get('x-github-request-id') ?? undefined
+
+      throw new GitHubOAuthRequestError(
+        `GitHub authorization revoke returned HTTP ${response.status}`,
+        {
+          status: response.status,
+          ...(requestId !== undefined ? { requestId } : {}),
+        },
       )
     },
   }
@@ -171,6 +236,12 @@ function parseTokenResponse(value: unknown, issuedAt: Date): GitHubOAuthToken {
     refreshToken,
     refreshTokenExpiresAt: new Date(issuedAt.getTime() + refreshTokenExpiresIn * 1_000),
     tokenType: 'bearer',
+  }
+}
+
+function assertCodeVerifier(value: string): void {
+  if (value.length < 43 || value.length > 128 || !/^[A-Za-z0-9._~-]+$/.test(value)) {
+    throw new GitHubOAuthRequestError('GitHub PKCE code verifier is invalid')
   }
 }
 

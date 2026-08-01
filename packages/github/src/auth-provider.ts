@@ -60,6 +60,7 @@ export interface GitHubAuthInvalidator {
   invalidateInstallation(installationId: number): void
   invalidateUser(userId: number): void
   revokeUser(userId: number): Promise<void>
+  disconnectUser(userId: number): Promise<void>
 }
 
 export interface GitHubUserAuthorizationService {
@@ -67,6 +68,7 @@ export interface GitHubUserAuthorizationService {
     readonly code: string
     readonly redirectUri?: string
     readonly expectedUserId?: number
+    readonly codeVerifier?: string
   }): Promise<GitHubUserAuthorizationResult>
 }
 
@@ -198,10 +200,12 @@ class DefaultGitHubAuthenticationService implements GitHubAuthenticationService 
       createGitHubOAuthClient({
         clientId: options.clientId,
         clientSecret: options.clientSecret,
+        apiBaseUrl: this.#apiBaseUrl,
         oauthBaseUrl: normalizeHttpOrigin(
           options.oauthBaseUrl ?? 'https://github.com',
           'oauthBaseUrl',
         ),
+        apiVersion: this.#apiVersion,
         requestTimeoutMs: options.requestTimeoutMs,
         userAgent: options.userAgent,
         ...(options.fetchImplementation !== undefined
@@ -279,6 +283,7 @@ class DefaultGitHubAuthenticationService implements GitHubAuthenticationService 
     readonly code: string
     readonly redirectUri?: string
     readonly expectedUserId?: number
+    readonly codeVerifier?: string
   }): Promise<GitHubUserAuthorizationResult> {
     if (input.expectedUserId !== undefined) {
       assertPositiveSafeInteger('expectedUserId', input.expectedUserId)
@@ -287,6 +292,7 @@ class DefaultGitHubAuthenticationService implements GitHubAuthenticationService 
     const oauthToken = await this.#oauthClient.exchangeAuthorizationCode({
       code: input.code,
       ...(input.redirectUri !== undefined ? { redirectUri: input.redirectUri } : {}),
+      ...(input.codeVerifier !== undefined ? { codeVerifier: input.codeVerifier } : {}),
     })
 
     const temporaryClient = this.#createUserClient(0, oauthToken.accessToken, () => undefined)
@@ -345,6 +351,40 @@ class DefaultGitHubAuthenticationService implements GitHubAuthenticationService 
     this.#userClientPromises.delete(userId)
     this.#forceUserRefresh.delete(userId)
     await this.#userTokenStore.delete(userId)
+  }
+
+  async disconnectUser(userId: number): Promise<void> {
+    assertPositiveSafeInteger('userId', userId)
+
+    try {
+      await this.getUserClient(userId)
+    } catch (error) {
+      if (
+        error instanceof GitHubUserAuthorizationNotFoundError ||
+        error instanceof GitHubUserReauthorizationRequiredError
+      ) {
+        await this.revokeUser(userId)
+        return
+      }
+
+      throw error
+    }
+
+    const stored = await this.#userTokenStore.get(userId)
+
+    if (!stored) {
+      await this.revokeUser(userId)
+      return
+    }
+
+    const accessToken = this.#tokenCipher.decrypt({
+      userId,
+      purpose: 'access',
+      encryptedToken: stored.encryptedAccessToken,
+    })
+
+    await this.#oauthClient.revokeUserAuthorization(accessToken)
+    await this.revokeUser(userId)
   }
 
   async #createAppClient(): Promise<AppGitHubClient> {

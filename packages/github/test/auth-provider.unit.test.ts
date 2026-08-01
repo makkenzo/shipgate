@@ -258,6 +258,7 @@ describe('GitHub authentication service', () => {
     const oauthClient: GitHubOAuthClient = {
       exchangeAuthorizationCode: vi.fn(),
       refreshUserToken,
+      revokeUserAuthorization: vi.fn(),
     }
     const created: CreateGitHubClientOptions[] = []
     const clientFactory = createFakeClientFactory(created)
@@ -331,6 +332,7 @@ describe('GitHub authentication service', () => {
     const oauthClient: GitHubOAuthClient = {
       exchangeAuthorizationCode: vi.fn(),
       refreshUserToken,
+      revokeUserAuthorization: vi.fn(),
     }
     const created: CreateGitHubClientOptions[] = []
     const service = createService({
@@ -416,9 +418,11 @@ describe('GitHub authentication service', () => {
     const cipher = createAes256GcmGitHubTokenCipher({ key: encryptionKey })
     const store = createInMemoryGitHubUserTokenStore()
     const token = createToken()
+    const revokeUserAuthorization = vi.fn()
     const oauthClient: GitHubOAuthClient = {
       exchangeAuthorizationCode: vi.fn(async () => token),
       refreshUserToken: vi.fn(),
+      revokeUserAuthorization,
     }
     const clientFactory = createFakeClientFactory([], async (options, route) => {
       if (options.authentication.type === 'user' && route === 'GET /user') {
@@ -432,9 +436,14 @@ describe('GitHub authentication service', () => {
     const authorization = await service.authorizeUser({
       code: 'authorization-code',
       expectedUserId: 99,
+      codeVerifier: 'v'.repeat(64),
     })
 
     expect(authorization.userId).toBe(99)
+    expect(oauthClient.exchangeAuthorizationCode).toHaveBeenCalledWith({
+      code: 'authorization-code',
+      codeVerifier: 'v'.repeat(64),
+    })
 
     const stored = await store.get(99)
 
@@ -442,7 +451,9 @@ describe('GitHub authentication service', () => {
     expect(stored?.encryptedAccessToken).not.toContain(token.accessToken)
     expect(stored?.encryptedRefreshToken).not.toContain(token.refreshToken)
 
-    await service.revokeUser(99)
+    await service.disconnectUser(99)
+
+    expect(revokeUserAuthorization).toHaveBeenCalledWith(token.accessToken)
 
     expect(await store.get(99)).toBeUndefined()
     await expect(service.getUserClient(99)).rejects.toMatchObject({

@@ -176,6 +176,15 @@ const runtimeEnvironmentSchema = z
     API_METRICS_ENABLED: optionalBooleanEnvironmentSchema,
 
     API_CORS_ORIGINS: corsOriginsEnvironmentSchema,
+
+    AUTH_SESSION_TTL_SECONDS: z.coerce
+      .number()
+      .int()
+      .min(300)
+      .max(30 * 24 * 60 * 60)
+      .default(7 * 24 * 60 * 60),
+
+    AUTH_OAUTH_ATTEMPT_TTL_SECONDS: z.coerce.number().int().min(60).max(1800).default(600),
   })
   .superRefine((environment, context) => {
     if (
@@ -269,6 +278,11 @@ export interface RuntimeConfig {
     readonly corsOrigins: readonly string[]
   }
 
+  readonly auth: {
+    readonly sessionTtlSeconds: number
+    readonly oauthAttemptTtlSeconds: number
+  }
+
   readonly database: {
     readonly poolMin: number
     readonly poolMax: number
@@ -357,6 +371,11 @@ export function loadRuntimeConfig(environment: NodeJS.ProcessEnv = process.env):
       metricsEnabled: result.data.API_METRICS_ENABLED ?? result.data.NODE_ENV !== 'production',
 
       corsOrigins: result.data.API_CORS_ORIGINS,
+    },
+
+    auth: {
+      sessionTtlSeconds: result.data.AUTH_SESSION_TTL_SECONDS,
+      oauthAttemptTtlSeconds: result.data.AUTH_OAUTH_ATTEMPT_TTL_SECONDS,
     },
 
     database: {

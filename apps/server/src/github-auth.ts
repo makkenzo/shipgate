@@ -111,6 +111,7 @@ function createUnavailableGitHubAuthenticationService(
 
     invalidateInstallation() {},
     invalidateUser() {},
+    disconnectUser: deleteUserAuthorization,
     revokeUser: deleteUserAuthorization,
   }
 }
@@ -128,6 +129,7 @@ function createLazyGitHubAuthenticationService(
     authorizeUser: (input) => getService().authorizeUser(input),
     invalidateInstallation: (installationId) => getService().invalidateInstallation(installationId),
     invalidateUser: (userId) => getService().invalidateUser(userId),
+    disconnectUser: (userId) => getService().disconnectUser(userId),
     revokeUser: (userId) => getService().revokeUser(userId),
   }
 }

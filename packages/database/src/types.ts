@@ -13,7 +13,13 @@ export type JsonValue =
     }
 
 export interface DatabaseSchema {
-  shipgate_github_user_credential: ShipgateGitHubUserCredentialTable
+  github_user_credentials: GitHubUserCredentialTable
+
+  github_users: GitHubUserTable
+
+  sessions: SessionTable
+
+  oauth_attempts: OAuthAttemptTable
 
   shipgate_job_execution: ShipgateJobExecutionTable
 
@@ -57,7 +63,7 @@ export interface DatabaseClient {
   destroy(): Promise<void>
 }
 
-export interface ShipgateGitHubUserCredentialTable {
+export interface GitHubUserCredentialTable {
   github_user_id: string
   version: Generated<number>
   encrypted_access_token: string
@@ -68,6 +74,42 @@ export interface ShipgateGitHubUserCredentialTable {
   refresh_lease_expires_at: Date | null
   created_at: Generated<Date>
   updated_at: Generated<Date>
+}
+
+export interface GitHubUserTable {
+  github_user_id: string
+  login: string
+  avatar_url: string | null
+  display_name: string | null
+  email: string | null
+  html_url: string
+  installations: JsonValue
+  installations_synced_at: Date
+  created_at: Generated<Date>
+  updated_at: Generated<Date>
+}
+
+export interface SessionTable {
+  id: string
+  github_user_id: string
+  token_hash: string
+  csrf_token_hash: string
+  expires_at: Date
+  revoked_at: Date | null
+  revocation_reason: string | null
+  last_seen_at: Date
+  user_agent: string | null
+  created_at: Generated<Date>
+}
+
+export interface OAuthAttemptTable {
+  id: string
+  state_hash: string
+  pkce_verifier: string
+  return_to: string
+  expires_at: Date
+  consumed_at: Date | null
+  created_at: Generated<Date>
 }
 
 export type JobExecutionStatus = 'queued' | 'running' | 'retrying' | 'succeeded' | 'failed'

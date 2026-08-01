@@ -1,6 +1,6 @@
 export const GITHUB_API_VERSION = '2026-03-10'
 
-export const GITHUB_APP_CALLBACK_PATH = '/api/v1/github/oauth/callback'
+export const GITHUB_APP_CALLBACK_PATH = '/api/v1/auth/github/callback'
 
 export const GITHUB_APP_WEBHOOK_PATH = '/api/v1/github/webhooks'
 
