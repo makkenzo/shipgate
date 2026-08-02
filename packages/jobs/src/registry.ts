@@ -28,6 +28,11 @@ export type DiagnosticJobPayloadInput = z.input<typeof diagnosticJobPayloadSchem
 
 export type DiagnosticJobPayload = z.output<typeof diagnosticJobPayloadSchema>
 
+export const githubWebhookProcessPayloadSchema = z
+  .object({ deliveryId: z.string().uuid() })
+  .strict()
+export type GitHubWebhookProcessPayload = z.output<typeof githubWebhookProcessPayloadSchema>
+
 function defineTask<Schema extends z.ZodTypeAny>(
   definition: JobTaskDefinition<Schema>,
 ): JobTaskDefinition<Schema> {
@@ -35,6 +40,48 @@ function defineTask<Schema extends z.ZodTypeAny>(
 }
 
 export const taskDefinitions = {
+  github_webhook_process: defineTask({
+    dataSchema: githubWebhookProcessPayloadSchema,
+    retry: { maxAttempts: 10 },
+    async execute(payload, context) {
+      const now = new Date()
+      const delivery = await context.database.kysely
+        .updateTable('github_webhook_deliveries')
+        .set({
+          processing_state: 'processing',
+          processing_started_at: now,
+          attempt_count: context.job.attempt,
+          error_code: null,
+          updated_at: now,
+        })
+        .where('delivery_id', '=', payload.deliveryId)
+        .where('processing_state', '!=', 'succeeded')
+        .returning(['delivery_id', 'event', 'action'])
+        .executeTakeFirst()
+      if (!delivery) return { deliveryId: payload.deliveryId, skipped: true }
+
+      // Event-specific dispatch is introduced by the following roadmap tasks.
+      await context.database.kysely
+        .updateTable('github_webhook_deliveries')
+        .set({
+          processing_state: 'succeeded',
+          processed_at: new Date(),
+          error_code: null,
+          updated_at: new Date(),
+        })
+        .where('delivery_id', '=', payload.deliveryId)
+        .execute()
+
+      await context.database.kysely
+        .updateTable('github_webhook_deliveries')
+        .set({ raw_payload: null, raw_payload_purged_at: new Date(), updated_at: new Date() })
+        .where('raw_payload_expires_at', '<=', new Date())
+        .where('raw_payload', 'is not', null)
+        .execute()
+
+      return { deliveryId: payload.deliveryId, event: delivery.event, action: delivery.action }
+    },
+  }),
   diagnostic_echo: defineTask({
     dataSchema: diagnosticJobPayloadSchema,
 

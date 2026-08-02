@@ -66,3 +66,4 @@ export {
   type ValidateGitHubAppRegistrationOptions,
   validateGitHubAppRegistration,
 } from './validation.js'
+export { hashGitHubWebhookPayload, verifyGitHubWebhookSignature } from './webhook.js'

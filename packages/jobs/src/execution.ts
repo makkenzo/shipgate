@@ -30,9 +30,12 @@ interface ExecuteJobAttemptOptions {
 }
 
 export function createTaskList(dependencies: JobTaskDependencies): TaskList {
-  return {
-    diagnostic_echo: createTaskExecutor('diagnostic_echo', dependencies),
-  }
+  return Object.fromEntries(
+    Object.keys(taskDefinitions).map((taskName) => [
+      taskName,
+      createTaskExecutor(taskName as TaskName, dependencies),
+    ]),
+  ) as TaskList
 }
 
 function createTaskExecutor<Name extends TaskName>(

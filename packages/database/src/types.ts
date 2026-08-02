@@ -27,6 +27,8 @@ export interface DatabaseSchema {
 
   github_installation_permissions: GitHubInstallationPermissionTable
 
+  github_webhook_deliveries: GitHubWebhookDeliveryTable
+
   shipgate_job_execution: ShipgateJobExecutionTable
 
   shipgate_worker_heartbeat: ShipgateWorkerHeartbeatTable
@@ -159,6 +161,27 @@ export interface GitHubInstallationPermissionTable {
   permission_level: 'read' | 'write'
   last_reconciled_at: Date
   created_at: Generated<Date>
+  updated_at: Generated<Date>
+}
+
+export type GitHubWebhookProcessingState = 'queued' | 'processing' | 'succeeded' | 'failed'
+
+export interface GitHubWebhookDeliveryTable {
+  delivery_id: string
+  event: string
+  action: string | null
+  installation_id: string | null
+  repository_id: string | null
+  payload_hash: string
+  raw_payload: Buffer | null
+  processing_state: GitHubWebhookProcessingState
+  attempt_count: number
+  error_code: string | null
+  received_at: Generated<Date>
+  processing_started_at: Date | null
+  processed_at: Date | null
+  raw_payload_expires_at: Date
+  raw_payload_purged_at: Date | null
   updated_at: Generated<Date>
 }
 

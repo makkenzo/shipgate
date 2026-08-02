@@ -40,6 +40,8 @@ export type {
   GitHubInstallationTable,
   GitHubUserCredentialTable,
   GitHubUserTable,
+  GitHubWebhookDeliveryTable,
+  GitHubWebhookProcessingState,
   JobExecutionStatus,
   JsonPrimitive,
   JsonValue,

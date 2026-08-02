@@ -92,6 +92,12 @@ const githubRuntimeEnvironmentShape = {
   GITHUB_TOKEN_EARLY_REFRESH_MS: z.coerce.number().int().min(1_000).default(300_000),
   GITHUB_REFRESH_LEASE_MS: z.coerce.number().int().min(1_000).default(60_000),
   GITHUB_REFRESH_LEASE_POLL_MS: z.coerce.number().int().min(25).default(100),
+  GITHUB_WEBHOOK_BODY_LIMIT_BYTES: z.coerce
+    .number()
+    .int()
+    .min(1_024)
+    .max(25 * 1_024 * 1_024)
+    .default(10 * 1_024 * 1_024),
   GITHUB_TOKEN_ENCRYPTION_KEY_ID: z
     .string()
     .trim()
@@ -243,6 +249,7 @@ export interface GitHubRuntimeConfig {
   readonly tokenEarlyRefreshMs: number
   readonly refreshLeaseMs: number
   readonly refreshLeasePollMs: number
+  readonly webhookBodyLimitBytes: number
   readonly tokenEncryptionKeyId: string
 }
 
@@ -265,6 +272,7 @@ export interface RuntimeConfig {
     readonly tokenEarlyRefreshMs: number
     readonly refreshLeaseMs: number
     readonly refreshLeasePollMs: number
+    readonly webhookBodyLimitBytes: number
     readonly tokenEncryptionKeyId: string
   }
 
@@ -322,6 +330,7 @@ export function loadGitHubRuntimeConfig(
     tokenEarlyRefreshMs: result.data.GITHUB_TOKEN_EARLY_REFRESH_MS,
     refreshLeaseMs: result.data.GITHUB_REFRESH_LEASE_MS,
     refreshLeasePollMs: result.data.GITHUB_REFRESH_LEASE_POLL_MS,
+    webhookBodyLimitBytes: result.data.GITHUB_WEBHOOK_BODY_LIMIT_BYTES,
     tokenEncryptionKeyId: result.data.GITHUB_TOKEN_ENCRYPTION_KEY_ID,
   }
 }
@@ -354,6 +363,7 @@ export function loadRuntimeConfig(environment: NodeJS.ProcessEnv = process.env):
       tokenEarlyRefreshMs: result.data.GITHUB_TOKEN_EARLY_REFRESH_MS,
       refreshLeaseMs: result.data.GITHUB_REFRESH_LEASE_MS,
       refreshLeasePollMs: result.data.GITHUB_REFRESH_LEASE_POLL_MS,
+      webhookBodyLimitBytes: result.data.GITHUB_WEBHOOK_BODY_LIMIT_BYTES,
       tokenEncryptionKeyId: result.data.GITHUB_TOKEN_ENCRYPTION_KEY_ID,
     },
 

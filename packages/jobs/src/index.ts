@@ -2,6 +2,7 @@ export {
   type EnqueuedJob,
   type EnqueueJobOptions,
   enqueueJob,
+  enqueueJobInTransaction,
 } from './enqueue.js'
 
 export * from './graphile-worker-types.js'

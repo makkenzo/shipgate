@@ -30,6 +30,8 @@ export function createTestEnvironment(
     JOB_WORKER_HEARTBEAT_STALE_AFTER_MS: '5000',
 
     API_DOCS_ENABLED: 'false',
+    GITHUB_APP_WEBHOOK_SECRET: 'test-webhook-secret',
+    GITHUB_WEBHOOK_BODY_LIMIT_BYTES: '1048576',
 
     ...overrides,
   }

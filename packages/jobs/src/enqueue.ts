@@ -1,4 +1,6 @@
 import { type DatabaseClient, withTransaction } from '@shipgate/database'
+import type { Transaction } from 'kysely'
+import type { DatabaseSchema } from '@shipgate/database'
 import { sql } from 'kysely'
 
 import { createJobEnvelope } from './envelope.js'
@@ -9,6 +11,7 @@ import { markJobQueued } from './store.js'
 export interface EnqueueJobOptions {
   readonly correlationId: string
   readonly causationId?: string
+  readonly jobKey?: string
 }
 
 export interface EnqueuedJob {
@@ -25,76 +28,51 @@ export async function enqueueJob<Name extends TaskName>(
   input: TaskInput<Name>,
   options: EnqueueJobOptions,
 ): Promise<EnqueuedJob> {
-  const definition = taskDefinitions[taskName]
-
-  const payload = definition.dataSchema.parse(input)
-
-  const envelope = createJobEnvelope(payload, {
-    correlationId: options.correlationId,
-
-    ...(options.causationId !== undefined
-      ? {
-          causationId: options.causationId,
-        }
-      : {}),
-  })
-
-  const jsonEnvelope = toJsonValue(envelope)
-
-  const maxAttempts = definition.retry.maxAttempts
-
   return withTransaction(
     database.kysely,
-    async (transaction) => {
-      const result = await sql<{
-        readonly id: string
-      }>`
-        select (
-          graphile_worker.add_job(
-            identifier :=
-              ${taskName}::text,
-
-            payload :=
-              ${JSON.stringify(jsonEnvelope)}::json,
-
-            max_attempts :=
-              ${maxAttempts}::smallint
-          )
-        ).id::text as id
-      `.execute(transaction)
-
-      const jobId = result.rows[0]?.id
-
-      if (!jobId) {
-        throw new Error('Graphile Worker did not return a job ID')
-      }
-
-      await markJobQueued(transaction, {
-        jobId,
-        taskIdentifier: taskName,
-
-        correlationId: options.correlationId,
-
-        causationId: options.causationId,
-
-        payload: jsonEnvelope,
-
-        maxAttempts,
-      })
-
-      return {
-        jobId,
-        taskIdentifier: taskName,
-
-        correlationId: options.correlationId,
-
-        causationId: options.causationId,
-
-        maxAttempts,
-      }
-    },
-    {
-      operation: `jobs.enqueue:${taskName}`,
-    },
+    (transaction) => enqueueJobInTransaction(transaction, taskName, input, options),
+    { operation: `jobs.enqueue:${taskName}` },
   )
+}
+
+export async function enqueueJobInTransaction<Name extends TaskName>(
+  transaction: Transaction<DatabaseSchema>,
+  taskName: Name,
+  input: TaskInput<Name>,
+  options: EnqueueJobOptions,
+): Promise<EnqueuedJob> {
+  const definition = taskDefinitions[taskName]
+  const payload = definition.dataSchema.parse(input)
+  const envelope = createJobEnvelope(payload, {
+    correlationId: options.correlationId,
+    ...(options.causationId !== undefined ? { causationId: options.causationId } : {}),
+  })
+  const jsonEnvelope = toJsonValue(envelope)
+  const maxAttempts = definition.retry.maxAttempts
+  const result = await sql<{ readonly id: string }>`
+    select (graphile_worker.add_job(
+      identifier := ${taskName}::text,
+      payload := ${JSON.stringify(jsonEnvelope)}::json,
+      max_attempts := ${maxAttempts}::smallint,
+      job_key := ${options.jobKey ?? null}::text,
+      job_key_mode := 'unsafe_dedupe'::text
+    )).id::text as id
+  `.execute(transaction)
+  const jobId = result.rows[0]?.id
+  if (!jobId) throw new Error('Graphile Worker did not return a job ID')
+  await markJobQueued(transaction, {
+    jobId,
+    taskIdentifier: taskName,
+    correlationId: options.correlationId,
+    causationId: options.causationId,
+    payload: jsonEnvelope,
+    maxAttempts,
+  })
+  return {
+    jobId,
+    taskIdentifier: taskName,
+    correlationId: options.correlationId,
+    causationId: options.causationId,
+    maxAttempts,
+  }
 }
