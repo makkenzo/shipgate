@@ -47,7 +47,7 @@ jobs:
       - name: Install Playwright browser
         run: pnpm exec playwright install --with-deps chromium
 
-      - name: Start production stack
+      - name: Start containerized smoke-test services
         env:
           GITHUB_APP_STARTUP_VALIDATION_ENABLED: 'false'
         run: docker compose up -d --wait

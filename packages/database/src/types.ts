@@ -35,6 +35,24 @@ export interface DatabaseSchema {
 
   github_integration_events: GitHubIntegrationEventTable
 
+  projects: ProjectTable
+
+  repository_branches: RepositoryBranchTable
+
+  repository_commits: RepositoryCommitTable
+
+  changes: ChangeTable
+
+  change_commits: ChangeCommitTable
+
+  required_checks: RequiredCheckTable
+
+  commit_check_results: CommitCheckResultTable
+
+  repository_sync_runs: RepositorySyncRunTable
+
+  repository_sync_issues: RepositorySyncIssueTable
+
   shipgate_job_execution: ShipgateJobExecutionTable
 
   shipgate_worker_heartbeat: ShipgateWorkerHeartbeatTable
@@ -241,6 +259,192 @@ export interface GitHubIntegrationEventTable {
   github_user_id: string | null
   payload: JsonValue
   occurred_at: Date
+  created_at: Generated<Date>
+}
+
+export type ProjectStatus = 'active' | 'disconnected' | 'pending_deletion' | 'deleted'
+
+export interface ProjectTable {
+  id: string
+  installation_id: string
+  repository_id: string
+  owner_id: string
+  owner_login: string
+  repository_name: string
+  repository_full_name: string
+  default_branch: string | null
+  source_branch: string
+  production_branch: string
+  status: Generated<ProjectStatus>
+  source_sha: string | null
+  production_sha: string | null
+  last_successful_sync_at: Date | null
+  configuration_version: Generated<number>
+  deletion_requested_at: Date | null
+  deleted_at: Date | null
+  created_at: Generated<Date>
+  updated_at: Generated<Date>
+}
+
+export interface RepositoryBranchTable {
+  project_id: string
+  repository_id: string
+  name: string
+  head_sha: string
+  protected: Generated<boolean>
+  default_branch: Generated<boolean>
+  observed_at: Date
+  created_at: Generated<Date>
+  updated_at: Generated<Date>
+}
+
+export interface RepositoryCommitTable {
+  project_id: string
+  repository_id: string
+  sha: string
+  tree_sha: string | null
+  message: string
+  author_id: string | null
+  author_login: string | null
+  author_name: string | null
+  author_email: string | null
+  committer_id: string | null
+  committer_login: string | null
+  authored_at: Date | null
+  committed_at: Date
+  parent_shas: ColumnType<JsonValue, string, string>
+  source_delta_position: number | null
+  observed_at: Date
+  created_at: Generated<Date>
+  updated_at: Generated<Date>
+}
+
+export type ChangeMergeMethod = 'merge' | 'squash' | 'rebase' | 'unknown'
+
+export type ChangeSynchronizationState = 'known' | 'unknown'
+
+export type ChangeProductionPresence = 'present' | 'missing' | 'unknown' | 'not_applicable'
+
+export interface ChangeTable {
+  id: string
+  project_id: string
+  repository_id: string
+  github_pull_request_id: string
+  pull_request_number: number
+  title: string
+  url: string | null
+  author_id: string | null
+  author_login: string | null
+  base_branch: string
+  merged_at: Date
+  final_head_sha: string
+  merge_commit_sha: string | null
+  source_integration_sha: string | null
+  merge_method: ChangeMergeMethod
+  commit_set_fingerprint: string | null
+  synchronization_state: ChangeSynchronizationState
+  production_presence: ChangeProductionPresence
+  observed_at: Date
+  created_at: Generated<Date>
+  updated_at: Generated<Date>
+}
+
+export interface ChangeCommitTable {
+  project_id: string
+  repository_id: string
+  change_id: string
+  commit_sha: string
+  position: number
+  created_at: Generated<Date>
+}
+
+export type RequiredCheckType = 'check_run' | 'commit_status'
+
+export type RequiredCheckSource = 'branch_protection' | 'repository_ruleset'
+
+export interface RequiredCheckTable {
+  id: string
+  project_id: string
+  repository_id: string
+  policy_version: number
+  check_type: RequiredCheckType
+  context: string
+  integration_id: string | null
+  source: RequiredCheckSource
+  source_reference: string | null
+  observed_at: Date
+  created_at: Generated<Date>
+  updated_at: Generated<Date>
+}
+
+export type CommitCheckStatus = 'queued' | 'in_progress' | 'pending' | 'completed'
+
+export type CommitCheckConclusion =
+  | 'success'
+  | 'failure'
+  | 'neutral'
+  | 'cancelled'
+  | 'skipped'
+  | 'timed_out'
+  | 'action_required'
+  | 'stale'
+  | 'startup_failure'
+  | 'error'
+
+export interface CommitCheckResultTable {
+  id: string
+  project_id: string
+  repository_id: string
+  commit_sha: string
+  check_type: RequiredCheckType
+  context: string
+  integration_id: string | null
+  github_object_id: string
+  attempt: number | null
+  status: CommitCheckStatus
+  conclusion: CommitCheckConclusion | null
+  details_url: string | null
+  started_at: Date | null
+  completed_at: Date | null
+  observed_at: Date
+  created_at: Generated<Date>
+}
+
+export type RepositorySyncRunStatus = 'running' | 'succeeded' | 'failed'
+
+export interface RepositorySyncRunTable {
+  id: string
+  project_id: string
+  repository_id: string
+  reason: string
+  status: RepositorySyncRunStatus
+  configuration_version: number
+  idempotency_key: string
+  projection_fingerprint: string | null
+  source_sha: string | null
+  production_sha: string | null
+  started_at: Date
+  completed_at: Date | null
+  error_code: string | null
+  error_message: string | null
+  created_at: Generated<Date>
+}
+
+export type RepositorySyncIssueSeverity = 'warning' | 'error'
+
+export type RepositorySyncIssueScope = 'repository' | 'branch' | 'change' | 'commit' | 'check'
+
+export interface RepositorySyncIssueTable {
+  id: string
+  sync_run_id: string
+  project_id: string
+  repository_id: string
+  severity: RepositorySyncIssueSeverity
+  code: string
+  scope: RepositorySyncIssueScope
+  subject_id: string | null
+  message: string
+  details: ColumnType<JsonValue, string, string>
   created_at: Generated<Date>
 }
 
