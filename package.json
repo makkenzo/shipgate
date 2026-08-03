@@ -28,7 +28,7 @@
     "api:generate:compiled": "pnpm --filter @shipgate/server openapi:generate:compiled && pnpm --filter @shipgate/web api:generate && biome format --write apps/web/openapi apps/web/src/api/generated",
     "api:check": "pnpm --filter @shipgate/web api:check",
     "routes:check": "pnpm --filter @shipgate/web routes:check",
-    "verify": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build:production && pnpm api:check && pnpm routes:check"
+    "verify": "pnpm format:check && pnpm lint && pnpm build:production && pnpm typecheck && pnpm test && pnpm api:check && pnpm routes:check"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.6",
