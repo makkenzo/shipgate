@@ -27,6 +27,7 @@ import { GitHubRepositoryAccessVerificationError } from '../../github-access/ind
 import { ApiHttpError } from '../api-error.js'
 import {
   AuthSessionResponseSchema,
+  CsrfHeadersSchema,
   EmptyMutationBodySchema,
   GitHubCallbackQuerySchema,
   GitHubLoginQuerySchema,
@@ -262,7 +263,6 @@ export const authRoutes: FastifyPluginAsyncTypebox<AuthRoutesOptions> = async (a
     '/auth/session',
     {
       schema: {
-        hide: true,
         operationId: 'getAuthSession',
         summary: 'Get the current Shipgate session',
         tags: ['Authentication'],
@@ -307,10 +307,11 @@ export const authRoutes: FastifyPluginAsyncTypebox<AuthRoutesOptions> = async (a
     {
       preHandler: [requireAuthenticatedSession, requireCsrfProtection],
       schema: {
-        hide: true,
         operationId: 'logout',
         summary: 'Revoke the current Shipgate session',
         tags: ['Authentication'],
+        security: [{ shipgateSession: [] }],
+        headers: CsrfHeadersSchema,
         body: EmptyMutationBodySchema,
         response: {
           204: Type.Null(),
@@ -342,10 +343,11 @@ export const authRoutes: FastifyPluginAsyncTypebox<AuthRoutesOptions> = async (a
     {
       preHandler: [requireAuthenticatedSession, requireCsrfProtection],
       schema: {
-        hide: true,
         operationId: 'disconnectGitHub',
         summary: 'Disconnect GitHub and revoke all Shipgate sessions',
         tags: ['Authentication'],
+        security: [{ shipgateSession: [] }],
+        headers: CsrfHeadersSchema,
         body: EmptyMutationBodySchema,
         response: {
           204: Type.Null(),
@@ -508,7 +510,7 @@ function classifyGitHubAuthFailure(error: unknown): string {
   }
 
   if (error instanceof GitHubRepositoryAccessVerificationError) {
-    return `repository_access_verification_failed:${error.stage}`
+    return `repository_access_verification_failed:${error.phase}`
   }
 
   return 'unexpected_error'
@@ -546,7 +548,7 @@ function mapGitHubAuthError(error: unknown): ApiHttpError {
       code: 'GITHUB_REPOSITORY_ACCESS_VERIFICATION_FAILED',
       message: 'GitHub repository access could not be verified',
       details: {
-        stage: error.stage,
+        verificationPhase: error.phase,
         installationId: error.installationId,
         ...(error.status !== undefined ? { githubStatus: error.status } : {}),
       },

@@ -1,158 +1,80 @@
-export interface GitHubInstallationAccount {
-  readonly id: number
-  readonly login: string
-  readonly type: string
-  readonly avatarUrl: string | null
-}
+import {
+  deleteLocalAccount as deleteLocalAccountRequest,
+  disconnectGitHub as disconnectGitHubRequest,
+  getAuthSession as getAuthSessionRequest,
+  getConnectionConfiguration as getConnectionConfigurationRequest,
+  getInstallation as getInstallationRequest,
+  getInstallations as getInstallationsRequest,
+  logout as logoutRequest,
+} from './generated/sdk.gen'
+import type {
+  GetAuthSessionResponse,
+  GetConnectionConfigurationResponse,
+  GetInstallationResponse,
+  GetInstallationsResponse,
+} from './generated/types.gen'
 
-export interface GitHubInstallationSummary {
-  readonly id: number
-  readonly account: GitHubInstallationAccount
-  readonly repositorySelection: 'all' | 'selected'
-  readonly permissions: Readonly<Record<string, string>>
-  readonly suspendedAt: string | null
-}
-
-export type AuthSession =
-  | { readonly authenticated: false }
-  | {
-      readonly authenticated: true
-      readonly session: {
-        readonly id: string
-        readonly expiresAt: string
-      }
-      readonly user: {
-        readonly id: number
-        readonly login: string
-        readonly avatarUrl: string | null
-        readonly displayName: string | null
-        readonly email: string | null
-        readonly htmlUrl: string
-        readonly installations: readonly GitHubInstallationSummary[]
-      }
-    }
-
-export interface ConnectionConfiguration {
-  readonly githubLoginConfigured: boolean
-  readonly githubInstallationConfigured: boolean
-  readonly loginUrl: string
-  readonly installUrl: string | null
-}
-
-export interface InstallationPermissionStatus {
-  readonly name: string
-  readonly required: 'read' | 'write'
-  readonly actual: 'read' | 'write' | null
-  readonly satisfied: boolean
-}
-
-export interface InstallationSummary {
-  readonly id: number
-  readonly owner: GitHubInstallationAccount
-  readonly repositorySelection: 'all' | 'selected'
-  readonly lifecycleState: 'active' | 'suspended' | 'pending_deletion' | 'deleted'
-  readonly permissionState: 'current' | 'stale' | 'suspended' | 'revoked'
-  readonly suspendedAt: string | null
-  readonly repositoryCount: number
-  readonly userRepositoryCount: number
-  readonly permissions: readonly InstallationPermissionStatus[]
-  readonly permissionUpgradePending: boolean
-  readonly lastReconciledAt: string
-}
-
-export interface InstallationRepository {
-  readonly id: number
-  readonly ownerId: number
-  readonly ownerLogin: string
-  readonly name: string
-  readonly fullName: string
-  readonly private: boolean
-  readonly archived: boolean
-  readonly disabled: boolean
-  readonly defaultBranch: string | null
-  readonly visibility: string | null
-  readonly userPermission: 'none' | 'read' | 'triage' | 'write' | 'maintain' | 'admin'
-  readonly accessibleToUser: boolean
-  readonly lastReconciledAt: string
-}
-
-export interface InstallationDetail extends InstallationSummary {
-  readonly repositories: readonly InstallationRepository[]
-  readonly manageUrl: string
-}
+export type AuthSession = GetAuthSessionResponse
+export type ConnectionConfiguration = GetConnectionConfigurationResponse
+export type InstallationDetail = GetInstallationResponse
+export type InstallationSummary = GetInstallationsResponse['installations'][number]
 
 export async function getAuthSession(): Promise<AuthSession> {
-  return requestJson('/api/v1/auth/session')
+  const { data } = await getAuthSessionRequest({ throwOnError: true })
+
+  return data
 }
 
 export async function getConnectionConfiguration(): Promise<ConnectionConfiguration> {
-  return requestJson('/api/v1/connection')
+  const { data } = await getConnectionConfigurationRequest({ throwOnError: true })
+
+  return data
 }
 
 export async function getInstallations(): Promise<readonly InstallationSummary[]> {
-  const response = await requestJson<{ readonly installations: readonly InstallationSummary[] }>(
-    '/api/v1/installations',
-  )
+  const { data } = await getInstallationsRequest({ throwOnError: true })
 
-  return response.installations
+  return data.installations
 }
 
 export async function getInstallation(installationId: number): Promise<InstallationDetail> {
-  return requestJson(`/api/v1/installations/${encodeURIComponent(String(installationId))}`)
+  const { data } = await getInstallationRequest({
+    path: {
+      installationId: String(installationId),
+    },
+    throwOnError: true,
+  })
+
+  return data
 }
 
 export async function logout(): Promise<void> {
-  await mutate('/api/v1/auth/logout', 'POST')
+  await logoutRequest({
+    body: {},
+    headers: createCsrfHeaders(),
+    throwOnError: true,
+  })
 }
 
 export async function disconnectGitHub(): Promise<void> {
-  await mutate('/api/v1/auth/disconnect', 'POST')
+  await disconnectGitHubRequest({
+    body: {},
+    headers: createCsrfHeaders(),
+    throwOnError: true,
+  })
 }
 
 export async function deleteLocalAccount(): Promise<void> {
-  await mutate('/api/v1/account', 'DELETE')
-}
-
-async function mutate(url: string, method: 'POST' | 'DELETE'): Promise<void> {
-  const csrfToken = readCookie('__Host-shipgate_csrf')
-  const response = await fetch(url, {
-    method,
-    credentials: 'same-origin',
-    headers: {
-      'x-csrf-token': csrfToken ?? '',
-      ...(method === 'POST' ? { 'content-type': 'application/json' } : {}),
-    },
-    ...(method === 'POST' ? { body: '{}' } : {}),
+  await deleteLocalAccountRequest({
+    headers: createCsrfHeaders(),
+    throwOnError: true,
   })
-
-  await ensureSuccess(response)
 }
 
-async function requestJson<Value>(url: string): Promise<Value> {
-  const response = await fetch(url, {
-    credentials: 'same-origin',
-    headers: {
-      accept: 'application/json',
-    },
-  })
-
-  await ensureSuccess(response)
-
-  return (await response.json()) as Value
-}
-
-async function ensureSuccess(response: Response): Promise<void> {
-  if (response.ok) {
-    return
+function createCsrfHeaders(): Record<string, string> {
+  return {
+    'x-csrf-token': readCookie('__Host-shipgate_csrf') ?? '',
   }
-
-  const contentType = response.headers.get('content-type')
-
-  if (contentType?.includes('application/json')) {
-    throw (await response.json()) as unknown
-  }
-
-  throw new Error(`Shipgate API returned HTTP ${response.status}`)
 }
 
 function readCookie(name: string): string | undefined {
@@ -166,7 +88,11 @@ function readCookie(name: string): string | undefined {
     const cookie = part.trim()
 
     if (cookie.startsWith(prefix)) {
-      return decodeURIComponent(cookie.slice(prefix.length))
+      try {
+        return decodeURIComponent(cookie.slice(prefix.length))
+      } catch {
+        return undefined
+      }
     }
   }
 

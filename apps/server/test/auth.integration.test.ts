@@ -181,6 +181,7 @@ describe.sequential('GitHub login and Shipgate sessions', () => {
     })
 
     expect(session.statusCode).toBe(200)
+    expect(session.headers['cache-control']).toBe('no-store')
     expect(session.json()).toMatchObject({
       authenticated: true,
       user: {

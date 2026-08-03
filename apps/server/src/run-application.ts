@@ -36,7 +36,7 @@ export async function runApplication(options: RunApplicationOptions): Promise<vo
 
   const removeProcessHandlers = installProcessHandlers(context)
 
-  let stage: 'startup' | 'runtime' = 'startup'
+  let phase: 'startup' | 'runtime' = 'startup'
 
   try {
     context.logger.info(
@@ -58,9 +58,17 @@ export async function runApplication(options: RunApplicationOptions): Promise<vo
       await validateGitHubAppAtStartup(context)
     }
 
+    if (await finishInterruptedStartup(context)) {
+      return
+    }
+
     const application = await options.start(context)
 
-    stage = 'runtime'
+    if (await finishInterruptedStartup(context)) {
+      return
+    }
+
+    phase = 'runtime'
 
     if (!context.shutdown.isShuttingDown) {
       context.logger.info(
@@ -85,13 +93,17 @@ export async function runApplication(options: RunApplicationOptions): Promise<vo
       process.exitCode = 1
     }
   } catch (error) {
+    if (await finishInterruptedStartup(context)) {
+      return
+    }
+
     process.exitCode = 1
 
-    logFatal(context.logger, error, stage)
+    logFatal(context.logger, error, phase)
 
     const result = await context.shutdown.shutdown({
       type: 'fatal',
-      origin: stage,
+      origin: phase,
     })
 
     if (result.failed) {
@@ -101,6 +113,22 @@ export async function runApplication(options: RunApplicationOptions): Promise<vo
     removeProcessHandlers()
     context.logger.flush()
   }
+}
+
+async function finishInterruptedStartup(context: ApplicationContext): Promise<boolean> {
+  if (!context.shutdown.isShuttingDown) {
+    return false
+  }
+
+  const result = await context.shutdown.shutdown({
+    type: 'completed',
+  })
+
+  if (result.failed) {
+    process.exitCode = 1
+  }
+
+  return true
 }
 
 function installProcessHandlers(context: ApplicationContext): () => void {
@@ -173,13 +201,13 @@ function exitAfterFailedShutdown(context: ApplicationContext): never {
   process.exit(1)
 }
 
-function logFatal(logger: ApplicationContext['logger'], error: unknown, stage: string): void {
+function logFatal(logger: ApplicationContext['logger'], error: unknown, phase: string): void {
   const normalizedError = toError(error)
 
   logger.fatal(
     {
       event: 'application.fatal',
-      stage,
+      phase,
       err: normalizedError,
 
       ...(normalizedError instanceof EnvironmentValidationError

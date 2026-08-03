@@ -262,7 +262,9 @@ async function startMockGitHubServer(state: MockState): Promise<{
     } catch (error) {
       response.statusCode = 500
       response.setHeader('content-type', 'application/json')
-      response.end(JSON.stringify({ message: error instanceof Error ? error.message : String(error) }))
+      response.end(
+        JSON.stringify({ message: error instanceof Error ? error.message : String(error) }),
+      )
     }
   })
 
@@ -322,10 +324,7 @@ async function handleRequest(
     return
   }
 
-  if (
-    request.method === 'GET' &&
-    url.pathname === '/user/installations/123/repositories'
-  ) {
+  if (request.method === 'GET' && url.pathname === '/user/installations/123/repositories') {
     sendJson(response, 200, {
       total_count: 1,
       repositories: [githubRepositoryFixture],
@@ -346,10 +345,7 @@ async function handleRequest(
     return
   }
 
-  if (
-    request.method === 'POST' &&
-    url.pathname === '/app/installations/123/access_tokens'
-  ) {
+  if (request.method === 'POST' && url.pathname === '/app/installations/123/access_tokens') {
     const body = JSON.parse(await readBody(request)) as Record<string, unknown>
     state.installationTokenRequests = [...state.installationTokenRequests, body]
     sendJson(response, 201, {
@@ -369,7 +365,9 @@ async function handleRequest(
     return
   }
 
-  sendJson(response, 404, { message: `Unhandled contract route: ${request.method} ${url.pathname}` })
+  sendJson(response, 404, {
+    message: `Unhandled contract route: ${request.method} ${url.pathname}`,
+  })
 }
 
 function installationFixture() {

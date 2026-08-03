@@ -26,11 +26,13 @@ export async function processGitHubWebhookDelivery(input: {
   readonly deliveryId: string
   readonly attempt: number
 }): Promise<Readonly<Record<string, JsonValue>>> {
-  const delivery = await loadDelivery(input.database, input.deliveryId, input.attempt)
-  if (!delivery) return { deliveryId: input.deliveryId, skipped: true }
+  let completedDelivery: WebhookDelivery | undefined
 
-  let payload: RecordValue
   try {
+    const delivery = await loadDelivery(input.database, input.deliveryId, input.attempt)
+    if (!delivery) return { deliveryId: input.deliveryId, skipped: true }
+
+    let payload: RecordValue
     payload = parsePayload(delivery.rawPayload)
     validateEnvelope(delivery, payload)
     await input.database.kysely.transaction().execute(async (transaction) => {
@@ -240,6 +242,8 @@ export async function processGitHubWebhookDelivery(input: {
         .where('delivery_id', '=', delivery.deliveryId)
         .execute()
     })
+
+    completedDelivery = delivery
   } catch (error) {
     await input.database.kysely
       .updateTable('github_webhook_deliveries')
@@ -256,7 +260,15 @@ export async function processGitHubWebhookDelivery(input: {
 
   await purgeExpiredGitHubWebhookPayloads(input.database)
 
-  return { deliveryId: delivery.deliveryId, event: delivery.event, action: delivery.action }
+  if (!completedDelivery) {
+    throw new Error('GitHub webhook delivery completed without a claimed payload')
+  }
+
+  return {
+    deliveryId: completedDelivery.deliveryId,
+    event: completedDelivery.event,
+    action: completedDelivery.action,
+  }
 }
 
 export async function purgeExpiredGitHubWebhookPayloads(
@@ -291,6 +303,7 @@ async function loadDelivery(
     })
     .where('delivery_id', '=', deliveryId)
     .where('processing_state', '!=', 'succeeded')
+    .where('attempt_count', '<', attempt)
     .returning([
       'delivery_id',
       'event',

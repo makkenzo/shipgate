@@ -6,6 +6,7 @@ import { connectionConfigurationOptions, installationsOptions } from '@/api/conn
 import { buttonVariants } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { requireAuthenticatedRoute } from '@/lib/auth-route'
+import { toSafeHttpUrl } from '@/lib/safe-url'
 import { cn } from '@/lib/utils'
 
 export const Route = createFileRoute('/setup')({
@@ -17,6 +18,7 @@ function SetupPage() {
   const configuration = useQuery(connectionConfigurationOptions())
   const installations = useQuery(installationsOptions())
   const connected = (installations.data?.length ?? 0) > 0
+  const installUrl = toSafeHttpUrl(configuration.data?.installUrl)
 
   if (configuration.isError) {
     throw configuration.error
@@ -63,11 +65,10 @@ function SetupPage() {
             </Link>
           ) : (
             <a
-              href={configuration.data?.installUrl ?? undefined}
+              href={installUrl}
               className={cn(
                 buttonVariants(),
-                (!configuration.data?.installUrl || configuration.isPending) &&
-                  'pointer-events-none opacity-50',
+                (!installUrl || configuration.isPending) && 'pointer-events-none opacity-50',
               )}
             >
               <GitBranch data-icon="inline-start" />

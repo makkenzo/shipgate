@@ -6,6 +6,7 @@ import { TypeBoxValidatorCompiler } from '@fastify/type-provider-typebox'
 import Fastify, { type FastifyBaseLogger, type FastifyInstance } from 'fastify'
 
 import type { ApplicationContext } from '../application-context.js'
+import { SESSION_COOKIE_NAME } from '../auth/cookies.js'
 import { resolveCorrelationId } from '../correlation-id.js'
 import { registerApiErrorHandling, sendApiNotFound } from './api-error.js'
 import { createApiMetrics } from './metrics.js'
@@ -41,7 +42,12 @@ export async function buildApiApplication(context: ApplicationContext): Promise<
    */
   await app.register(swagger, {
     openapi: {
-      openapi: '3.0.3',
+      /*
+       * TypeBox represents nullable values as JSON Schema unions containing
+       * { type: 'null' }. That is valid in OpenAPI 3.1 and would be an invalid
+       * schema (and generate `unknown`) under OpenAPI 3.0.
+       */
+      openapi: '3.1.0',
 
       info: {
         title: 'Shipgate API',
@@ -61,6 +67,18 @@ export async function buildApiApplication(context: ApplicationContext): Promise<
 
       tags: [
         {
+          name: 'Authentication',
+
+          description: 'Shipgate browser session lifecycle.',
+        },
+
+        {
+          name: 'Connections',
+
+          description: 'GitHub connection and installation state.',
+        },
+
+        {
           name: 'Operations',
 
           description: 'Application health and readiness.',
@@ -72,6 +90,17 @@ export async function buildApiApplication(context: ApplicationContext): Promise<
           description: 'Non-product infrastructure diagnostics.',
         },
       ],
+
+      components: {
+        securitySchemes: {
+          shipgateSession: {
+            type: 'apiKey',
+            in: 'cookie',
+            name: SESSION_COOKIE_NAME,
+            description: 'HttpOnly Shipgate browser session cookie.',
+          },
+        },
+      },
     },
   })
 
@@ -79,7 +108,7 @@ export async function buildApiApplication(context: ApplicationContext): Promise<
     global: true,
   })
 
-  if (context.runtimeConfig.environment === 'development') {
+  if (context.runtimeConfig.api.corsOrigins.length > 0) {
     await app.register(cors, {
       origin: [...context.runtimeConfig.api.corsOrigins],
 

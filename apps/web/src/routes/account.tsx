@@ -2,11 +2,12 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { ExternalLink, LogOut, Trash2, Unplug } from 'lucide-react'
 
-import { disconnectGitHub, deleteLocalAccount, logout } from '@/api/connection'
+import { deleteLocalAccount, disconnectGitHub, logout } from '@/api/connection'
 import { authSessionOptions } from '@/api/connection-queries'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { requireAuthenticatedRoute } from '@/lib/auth-route'
+import { toSafeHttpUrl } from '@/lib/safe-url'
 
 export const Route = createFileRoute('/account')({
   beforeLoad: ({ context }) => requireAuthenticatedRoute(context.queryClient),
@@ -42,7 +43,10 @@ function AccountPage() {
   }
 
   const user = session.data.user
-  const pending = logoutMutation.isPending || disconnectMutation.isPending || deleteMutation.isPending
+  const avatarUrl = toSafeHttpUrl(user.avatarUrl)
+  const profileUrl = toSafeHttpUrl(user.htmlUrl)
+  const pending =
+    logoutMutation.isPending || disconnectMutation.isPending || deleteMutation.isPending
 
   return (
     <main className="mx-auto w-full max-w-3xl px-6 py-10">
@@ -55,10 +59,12 @@ function AccountPage() {
         <CardHeader>
           <div className="flex items-center gap-4">
             <div className="flex size-12 items-center justify-center overflow-hidden rounded-xl bg-muted">
-              {user.avatarUrl ? (
-                <img src={user.avatarUrl} alt="" className="size-full object-cover" />
+              {avatarUrl ? (
+                <img src={avatarUrl} alt="" className="size-full object-cover" />
               ) : (
-                <span className="text-lg font-semibold">{user.login.slice(0, 1).toUpperCase()}</span>
+                <span className="text-lg font-semibold">
+                  {user.login.slice(0, 1).toUpperCase()}
+                </span>
               )}
             </div>
             <div>
@@ -68,14 +74,16 @@ function AccountPage() {
           </div>
         </CardHeader>
         <CardContent className="flex flex-wrap gap-3">
-          <a
-            href={user.htmlUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
-          >
-            Open GitHub profile <ExternalLink className="size-3.5" />
-          </a>
+          {profileUrl ? (
+            <a
+              href={profileUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
+            >
+              Open GitHub profile <ExternalLink className="size-3.5" />
+            </a>
+          ) : null}
         </CardContent>
       </Card>
 
@@ -87,11 +95,7 @@ function AccountPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Button
-            variant="outline"
-            disabled={pending}
-            onClick={() => logoutMutation.mutate()}
-          >
+          <Button variant="outline" disabled={pending} onClick={() => logoutMutation.mutate()}>
             <LogOut data-icon="inline-start" />
             Sign out
           </Button>
@@ -127,8 +131,8 @@ function AccountPage() {
           <CardTitle>Delete local account</CardTitle>
           <CardDescription>
             Permanently remove the local Shipgate user record, user repository access snapshots,
-            credentials, and sessions. The GitHub grant itself is left untouched; disconnect it first
-            when you also want to revoke the authorization on GitHub.
+            credentials, and sessions. The GitHub grant itself is left untouched; disconnect it
+            first when you also want to revoke the authorization on GitHub.
           </CardDescription>
         </CardHeader>
         <CardContent>

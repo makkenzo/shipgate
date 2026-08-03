@@ -1,11 +1,19 @@
 {
-  "openapi": "3.0.3",
+  "openapi": "3.1.0",
   "info": {
     "title": "Shipgate API",
     "description": "Shipgate HTTP API.",
     "version": "0.0.0"
   },
   "components": {
+    "securitySchemes": {
+      "shipgateSession": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "__Host-shipgate_session",
+        "description": "HttpOnly Shipgate browser session cookie."
+      }
+    },
     "schemas": {}
   },
   "paths": {
@@ -158,6 +166,1083 @@
                 }
               }
             }
+          },
+          "default": {
+            "description": "Common error response returned by the Shipgate API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["code", "message", "requestId"],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "minLength": 1,
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "details": {}
+                  },
+                  "additionalProperties": false,
+                  "title": "ApiError",
+                  "description": "Common error response returned by the Shipgate API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/session": {
+      "get": {
+        "operationId": "getAuthSession",
+        "summary": "Get the current Shipgate session",
+        "tags": ["Authentication"],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "required": ["authenticated"],
+                      "properties": {
+                        "authenticated": {
+                          "type": "boolean",
+                          "enum": [false]
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "required": ["authenticated", "session", "user"],
+                      "properties": {
+                        "authenticated": {
+                          "type": "boolean",
+                          "enum": [true]
+                        },
+                        "session": {
+                          "type": "object",
+                          "required": ["id", "expiresAt"],
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "expiresAt": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        "user": {
+                          "type": "object",
+                          "required": [
+                            "id",
+                            "login",
+                            "avatarUrl",
+                            "displayName",
+                            "email",
+                            "htmlUrl",
+                            "installations"
+                          ],
+                          "properties": {
+                            "id": {
+                              "type": "integer",
+                              "minimum": 1
+                            },
+                            "login": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "avatarUrl": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "displayName": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "email": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "htmlUrl": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "installations": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "required": [
+                                  "id",
+                                  "account",
+                                  "repositorySelection",
+                                  "permissions",
+                                  "suspendedAt"
+                                ],
+                                "properties": {
+                                  "id": {
+                                    "type": "integer",
+                                    "minimum": 1
+                                  },
+                                  "account": {
+                                    "type": "object",
+                                    "required": ["id", "login", "type", "avatarUrl"],
+                                    "properties": {
+                                      "id": {
+                                        "type": "integer",
+                                        "minimum": 1
+                                      },
+                                      "login": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      },
+                                      "type": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      },
+                                      "avatarUrl": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      }
+                                    },
+                                    "additionalProperties": false
+                                  },
+                                  "repositorySelection": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string",
+                                        "enum": ["all"]
+                                      },
+                                      {
+                                        "type": "string",
+                                        "enum": ["selected"]
+                                      }
+                                    ]
+                                  },
+                                  "permissions": {
+                                    "type": "object",
+                                    "additionalProperties": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "suspendedAt": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  }
+                                },
+                                "additionalProperties": false
+                              }
+                            }
+                          },
+                          "additionalProperties": false
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  ],
+                  "title": "AuthSessionResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Common error response returned by the Shipgate API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["code", "message", "requestId"],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "minLength": 1,
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "details": {}
+                  },
+                  "additionalProperties": false,
+                  "title": "ApiError",
+                  "description": "Common error response returned by the Shipgate API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/logout": {
+      "post": {
+        "operationId": "logout",
+        "summary": "Revoke the current Shipgate session",
+        "tags": ["Authentication"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            "in": "header",
+            "name": "x-csrf-token",
+            "required": false
+          }
+        ],
+        "security": [
+          {
+            "shipgateSession": []
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Default Response"
+          },
+          "default": {
+            "description": "Common error response returned by the Shipgate API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["code", "message", "requestId"],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "minLength": 1,
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "details": {}
+                  },
+                  "additionalProperties": false,
+                  "title": "ApiError",
+                  "description": "Common error response returned by the Shipgate API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/disconnect": {
+      "post": {
+        "operationId": "disconnectGitHub",
+        "summary": "Disconnect GitHub and revoke all Shipgate sessions",
+        "tags": ["Authentication"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            "in": "header",
+            "name": "x-csrf-token",
+            "required": false
+          }
+        ],
+        "security": [
+          {
+            "shipgateSession": []
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Default Response"
+          },
+          "default": {
+            "description": "Common error response returned by the Shipgate API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["code", "message", "requestId"],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "minLength": 1,
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "details": {}
+                  },
+                  "additionalProperties": false,
+                  "title": "ApiError",
+                  "description": "Common error response returned by the Shipgate API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/connection": {
+      "get": {
+        "operationId": "getConnectionConfiguration",
+        "summary": "Get GitHub connection configuration",
+        "tags": ["Connections"],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "githubLoginConfigured",
+                    "githubInstallationConfigured",
+                    "loginUrl",
+                    "installUrl"
+                  ],
+                  "properties": {
+                    "githubLoginConfigured": {
+                      "type": "boolean"
+                    },
+                    "githubInstallationConfigured": {
+                      "type": "boolean"
+                    },
+                    "loginUrl": {
+                      "type": "string"
+                    },
+                    "installUrl": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Common error response returned by the Shipgate API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["code", "message", "requestId"],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "minLength": 1,
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "details": {}
+                  },
+                  "additionalProperties": false,
+                  "title": "ApiError",
+                  "description": "Common error response returned by the Shipgate API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/installations": {
+      "get": {
+        "operationId": "getInstallations",
+        "summary": "List installations visible to the current user",
+        "tags": ["Connections"],
+        "security": [
+          {
+            "shipgateSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["installations"],
+                  "properties": {
+                    "installations": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "id",
+                          "owner",
+                          "repositorySelection",
+                          "lifecycleState",
+                          "permissionState",
+                          "suspendedAt",
+                          "repositoryCount",
+                          "userRepositoryCount",
+                          "permissions",
+                          "permissionUpgradePending",
+                          "lastReconciledAt"
+                        ],
+                        "properties": {
+                          "id": {
+                            "type": "integer",
+                            "minimum": 1
+                          },
+                          "owner": {
+                            "type": "object",
+                            "required": ["id", "login", "type", "avatarUrl"],
+                            "properties": {
+                              "id": {
+                                "type": "integer",
+                                "minimum": 1
+                              },
+                              "login": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "type": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "avatarUrl": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              }
+                            },
+                            "additionalProperties": false
+                          },
+                          "repositorySelection": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "enum": ["all"]
+                              },
+                              {
+                                "type": "string",
+                                "enum": ["selected"]
+                              }
+                            ]
+                          },
+                          "lifecycleState": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "enum": ["active"]
+                              },
+                              {
+                                "type": "string",
+                                "enum": ["suspended"]
+                              },
+                              {
+                                "type": "string",
+                                "enum": ["pending_deletion"]
+                              },
+                              {
+                                "type": "string",
+                                "enum": ["deleted"]
+                              }
+                            ]
+                          },
+                          "permissionState": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "enum": ["current"]
+                              },
+                              {
+                                "type": "string",
+                                "enum": ["stale"]
+                              },
+                              {
+                                "type": "string",
+                                "enum": ["suspended"]
+                              },
+                              {
+                                "type": "string",
+                                "enum": ["revoked"]
+                              }
+                            ]
+                          },
+                          "suspendedAt": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "repositoryCount": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
+                          "userRepositoryCount": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
+                          "permissions": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "required": ["name", "required", "actual", "satisfied"],
+                              "properties": {
+                                "name": {
+                                  "type": "string"
+                                },
+                                "required": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "enum": ["read"]
+                                    },
+                                    {
+                                      "type": "string",
+                                      "enum": ["write"]
+                                    }
+                                  ]
+                                },
+                                "actual": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "enum": ["read"]
+                                    },
+                                    {
+                                      "type": "string",
+                                      "enum": ["write"]
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "satisfied": {
+                                  "type": "boolean"
+                                }
+                              },
+                              "additionalProperties": false
+                            }
+                          },
+                          "permissionUpgradePending": {
+                            "type": "boolean"
+                          },
+                          "lastReconciledAt": {
+                            "type": "string"
+                          }
+                        },
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Common error response returned by the Shipgate API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["code", "message", "requestId"],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "minLength": 1,
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "details": {}
+                  },
+                  "additionalProperties": false,
+                  "title": "ApiError",
+                  "description": "Common error response returned by the Shipgate API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/installations/{installationId}": {
+      "get": {
+        "operationId": "getInstallation",
+        "summary": "Get an installation visible to the current user",
+        "tags": ["Connections"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]*$"
+            },
+            "in": "path",
+            "name": "installationId",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "shipgateSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "id",
+                    "owner",
+                    "repositorySelection",
+                    "lifecycleState",
+                    "permissionState",
+                    "suspendedAt",
+                    "repositoryCount",
+                    "userRepositoryCount",
+                    "permissions",
+                    "permissionUpgradePending",
+                    "lastReconciledAt",
+                    "repositories",
+                    "manageUrl"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "owner": {
+                      "type": "object",
+                      "required": ["id", "login", "type", "avatarUrl"],
+                      "properties": {
+                        "id": {
+                          "type": "integer",
+                          "minimum": 1
+                        },
+                        "login": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "type": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "avatarUrl": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "repositorySelection": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": ["all"]
+                        },
+                        {
+                          "type": "string",
+                          "enum": ["selected"]
+                        }
+                      ]
+                    },
+                    "lifecycleState": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": ["active"]
+                        },
+                        {
+                          "type": "string",
+                          "enum": ["suspended"]
+                        },
+                        {
+                          "type": "string",
+                          "enum": ["pending_deletion"]
+                        },
+                        {
+                          "type": "string",
+                          "enum": ["deleted"]
+                        }
+                      ]
+                    },
+                    "permissionState": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": ["current"]
+                        },
+                        {
+                          "type": "string",
+                          "enum": ["stale"]
+                        },
+                        {
+                          "type": "string",
+                          "enum": ["suspended"]
+                        },
+                        {
+                          "type": "string",
+                          "enum": ["revoked"]
+                        }
+                      ]
+                    },
+                    "suspendedAt": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "repositoryCount": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "userRepositoryCount": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "permissions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": ["name", "required", "actual", "satisfied"],
+                        "properties": {
+                          "name": {
+                            "type": "string"
+                          },
+                          "required": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "enum": ["read"]
+                              },
+                              {
+                                "type": "string",
+                                "enum": ["write"]
+                              }
+                            ]
+                          },
+                          "actual": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "enum": ["read"]
+                              },
+                              {
+                                "type": "string",
+                                "enum": ["write"]
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "satisfied": {
+                            "type": "boolean"
+                          }
+                        },
+                        "additionalProperties": false
+                      }
+                    },
+                    "permissionUpgradePending": {
+                      "type": "boolean"
+                    },
+                    "lastReconciledAt": {
+                      "type": "string"
+                    },
+                    "repositories": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "id",
+                          "ownerId",
+                          "ownerLogin",
+                          "name",
+                          "fullName",
+                          "private",
+                          "archived",
+                          "disabled",
+                          "defaultBranch",
+                          "visibility",
+                          "userPermission",
+                          "accessibleToUser",
+                          "lastReconciledAt"
+                        ],
+                        "properties": {
+                          "id": {
+                            "type": "integer",
+                            "minimum": 1
+                          },
+                          "ownerId": {
+                            "type": "integer",
+                            "minimum": 1
+                          },
+                          "ownerLogin": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "name": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "fullName": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "private": {
+                            "type": "boolean"
+                          },
+                          "archived": {
+                            "type": "boolean"
+                          },
+                          "disabled": {
+                            "type": "boolean"
+                          },
+                          "defaultBranch": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "visibility": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "userPermission": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "enum": ["none"]
+                              },
+                              {
+                                "type": "string",
+                                "enum": ["read"]
+                              },
+                              {
+                                "type": "string",
+                                "enum": ["triage"]
+                              },
+                              {
+                                "type": "string",
+                                "enum": ["write"]
+                              },
+                              {
+                                "type": "string",
+                                "enum": ["maintain"]
+                              },
+                              {
+                                "type": "string",
+                                "enum": ["admin"]
+                              }
+                            ]
+                          },
+                          "accessibleToUser": {
+                            "type": "boolean"
+                          },
+                          "lastReconciledAt": {
+                            "type": "string"
+                          }
+                        },
+                        "additionalProperties": false
+                      }
+                    },
+                    "manageUrl": {
+                      "type": "string"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Common error response returned by the Shipgate API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["code", "message", "requestId"],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "minLength": 1,
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "details": {}
+                  },
+                  "additionalProperties": false,
+                  "title": "ApiError",
+                  "description": "Common error response returned by the Shipgate API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/account": {
+      "delete": {
+        "operationId": "deleteLocalAccount",
+        "summary": "Delete the local Shipgate account",
+        "tags": ["Connections"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            "in": "header",
+            "name": "x-csrf-token",
+            "required": false
+          }
+        ],
+        "security": [
+          {
+            "shipgateSession": []
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Default Response"
           },
           "default": {
             "description": "Common error response returned by the Shipgate API.",
@@ -478,6 +1563,14 @@
     }
   ],
   "tags": [
+    {
+      "name": "Authentication",
+      "description": "Shipgate browser session lifecycle."
+    },
+    {
+      "name": "Connections",
+      "description": "GitHub connection and installation state."
+    },
     {
       "name": "Operations",
       "description": "Application health and readiness."

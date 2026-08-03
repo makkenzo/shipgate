@@ -72,6 +72,15 @@ export const EmptyMutationBodySchema = Type.Object(
   },
 )
 
+export const CsrfHeadersSchema = Type.Object(
+  {
+    'x-csrf-token': Type.Optional(Type.String({ minLength: 1, maxLength: 256 })),
+  },
+  {
+    additionalProperties: true,
+  },
+)
+
 export const AuthSessionResponseSchema = Type.Union(
   [
     Type.Object(

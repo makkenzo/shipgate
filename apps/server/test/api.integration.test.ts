@@ -96,6 +96,49 @@ describe.sequential('Fastify API', () => {
     })
   })
 
+  it('allows only configured cross-origin browser requests', async () => {
+    const allowed = await app.inject({
+      method: 'GET',
+      url: '/health',
+      headers: {
+        origin: 'http://localhost:5173',
+      },
+    })
+
+    expect(allowed.headers['access-control-allow-origin']).toBe('http://localhost:5173')
+
+    const rejected = await app.inject({
+      method: 'GET',
+      url: '/health',
+      headers: {
+        origin: 'https://untrusted.example',
+      },
+    })
+
+    expect(rejected.headers['access-control-allow-origin']).toBeUndefined()
+  })
+
+  it('publishes the browser API contract without exposing callback or webhook internals', () => {
+    const document = app.swagger()
+    const paths = document.paths ?? {}
+
+    expect('openapi' in document ? document.openapi : undefined).toBe('3.1.0')
+
+    expect(paths['/api/v1/auth/session']?.get?.operationId).toBe('getAuthSession')
+    expect(paths['/api/v1/auth/logout']?.post?.operationId).toBe('logout')
+    expect(paths['/api/v1/auth/disconnect']?.post?.operationId).toBe('disconnectGitHub')
+    expect(paths['/api/v1/connection']?.get?.operationId).toBe('getConnectionConfiguration')
+    expect(paths['/api/v1/installations']?.get?.operationId).toBe('getInstallations')
+    expect(paths['/api/v1/installations/{installationId}']?.get?.operationId).toBe(
+      'getInstallation',
+    )
+    expect(paths['/api/v1/account']?.delete?.operationId).toBe('deleteLocalAccount')
+
+    expect(paths['/api/v1/auth/github']).toBeUndefined()
+    expect(paths['/api/v1/auth/github/callback']).toBeUndefined()
+    expect(paths['/api/v1/github/webhooks']).toBeUndefined()
+  })
+
   it('returns the shared validation error contract', async () => {
     const response = await app.inject({
       method: 'POST',

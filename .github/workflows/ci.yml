@@ -42,7 +42,7 @@ jobs:
       - name: Verify source, contracts, tests, and build
         env:
           DATABASE_URL: postgresql://shipgate:shipgate@127.0.0.1:5432/shipgate
-        run: pnpm ci
+        run: pnpm verify
 
       - name: Install Playwright browser
         run: pnpm exec playwright install --with-deps chromium
@@ -50,7 +50,7 @@ jobs:
       - name: Start production stack
         env:
           GITHUB_APP_STARTUP_VALIDATION_ENABLED: 'false'
-        run: pnpm compose:up
+        run: docker compose up -d --wait
 
       - name: Run end-to-end tests
         run: pnpm test:e2e
@@ -61,4 +61,4 @@ jobs:
 
       - name: Stop production stack
         if: always()
-        run: pnpm compose:down
+        run: docker compose down

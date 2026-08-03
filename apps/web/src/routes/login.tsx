@@ -4,8 +4,9 @@ import { GitBranch, LockKeyhole } from 'lucide-react'
 
 import { connectionConfigurationOptions } from '@/api/connection-queries'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardDescription, CardHeader } from '@/components/ui/card'
 import { redirectAuthenticatedRoute } from '@/lib/auth-route'
+import { toSafeSameOriginPath } from '@/lib/safe-url'
 
 export const Route = createFileRoute('/login')({
   beforeLoad: ({ context }) => redirectAuthenticatedRoute(context.queryClient),
@@ -28,7 +29,9 @@ function LoginPage() {
           </div>
 
           <div>
-            <CardTitle className="text-xl">Connect Shipgate to GitHub</CardTitle>
+            <h1 className="font-heading text-xl leading-snug font-medium">
+              Connect Shipgate to GitHub
+            </h1>
             <CardDescription className="mt-2">
               Sign in with the GitHub account that can access the repositories you want Shipgate to
               manage.
@@ -45,7 +48,13 @@ function LoginPage() {
               !configuration.data?.githubLoginConfigured
             }
             onClick={() => {
-              window.location.assign(configuration.data?.loginUrl ?? '/api/v1/auth/github')
+              window.location.assign(
+                toSafeSameOriginPath(
+                  configuration.data?.loginUrl,
+                  window.location.origin,
+                  '/api/v1/auth/github',
+                ),
+              )
             }}
           >
             <GitBranch data-icon="inline-start" />

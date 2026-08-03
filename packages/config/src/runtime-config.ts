@@ -41,32 +41,35 @@ const optionalBooleanEnvironmentSchema = z.preprocess(
     .optional(),
 )
 
-const corsOriginsEnvironmentSchema = z
-  .string()
-  .default(
-    [
-      'http://localhost:3000',
-      'http://localhost:5173',
-      'http://127.0.0.1:3000',
-      'http://127.0.0.1:5173',
-    ].join(','),
-  )
-  .transform((value, context) => {
-    const origins = parseCommaSeparatedValues(value)
+const developmentCorsOrigins = [
+  'http://localhost:3000',
+  'http://localhost:5173',
+  'http://127.0.0.1:3000',
+  'http://127.0.0.1:5173',
+] as const
 
-    for (const origin of origins) {
-      if (!isHttpOrigin(origin)) {
-        context.addIssue({
-          code: 'custom',
-          message: `Invalid HTTP origin: ${origin}`,
-        })
+const corsOriginsEnvironmentSchema = z.preprocess(
+  (value) => (value === '' || value === undefined ? undefined : value),
+  z
+    .string()
+    .transform((value, context) => {
+      const origins = parseCommaSeparatedValues(value)
 
-        return z.NEVER
+      for (const origin of origins) {
+        if (!isHttpOrigin(origin)) {
+          context.addIssue({
+            code: 'custom',
+            message: `Invalid HTTP origin: ${origin}`,
+          })
+
+          return z.NEVER
+        }
       }
-    }
 
-    return origins
-  })
+      return origins
+    })
+    .optional(),
+)
 
 const githubRuntimeEnvironmentShape = {
   APP_ORIGIN: optionalHttpsOriginEnvironmentSchema,
@@ -394,7 +397,9 @@ export function loadRuntimeConfig(environment: NodeJS.ProcessEnv = process.env):
 
       metricsEnabled: result.data.API_METRICS_ENABLED ?? result.data.NODE_ENV !== 'production',
 
-      corsOrigins: result.data.API_CORS_ORIGINS,
+      corsOrigins:
+        result.data.API_CORS_ORIGINS ??
+        (result.data.NODE_ENV === 'production' ? [] : developmentCorsOrigins),
     },
 
     auth: {

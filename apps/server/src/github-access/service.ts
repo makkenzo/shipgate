@@ -50,7 +50,7 @@ export interface GitHubRepositoryAccessService {
   invalidateUser(githubUserId: number): void
 }
 
-export type GitHubRepositoryAccessVerificationStage =
+export type GitHubRepositoryAccessVerificationPhase =
   | 'resolve_user_client'
   | 'installation_metadata'
   | 'persist_installation_metadata'
@@ -63,7 +63,7 @@ export type GitHubRepositoryAccessVerificationStage =
 export class GitHubRepositoryAccessVerificationError extends Error {
   readonly githubUserId: number
   readonly installationId: number
-  readonly stage: GitHubRepositoryAccessVerificationStage
+  readonly phase: GitHubRepositoryAccessVerificationPhase
   readonly status: number | undefined
 
   constructor(
@@ -71,7 +71,7 @@ export class GitHubRepositoryAccessVerificationError extends Error {
     options: {
       readonly githubUserId: number
       readonly installationId: number
-      readonly stage: GitHubRepositoryAccessVerificationStage
+      readonly phase: GitHubRepositoryAccessVerificationPhase
       readonly status?: number
       readonly cause?: unknown
     },
@@ -83,7 +83,7 @@ export class GitHubRepositoryAccessVerificationError extends Error {
     this.name = 'GitHubRepositoryAccessVerificationError'
     this.githubUserId = options.githubUserId
     this.installationId = options.installationId
-    this.stage = options.stage
+    this.phase = options.phase
     this.status = options.status
   }
 }
@@ -239,7 +239,7 @@ class DefaultGitHubRepositoryAccessService implements GitHubRepositoryAccessServ
         {
           githubUserId: input.githubUserId,
           installationId: input.installationId,
-          stage: 'cache',
+          phase: 'cache',
         },
       )
     }
@@ -505,7 +505,7 @@ class DefaultGitHubRepositoryAccessService implements GitHubRepositoryAccessServ
     if (row?.lifecycle_state === 'pending_deletion' || row?.lifecycle_state === 'deleted') {
       throw new GitHubRepositoryAccessVerificationError(
         `GitHub installation ${installationId} is pending deletion`,
-        { githubUserId, installationId, stage: 'reconciliation_invalidated' },
+        { githubUserId, installationId, phase: 'reconciliation_invalidated' },
       )
     }
   }
@@ -638,7 +638,7 @@ class DefaultGitHubRepositoryAccessService implements GitHubRepositoryAccessServ
         {
           githubUserId: input.githubUserId,
           installationId: input.installationId,
-          stage: 'reconciliation_invalidated',
+          phase: 'reconciliation_invalidated',
         },
       )
     }
@@ -690,7 +690,7 @@ class DefaultGitHubRepositoryAccessService implements GitHubRepositoryAccessServ
       readonly githubUserId: number
       readonly installationId: number
     },
-    stage: GitHubRepositoryAccessVerificationStage,
+    phase: GitHubRepositoryAccessVerificationPhase,
     error: unknown,
     reconciledAt: Date,
   ): Promise<never> {
@@ -719,7 +719,7 @@ class DefaultGitHubRepositoryAccessService implements GitHubRepositoryAccessServ
       {
         githubUserId: input.githubUserId,
         installationId: input.installationId,
-        stage,
+        phase,
         ...(status !== undefined ? { status } : {}),
         cause: error,
       },

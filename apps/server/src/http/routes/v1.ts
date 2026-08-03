@@ -15,6 +15,12 @@ interface ApiV1RoutesOptions {
 export const apiV1Routes: FastifyPluginAsyncTypebox<ApiV1RoutesOptions> = async (app, options) => {
   app.addHook('onRequest', enforceJsonContentType)
 
+  app.addHook('onSend', async (_request, reply, payload) => {
+    reply.header('cache-control', 'no-store')
+
+    return payload
+  })
+
   await app.register(githubWebhookRoutes, { context: options.context })
 
   registerSessionMiddleware(app, options.context)

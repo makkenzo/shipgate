@@ -3,8 +3,8 @@
 import { queryOptions, type UseMutationOptions } from '@tanstack/react-query';
 
 import { client } from '../client.gen';
-import { createDiagnosticJob, getDiagnosticJob, getHealth, getReadiness, type Options } from '../sdk.gen';
-import type { CreateDiagnosticJobData, CreateDiagnosticJobError, CreateDiagnosticJobResponse, GetDiagnosticJobData, GetDiagnosticJobError, GetDiagnosticJobResponse, GetHealthData, GetHealthError, GetHealthResponse, GetReadinessData, GetReadinessError, GetReadinessResponse } from '../types.gen';
+import { createDiagnosticJob, deleteLocalAccount, disconnectGitHub, getAuthSession, getConnectionConfiguration, getDiagnosticJob, getHealth, getInstallation, getInstallations, getReadiness, logout, type Options } from '../sdk.gen';
+import type { CreateDiagnosticJobData, CreateDiagnosticJobError, CreateDiagnosticJobResponse, DeleteLocalAccountData, DeleteLocalAccountError, DeleteLocalAccountResponse, DisconnectGitHubData, DisconnectGitHubError, DisconnectGitHubResponse, GetAuthSessionData, GetAuthSessionError, GetAuthSessionResponse, GetConnectionConfigurationData, GetConnectionConfigurationError, GetConnectionConfigurationResponse, GetDiagnosticJobData, GetDiagnosticJobError, GetDiagnosticJobResponse, GetHealthData, GetHealthError, GetHealthResponse, GetInstallationData, GetInstallationError, GetInstallationResponse, GetInstallationsData, GetInstallationsError, GetInstallationsResponse, GetReadinessData, GetReadinessError, GetReadinessResponse, LogoutData, LogoutError, LogoutResponse } from '../types.gen';
 
 export type QueryKey<TOptions extends Options> = [
     Pick<TOptions, 'baseUrl' | 'body' | 'headers' | 'path' | 'query'> & {
@@ -75,6 +75,24 @@ export const getReadinessOptions = (options?: Options<GetReadinessData>) => quer
     queryKey: getReadinessQueryKey(options)
 });
 
+export const getAuthSessionQueryKey = (options?: Options<GetAuthSessionData>) => createQueryKey('getAuthSession', options);
+
+/**
+ * Get the current Shipgate session
+ */
+export const getAuthSessionOptions = (options?: Options<GetAuthSessionData>) => queryOptions<GetAuthSessionResponse, GetAuthSessionError, GetAuthSessionResponse, ReturnType<typeof getAuthSessionQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await getAuthSession({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getAuthSessionQueryKey(options)
+});
+
 export type MutationKey<TOptions extends Partial<Options>> = [
     Pick<TOptions, 'baseUrl' | 'body' | 'headers' | 'path' | 'query'> & {
         _id: string;
@@ -102,6 +120,120 @@ const createMutationKey = <TOptions extends Partial<Options>>(id: string, option
         params.query = options.query;
     }
     return [params];
+};
+
+export const logoutMutationKey = (options?: Partial<Options<LogoutData>>) => createMutationKey('logout', options);
+
+/**
+ * Revoke the current Shipgate session
+ */
+export const logoutMutation = (options?: Partial<Options<LogoutData>>): UseMutationOptions<LogoutResponse, LogoutError, Options<LogoutData>> => {
+    const mutationOptions: UseMutationOptions<LogoutResponse, LogoutError, Options<LogoutData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await logout({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        },
+        mutationKey: logoutMutationKey(options)
+    };
+    return mutationOptions;
+};
+
+export const disconnectGitHubMutationKey = (options?: Partial<Options<DisconnectGitHubData>>) => createMutationKey('disconnectGitHub', options);
+
+/**
+ * Disconnect GitHub and revoke all Shipgate sessions
+ */
+export const disconnectGitHubMutation = (options?: Partial<Options<DisconnectGitHubData>>): UseMutationOptions<DisconnectGitHubResponse, DisconnectGitHubError, Options<DisconnectGitHubData>> => {
+    const mutationOptions: UseMutationOptions<DisconnectGitHubResponse, DisconnectGitHubError, Options<DisconnectGitHubData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await disconnectGitHub({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        },
+        mutationKey: disconnectGitHubMutationKey(options)
+    };
+    return mutationOptions;
+};
+
+export const getConnectionConfigurationQueryKey = (options?: Options<GetConnectionConfigurationData>) => createQueryKey('getConnectionConfiguration', options);
+
+/**
+ * Get GitHub connection configuration
+ */
+export const getConnectionConfigurationOptions = (options?: Options<GetConnectionConfigurationData>) => queryOptions<GetConnectionConfigurationResponse, GetConnectionConfigurationError, GetConnectionConfigurationResponse, ReturnType<typeof getConnectionConfigurationQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await getConnectionConfiguration({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getConnectionConfigurationQueryKey(options)
+});
+
+export const getInstallationsQueryKey = (options?: Options<GetInstallationsData>) => createQueryKey('getInstallations', options);
+
+/**
+ * List installations visible to the current user
+ */
+export const getInstallationsOptions = (options?: Options<GetInstallationsData>) => queryOptions<GetInstallationsResponse, GetInstallationsError, GetInstallationsResponse, ReturnType<typeof getInstallationsQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await getInstallations({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getInstallationsQueryKey(options)
+});
+
+export const getInstallationQueryKey = (options: Options<GetInstallationData>) => createQueryKey('getInstallation', options);
+
+/**
+ * Get an installation visible to the current user
+ */
+export const getInstallationOptions = (options: Options<GetInstallationData>) => queryOptions<GetInstallationResponse, GetInstallationError, GetInstallationResponse, ReturnType<typeof getInstallationQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await getInstallation({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getInstallationQueryKey(options)
+});
+
+export const deleteLocalAccountMutationKey = (options?: Partial<Options<DeleteLocalAccountData>>) => createMutationKey('deleteLocalAccount', options);
+
+/**
+ * Delete the local Shipgate account
+ */
+export const deleteLocalAccountMutation = (options?: Partial<Options<DeleteLocalAccountData>>): UseMutationOptions<DeleteLocalAccountResponse, DeleteLocalAccountError, Options<DeleteLocalAccountData>> => {
+    const mutationOptions: UseMutationOptions<DeleteLocalAccountResponse, DeleteLocalAccountError, Options<DeleteLocalAccountData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await deleteLocalAccount({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        },
+        mutationKey: deleteLocalAccountMutationKey(options)
+    };
+    return mutationOptions;
 };
 
 export const createDiagnosticJobMutationKey = (options?: Partial<Options<CreateDiagnosticJobData>>) => createMutationKey('createDiagnosticJob', options);

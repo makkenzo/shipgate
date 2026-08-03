@@ -159,9 +159,7 @@ describe.sequential('PostgreSQL infrastructure', () => {
       await firstLock
     }
 
-    const rollbackResults: Array<
-      Awaited<ReturnType<typeof rollbackLastMigration>>[number]
-    > = []
+    const rollbackResults: Array<Awaited<ReturnType<typeof rollbackLastMigration>>[number]> = []
 
     for (let index = 0; index < expectedMigrationNames.length; index += 1) {
       rollbackResults.push(...(await rollbackLastMigration(database.kysely)))

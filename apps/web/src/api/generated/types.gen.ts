@@ -92,6 +92,344 @@ export type GetReadinessResponses = {
 
 export type GetReadinessResponse = GetReadinessResponses[keyof GetReadinessResponses];
 
+export type GetAuthSessionData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/auth/session';
+};
+
+export type GetAuthSessionErrors = {
+    /**
+     * ApiError
+     *
+     * Common error response returned by the Shipgate API.
+     */
+    default: {
+        code: string;
+        message: string;
+        requestId: string;
+        details?: unknown;
+    };
+};
+
+export type GetAuthSessionError = GetAuthSessionErrors[keyof GetAuthSessionErrors];
+
+export type GetAuthSessionResponses = {
+    /**
+     * AuthSessionResponse
+     *
+     * Default Response
+     */
+    200: {
+        authenticated: false;
+    } | {
+        authenticated: true;
+        session: {
+            id: string;
+            expiresAt: string;
+        };
+        user: {
+            id: number;
+            login: string;
+            avatarUrl: string | null;
+            displayName: string | null;
+            email: string | null;
+            htmlUrl: string;
+            installations: Array<{
+                id: number;
+                account: {
+                    id: number;
+                    login: string;
+                    type: string;
+                    avatarUrl: string | null;
+                };
+                repositorySelection: 'all' | 'selected';
+                permissions: {
+                    [key: string]: string;
+                };
+                suspendedAt: string | null;
+            }>;
+        };
+    };
+};
+
+export type GetAuthSessionResponse = GetAuthSessionResponses[keyof GetAuthSessionResponses];
+
+export type LogoutData = {
+    body: {
+        [key: string]: never;
+    };
+    headers?: {
+        'x-csrf-token'?: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/v1/auth/logout';
+};
+
+export type LogoutErrors = {
+    /**
+     * ApiError
+     *
+     * Common error response returned by the Shipgate API.
+     */
+    default: {
+        code: string;
+        message: string;
+        requestId: string;
+        details?: unknown;
+    };
+};
+
+export type LogoutError = LogoutErrors[keyof LogoutErrors];
+
+export type LogoutResponses = {
+    /**
+     * Default Response
+     */
+    204: void;
+};
+
+export type LogoutResponse = LogoutResponses[keyof LogoutResponses];
+
+export type DisconnectGitHubData = {
+    body: {
+        [key: string]: never;
+    };
+    headers?: {
+        'x-csrf-token'?: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/v1/auth/disconnect';
+};
+
+export type DisconnectGitHubErrors = {
+    /**
+     * ApiError
+     *
+     * Common error response returned by the Shipgate API.
+     */
+    default: {
+        code: string;
+        message: string;
+        requestId: string;
+        details?: unknown;
+    };
+};
+
+export type DisconnectGitHubError = DisconnectGitHubErrors[keyof DisconnectGitHubErrors];
+
+export type DisconnectGitHubResponses = {
+    /**
+     * Default Response
+     */
+    204: void;
+};
+
+export type DisconnectGitHubResponse = DisconnectGitHubResponses[keyof DisconnectGitHubResponses];
+
+export type GetConnectionConfigurationData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/connection';
+};
+
+export type GetConnectionConfigurationErrors = {
+    /**
+     * ApiError
+     *
+     * Common error response returned by the Shipgate API.
+     */
+    default: {
+        code: string;
+        message: string;
+        requestId: string;
+        details?: unknown;
+    };
+};
+
+export type GetConnectionConfigurationError = GetConnectionConfigurationErrors[keyof GetConnectionConfigurationErrors];
+
+export type GetConnectionConfigurationResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        githubLoginConfigured: boolean;
+        githubInstallationConfigured: boolean;
+        loginUrl: string;
+        installUrl: string | null;
+    };
+};
+
+export type GetConnectionConfigurationResponse = GetConnectionConfigurationResponses[keyof GetConnectionConfigurationResponses];
+
+export type GetInstallationsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/installations';
+};
+
+export type GetInstallationsErrors = {
+    /**
+     * ApiError
+     *
+     * Common error response returned by the Shipgate API.
+     */
+    default: {
+        code: string;
+        message: string;
+        requestId: string;
+        details?: unknown;
+    };
+};
+
+export type GetInstallationsError = GetInstallationsErrors[keyof GetInstallationsErrors];
+
+export type GetInstallationsResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        installations: Array<{
+            id: number;
+            owner: {
+                id: number;
+                login: string;
+                type: string;
+                avatarUrl: string | null;
+            };
+            repositorySelection: 'all' | 'selected';
+            lifecycleState: 'active' | 'suspended' | 'pending_deletion' | 'deleted';
+            permissionState: 'current' | 'stale' | 'suspended' | 'revoked';
+            suspendedAt: string | null;
+            repositoryCount: number;
+            userRepositoryCount: number;
+            permissions: Array<{
+                name: string;
+                required: 'read' | 'write';
+                actual: 'read' | 'write' | null;
+                satisfied: boolean;
+            }>;
+            permissionUpgradePending: boolean;
+            lastReconciledAt: string;
+        }>;
+    };
+};
+
+export type GetInstallationsResponse = GetInstallationsResponses[keyof GetInstallationsResponses];
+
+export type GetInstallationData = {
+    body?: never;
+    path: {
+        installationId: string;
+    };
+    query?: never;
+    url: '/api/v1/installations/{installationId}';
+};
+
+export type GetInstallationErrors = {
+    /**
+     * ApiError
+     *
+     * Common error response returned by the Shipgate API.
+     */
+    default: {
+        code: string;
+        message: string;
+        requestId: string;
+        details?: unknown;
+    };
+};
+
+export type GetInstallationError = GetInstallationErrors[keyof GetInstallationErrors];
+
+export type GetInstallationResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        id: number;
+        owner: {
+            id: number;
+            login: string;
+            type: string;
+            avatarUrl: string | null;
+        };
+        repositorySelection: 'all' | 'selected';
+        lifecycleState: 'active' | 'suspended' | 'pending_deletion' | 'deleted';
+        permissionState: 'current' | 'stale' | 'suspended' | 'revoked';
+        suspendedAt: string | null;
+        repositoryCount: number;
+        userRepositoryCount: number;
+        permissions: Array<{
+            name: string;
+            required: 'read' | 'write';
+            actual: 'read' | 'write' | null;
+            satisfied: boolean;
+        }>;
+        permissionUpgradePending: boolean;
+        lastReconciledAt: string;
+        repositories: Array<{
+            id: number;
+            ownerId: number;
+            ownerLogin: string;
+            name: string;
+            fullName: string;
+            private: boolean;
+            archived: boolean;
+            disabled: boolean;
+            defaultBranch: string | null;
+            visibility: string | null;
+            userPermission: 'none' | 'read' | 'triage' | 'write' | 'maintain' | 'admin';
+            accessibleToUser: boolean;
+            lastReconciledAt: string;
+        }>;
+        manageUrl: string;
+    };
+};
+
+export type GetInstallationResponse = GetInstallationResponses[keyof GetInstallationResponses];
+
+export type DeleteLocalAccountData = {
+    body?: never;
+    headers?: {
+        'x-csrf-token'?: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/v1/account';
+};
+
+export type DeleteLocalAccountErrors = {
+    /**
+     * ApiError
+     *
+     * Common error response returned by the Shipgate API.
+     */
+    default: {
+        code: string;
+        message: string;
+        requestId: string;
+        details?: unknown;
+    };
+};
+
+export type DeleteLocalAccountError = DeleteLocalAccountErrors[keyof DeleteLocalAccountErrors];
+
+export type DeleteLocalAccountResponses = {
+    /**
+     * Default Response
+     */
+    204: void;
+};
+
+export type DeleteLocalAccountResponse = DeleteLocalAccountResponses[keyof DeleteLocalAccountResponses];
+
 export type CreateDiagnosticJobData = {
     /**
      * DiagnosticJobRequest
@@ -175,15 +513,15 @@ export type GetDiagnosticJobResponses = {
         taskIdentifier: string;
         status: 'queued' | 'running' | 'retrying' | 'succeeded' | 'failed';
         correlationId: string;
-        causationId: string | unknown;
+        causationId: string | null;
         payload: unknown;
         attempts: number;
         maxAttempts: number;
         result: unknown;
         lastError: unknown;
         queuedAt: string;
-        startedAt: string | unknown;
-        completedAt: string | unknown;
+        startedAt: string | null;
+        completedAt: string | null;
         updatedAt: string;
     };
 };

@@ -23,7 +23,7 @@ export async function replaceGitHubInstallationSnapshot(
     options.permissionState ?? (summary.suspendedAt === null ? 'current' : 'suspended')
 
   await database.kysely.transaction().execute(async (transaction) => {
-    await transaction
+    const storedInstallation = await transaction
       .insertInto('github_installations')
       .values({
         installation_id: installationId,
@@ -42,23 +42,34 @@ export async function replaceGitHubInstallationSnapshot(
         updated_at: reconciledAt,
       })
       .onConflict((conflict) =>
-        conflict.column('installation_id').doUpdateSet({
-          owner_id: serializeGitHubId(summary.account.id, 'installation owner ID'),
-          owner_type: summary.account.type,
-          owner_login: summary.account.login,
-          owner_avatar_url: summary.account.avatarUrl,
-          repository_selection: summary.repositorySelection,
-          suspended_at: parseNullableDate(summary.suspendedAt, 'installation suspended_at'),
-          permission_state: permissionState,
-          lifecycle_state: summary.suspendedAt === null ? 'active' : 'suspended',
-          deletion_requested_at: null,
-          deleted_at: null,
-          last_successful_confirmation_at: reconciledAt,
-          last_reconciled_at: reconciledAt,
-          updated_at: reconciledAt,
-        }),
+        conflict
+          .column('installation_id')
+          .doUpdateSet({
+            owner_id: serializeGitHubId(summary.account.id, 'installation owner ID'),
+            owner_type: summary.account.type,
+            owner_login: summary.account.login,
+            owner_avatar_url: summary.account.avatarUrl,
+            repository_selection: summary.repositorySelection,
+            suspended_at: parseNullableDate(summary.suspendedAt, 'installation suspended_at'),
+            permission_state: permissionState,
+            lifecycle_state: summary.suspendedAt === null ? 'active' : 'suspended',
+            deletion_requested_at: null,
+            deleted_at: null,
+            last_successful_confirmation_at: reconciledAt,
+            last_reconciled_at: reconciledAt,
+            updated_at: reconciledAt,
+          })
+          .where('github_installations.lifecycle_state', 'not in', ['pending_deletion', 'deleted'])
+          .where('github_installations.last_reconciled_at', '<=', reconciledAt),
       )
-      .execute()
+      .returning('installation_id')
+      .executeTakeFirst()
+
+    if (!storedInstallation) {
+      throw new Error(
+        `GitHub installation ${installationId} changed while its access snapshot was being reconciled`,
+      )
+    }
 
     await transaction
       .deleteFrom('github_installation_permissions')

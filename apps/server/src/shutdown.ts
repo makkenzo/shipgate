@@ -140,7 +140,7 @@ async function performShutdown(options: PerformShutdownOptions): Promise<Shutdow
     logger.fatal(
       {
         event: 'application.fatal',
-        stage: 'shutdown',
+        phase: 'shutdown',
         reason: 'shutdown_timeout',
         shutdownTimeoutMs: timeoutMs,
       },

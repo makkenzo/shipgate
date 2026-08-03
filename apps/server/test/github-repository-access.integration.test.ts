@@ -15,6 +15,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { type ApplicationContext, createApplicationContext } from '../src/application-context.js'
 import type { GitHubInstallationSummary } from '../src/auth/model.js'
 import { createGitHubRepositoryAccessService } from '../src/github-access/index.js'
+import { replaceGitHubInstallationSnapshot } from '../src/github-access/store.js'
 
 describe.sequential('GitHub installation and repository access', () => {
   let postgres: PostgresTestDatabase
@@ -411,6 +412,104 @@ describe.sequential('GitHub installation and repository access', () => {
     expect(revoked).toMatchObject({
       allowed: false,
       reason: 'installation_not_accessible',
+    })
+  })
+
+  it('does not overwrite a newer lifecycle update with a stale access snapshot', async () => {
+    const installationId = 127
+    const lifecycleUpdatedAt = new Date('2026-08-03T12:05:00.000Z')
+
+    await context.database.kysely
+      .insertInto('github_installations')
+      .values({
+        installation_id: String(installationId),
+        owner_id: '99',
+        owner_type: 'User',
+        owner_login: 'octocat',
+        owner_avatar_url: null,
+        repository_selection: 'selected',
+        suspended_at: lifecycleUpdatedAt,
+        permission_state: 'suspended',
+        lifecycle_state: 'suspended',
+        deletion_requested_at: null,
+        deleted_at: null,
+        last_successful_confirmation_at: lifecycleUpdatedAt,
+        last_reconciled_at: lifecycleUpdatedAt,
+        updated_at: lifecycleUpdatedAt,
+      })
+      .execute()
+
+    await expect(
+      replaceGitHubInstallationSnapshot(context.database, {
+        installation: {
+          summary: createInstallationSummary(installationId),
+          permissions: { metadata: 'read', contents: 'write' },
+        },
+        repositories: [],
+        userRepositories: [],
+        reconciledAt: new Date('2026-08-03T12:00:00.000Z'),
+      }),
+    ).rejects.toThrow('changed while its access snapshot was being reconciled')
+
+    const installation = await context.database.kysely
+      .selectFrom('github_installations')
+      .select(['lifecycle_state', 'permission_state', 'last_reconciled_at'])
+      .where('installation_id', '=', String(installationId))
+      .executeTakeFirstOrThrow()
+
+    expect(installation).toEqual({
+      lifecycle_state: 'suspended',
+      permission_state: 'suspended',
+      last_reconciled_at: lifecycleUpdatedAt,
+    })
+  })
+
+  it('never resurrects an installation pending deletion from a later snapshot', async () => {
+    const installationId = 128
+    const deletionRequestedAt = new Date('2026-08-03T12:00:00.000Z')
+
+    await context.database.kysely
+      .insertInto('github_installations')
+      .values({
+        installation_id: String(installationId),
+        owner_id: '99',
+        owner_type: 'User',
+        owner_login: 'octocat',
+        owner_avatar_url: null,
+        repository_selection: 'selected',
+        suspended_at: null,
+        permission_state: 'revoked',
+        lifecycle_state: 'pending_deletion',
+        deletion_requested_at: deletionRequestedAt,
+        deleted_at: null,
+        last_successful_confirmation_at: deletionRequestedAt,
+        last_reconciled_at: deletionRequestedAt,
+        updated_at: deletionRequestedAt,
+      })
+      .execute()
+
+    await expect(
+      replaceGitHubInstallationSnapshot(context.database, {
+        installation: {
+          summary: createInstallationSummary(installationId),
+          permissions: { metadata: 'read', contents: 'write' },
+        },
+        repositories: [],
+        userRepositories: [],
+        reconciledAt: new Date('2026-08-03T12:10:00.000Z'),
+      }),
+    ).rejects.toThrow('changed while its access snapshot was being reconciled')
+
+    const installation = await context.database.kysely
+      .selectFrom('github_installations')
+      .select(['lifecycle_state', 'permission_state', 'deletion_requested_at'])
+      .where('installation_id', '=', String(installationId))
+      .executeTakeFirstOrThrow()
+
+    expect(installation).toEqual({
+      lifecycle_state: 'pending_deletion',
+      permission_state: 'revoked',
+      deletion_requested_at: deletionRequestedAt,
     })
   })
 })

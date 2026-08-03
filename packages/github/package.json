@@ -23,6 +23,7 @@
     "build": "tsc --build tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json",
     "test": "pnpm build && vitest run",
+    "test:smoke": "vitest run test/github-live.smoke.integration.test.ts --config ../../vitest.integration.config.ts",
     "clean": "tsc --build tsconfig.build.json --clean"
   },
   "devDependencies": {

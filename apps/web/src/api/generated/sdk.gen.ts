@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { CreateDiagnosticJobData, CreateDiagnosticJobErrors, CreateDiagnosticJobResponses, GetDiagnosticJobData, GetDiagnosticJobErrors, GetDiagnosticJobResponses, GetHealthData, GetHealthErrors, GetHealthResponses, GetReadinessData, GetReadinessErrors, GetReadinessResponses } from './types.gen';
+import type { CreateDiagnosticJobData, CreateDiagnosticJobErrors, CreateDiagnosticJobResponses, DeleteLocalAccountData, DeleteLocalAccountErrors, DeleteLocalAccountResponses, DisconnectGitHubData, DisconnectGitHubErrors, DisconnectGitHubResponses, GetAuthSessionData, GetAuthSessionErrors, GetAuthSessionResponses, GetConnectionConfigurationData, GetConnectionConfigurationErrors, GetConnectionConfigurationResponses, GetDiagnosticJobData, GetDiagnosticJobErrors, GetDiagnosticJobResponses, GetHealthData, GetHealthErrors, GetHealthResponses, GetInstallationData, GetInstallationErrors, GetInstallationResponses, GetInstallationsData, GetInstallationsErrors, GetInstallationsResponses, GetReadinessData, GetReadinessErrors, GetReadinessResponses, LogoutData, LogoutErrors, LogoutResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -27,6 +27,89 @@ export const getHealth = <ThrowOnError extends boolean = false>(options?: Option
  * Application readiness
  */
 export const getReadiness = <ThrowOnError extends boolean = false>(options?: Options<GetReadinessData, ThrowOnError>): RequestResult<GetReadinessResponses, GetReadinessErrors, ThrowOnError> => (options?.client ?? client).get<GetReadinessResponses, GetReadinessErrors, ThrowOnError>({ url: '/ready', ...options });
+
+/**
+ * Get the current Shipgate session
+ */
+export const getAuthSession = <ThrowOnError extends boolean = false>(options?: Options<GetAuthSessionData, ThrowOnError>): RequestResult<GetAuthSessionResponses, GetAuthSessionErrors, ThrowOnError> => (options?.client ?? client).get<GetAuthSessionResponses, GetAuthSessionErrors, ThrowOnError>({ url: '/api/v1/auth/session', ...options });
+
+/**
+ * Revoke the current Shipgate session
+ */
+export const logout = <ThrowOnError extends boolean = false>(options: Options<LogoutData, ThrowOnError>): RequestResult<LogoutResponses, LogoutErrors, ThrowOnError> => (options.client ?? client).post<LogoutResponses, LogoutErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: '__Host-shipgate_session',
+            type: 'apiKey'
+        }],
+    url: '/api/v1/auth/logout',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Disconnect GitHub and revoke all Shipgate sessions
+ */
+export const disconnectGitHub = <ThrowOnError extends boolean = false>(options: Options<DisconnectGitHubData, ThrowOnError>): RequestResult<DisconnectGitHubResponses, DisconnectGitHubErrors, ThrowOnError> => (options.client ?? client).post<DisconnectGitHubResponses, DisconnectGitHubErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: '__Host-shipgate_session',
+            type: 'apiKey'
+        }],
+    url: '/api/v1/auth/disconnect',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Get GitHub connection configuration
+ */
+export const getConnectionConfiguration = <ThrowOnError extends boolean = false>(options?: Options<GetConnectionConfigurationData, ThrowOnError>): RequestResult<GetConnectionConfigurationResponses, GetConnectionConfigurationErrors, ThrowOnError> => (options?.client ?? client).get<GetConnectionConfigurationResponses, GetConnectionConfigurationErrors, ThrowOnError>({ url: '/api/v1/connection', ...options });
+
+/**
+ * List installations visible to the current user
+ */
+export const getInstallations = <ThrowOnError extends boolean = false>(options?: Options<GetInstallationsData, ThrowOnError>): RequestResult<GetInstallationsResponses, GetInstallationsErrors, ThrowOnError> => (options?.client ?? client).get<GetInstallationsResponses, GetInstallationsErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: '__Host-shipgate_session',
+            type: 'apiKey'
+        }],
+    url: '/api/v1/installations',
+    ...options
+});
+
+/**
+ * Get an installation visible to the current user
+ */
+export const getInstallation = <ThrowOnError extends boolean = false>(options: Options<GetInstallationData, ThrowOnError>): RequestResult<GetInstallationResponses, GetInstallationErrors, ThrowOnError> => (options.client ?? client).get<GetInstallationResponses, GetInstallationErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: '__Host-shipgate_session',
+            type: 'apiKey'
+        }],
+    url: '/api/v1/installations/{installationId}',
+    ...options
+});
+
+/**
+ * Delete the local Shipgate account
+ */
+export const deleteLocalAccount = <ThrowOnError extends boolean = false>(options?: Options<DeleteLocalAccountData, ThrowOnError>): RequestResult<DeleteLocalAccountResponses, DeleteLocalAccountErrors, ThrowOnError> => (options?.client ?? client).delete<DeleteLocalAccountResponses, DeleteLocalAccountErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: '__Host-shipgate_session',
+            type: 'apiKey'
+        }],
+    url: '/api/v1/account',
+    ...options
+});
 
 /**
  * Enqueue a diagnostic job

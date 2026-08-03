@@ -63,13 +63,17 @@ FROM dependencies AS build
 
 COPY . .
 
-RUN pnpm build
+RUN pnpm build:production
 
 RUN pnpm \
   --filter @shipgate/server \
   --prod \
   deploy \
   /out/server
+
+RUN find /out/server -type f \
+  \( -name '*.d.ts' -o -name '*.map' -o -name '*.tsbuildinfo' \) \
+  -delete
 
 
 FROM base AS runtime

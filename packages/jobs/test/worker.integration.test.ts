@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto'
+
 import { createDatabase, type DatabaseClient, migrateToLatest } from '@shipgate/database'
 import {
   enqueueJob,
@@ -170,5 +172,136 @@ describe.sequential('Graphile Worker', () => {
         code: 'DIAGNOSTIC_PERMANENT_FAILURE',
       },
     })
+  })
+
+  it('marks a delivery failed when its retained payload is unavailable', async () => {
+    const deliveryId = randomUUID()
+    const receivedAt = new Date()
+
+    await database.kysely
+      .insertInto('github_webhook_deliveries')
+      .values({
+        delivery_id: deliveryId,
+        event: 'push',
+        action: null,
+        installation_id: null,
+        repository_id: null,
+        payload_hash: '0'.repeat(64),
+        raw_payload: null,
+        processing_state: 'queued',
+        attempt_count: 0,
+        error_code: null,
+        received_at: receivedAt,
+        processing_started_at: null,
+        processed_at: null,
+        raw_payload_expires_at: receivedAt,
+        raw_payload_purged_at: receivedAt,
+        updated_at: receivedAt,
+      })
+      .execute()
+
+    const queued = await enqueueJob(
+      database,
+      'github_webhook_process',
+      { deliveryId },
+      { correlationId: `worker-test-webhook-missing-payload-${deliveryId}` },
+    )
+    const execution = await waitForJobExecution(database, queued.jobId, {
+      timeoutMs: 20_000,
+    })
+    const delivery = await database.kysely
+      .selectFrom('github_webhook_deliveries')
+      .select(['processing_state', 'attempt_count', 'error_code'])
+      .where('delivery_id', '=', deliveryId)
+      .executeTakeFirstOrThrow()
+
+    expect(execution).toMatchObject({
+      status: 'failed',
+      attempts: 1,
+      lastError: { code: 'GITHUB_WEBHOOK_PAYLOAD_UNAVAILABLE' },
+    })
+    expect(delivery).toEqual({
+      processing_state: 'failed',
+      attempt_count: 1,
+      error_code: 'GITHUB_WEBHOOK_PAYLOAD_UNAVAILABLE',
+    })
+  })
+
+  it('claims a webhook delivery only once across concurrent jobs', async () => {
+    const deliveryId = randomUUID()
+    const installationId = '9000123'
+    const receivedAt = new Date()
+    const payload = Buffer.from(
+      JSON.stringify({
+        action: 'created',
+        installation: {
+          id: Number(installationId),
+          account: {
+            id: 99,
+            login: 'octocat',
+            type: 'User',
+            avatar_url: null,
+          },
+          target_type: 'User',
+          repository_selection: 'selected',
+          permissions: { metadata: 'read' },
+          suspended_at: null,
+        },
+        repositories: [],
+      }),
+    )
+
+    await database.kysely
+      .insertInto('github_webhook_deliveries')
+      .values({
+        delivery_id: deliveryId,
+        event: 'installation',
+        action: 'created',
+        installation_id: installationId,
+        repository_id: null,
+        payload_hash: '1'.repeat(64),
+        raw_payload: payload,
+        processing_state: 'queued',
+        attempt_count: 0,
+        error_code: null,
+        received_at: receivedAt,
+        processing_started_at: null,
+        processed_at: null,
+        raw_payload_expires_at: new Date(receivedAt.getTime() + 60_000),
+        raw_payload_purged_at: null,
+        updated_at: receivedAt,
+      })
+      .execute()
+
+    const queued = await Promise.all([
+      enqueueJob(
+        database,
+        'github_webhook_process',
+        { deliveryId },
+        {
+          correlationId: `worker-test-webhook-claim-a-${deliveryId}`,
+        },
+      ),
+      enqueueJob(
+        database,
+        'github_webhook_process',
+        { deliveryId },
+        {
+          correlationId: `worker-test-webhook-claim-b-${deliveryId}`,
+        },
+      ),
+    ])
+    const executions = await Promise.all(
+      queued.map((job) => waitForJobExecution(database, job.jobId, { timeoutMs: 20_000 })),
+    )
+    const events = await database.kysely
+      .selectFrom('github_integration_events')
+      .select('id')
+      .where('event_type', '=', 'github.installation.created')
+      .where('installation_id', '=', installationId)
+      .execute()
+
+    expect(executions.map((execution) => execution.status)).toEqual(['succeeded', 'succeeded'])
+    expect(events).toHaveLength(1)
   })
 })

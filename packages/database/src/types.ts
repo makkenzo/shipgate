@@ -152,13 +152,7 @@ export interface GitHubInstallationTable {
   updated_at: Generated<Date>
 }
 
-export type GitHubRepositoryPermission =
-  | 'none'
-  | 'read'
-  | 'triage'
-  | 'write'
-  | 'maintain'
-  | 'admin'
+export type GitHubRepositoryPermission = 'none' | 'read' | 'triage' | 'write' | 'maintain' | 'admin'
 
 export interface GitHubInstallationRepositoryTable {
   installation_id: string

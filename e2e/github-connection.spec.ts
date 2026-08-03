@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, type Page, test } from '@playwright/test'
 
 const installationId = 123
 
@@ -45,7 +45,7 @@ interface InstallationFixture {
   }[]
 }
 
-test('covers the GitHub connection screens without Stage 4 product UI', async ({ page }) => {
+test('covers the GitHub connection screens', async ({ page }) => {
   const state: UiState = { installations: [] }
   await mockConnectionApi(page, state)
 

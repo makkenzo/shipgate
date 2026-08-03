@@ -15,6 +15,7 @@ import { Badge } from '@/components/ui/badge'
 import { buttonVariants } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { requireAuthenticatedRoute } from '@/lib/auth-route'
+import { toSafeHttpUrl } from '@/lib/safe-url'
 
 export const Route = createFileRoute('/installations_/$installationId')({
   beforeLoad: ({ context }) => requireAuthenticatedRoute(context.queryClient),
@@ -26,9 +27,7 @@ function InstallationPage() {
   const numericInstallationId = Number(installationId)
   const installationIdIsValid =
     Number.isSafeInteger(numericInstallationId) && numericInstallationId > 0
-  const installation = useQuery(
-    installationOptions(numericInstallationId, installationIdIsValid),
-  )
+  const installation = useQuery(installationOptions(numericInstallationId, installationIdIsValid))
 
   if (!installationIdIsValid) {
     throw new Error('Installation ID is invalid')
@@ -52,6 +51,8 @@ function InstallationPage() {
   const installationRemoved =
     installation.data.lifecycleState === 'pending_deletion' ||
     installation.data.lifecycleState === 'deleted'
+  const avatarUrl = toSafeHttpUrl(installation.data.owner.avatarUrl)
+  const manageUrl = toSafeHttpUrl(installation.data.manageUrl)
 
   return (
     <main className="mx-auto w-full max-w-5xl px-6 py-10">
@@ -66,12 +67,8 @@ function InstallationPage() {
       <div className="mt-6 flex flex-col justify-between gap-5 sm:flex-row sm:items-start">
         <div className="flex items-start gap-4">
           <div className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-muted">
-            {installation.data.owner.avatarUrl ? (
-              <img
-                src={installation.data.owner.avatarUrl}
-                alt=""
-                className="size-full object-cover"
-              />
+            {avatarUrl ? (
+              <img src={avatarUrl} alt="" className="size-full object-cover" />
             ) : (
               <GitBranch className="size-5" />
             )}
@@ -87,15 +84,17 @@ function InstallationPage() {
           </div>
         </div>
 
-        <a
-          href={installation.data.manageUrl}
-          target="_blank"
-          rel="noreferrer"
-          className={buttonVariants({ variant: 'outline' })}
-        >
-          Manage on GitHub
-          <ExternalLink data-icon="inline-end" />
-        </a>
+        {manageUrl ? (
+          <a
+            href={manageUrl}
+            target="_blank"
+            rel="noreferrer"
+            className={buttonVariants({ variant: 'outline' })}
+          >
+            Manage on GitHub
+            <ExternalLink data-icon="inline-end" />
+          </a>
+        ) : null}
       </div>
 
       {installationRemoved ? (
@@ -166,7 +165,9 @@ function InstallationPage() {
 
                     {repository.accessibleToUser ? (
                       <Badge
-                        variant={hasWriteAccess(repository.userPermission) ? 'default' : 'secondary'}
+                        variant={
+                          hasWriteAccess(repository.userPermission) ? 'default' : 'secondary'
+                        }
                       >
                         <KeyRound className="size-3" />
                         {repository.userPermission}
@@ -191,7 +192,10 @@ function InstallationPage() {
           </CardHeader>
           <CardContent className="space-y-3">
             {installation.data.permissions.map((permission) => (
-              <div key={permission.name} className="flex items-center justify-between gap-3 text-sm">
+              <div
+                key={permission.name}
+                className="flex items-center justify-between gap-3 text-sm"
+              >
                 <span className="truncate">{permission.name}</span>
                 <Badge variant={permission.satisfied ? 'outline' : 'destructive'}>
                   {permission.actual ?? 'missing'} / {permission.required}

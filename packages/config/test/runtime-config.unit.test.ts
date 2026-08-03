@@ -30,6 +30,20 @@ describe('loadRuntimeConfig', () => {
     expect(config.api.docsEnabled).toBe(false)
     expect(config.api.diagnosticsEnabled).toBe(false)
     expect(config.api.metricsEnabled).toBe(false)
+    expect(config.api.corsOrigins).toEqual([])
+  })
+
+  it('allows local browser origins by default only outside production', () => {
+    const config = loadRuntimeConfig({
+      NODE_ENV: 'development',
+    })
+
+    expect(config.api.corsOrigins).toEqual([
+      'http://localhost:3000',
+      'http://localhost:5173',
+      'http://127.0.0.1:3000',
+      'http://127.0.0.1:5173',
+    ])
   })
 
   it('accepts explicit internal endpoint configuration', () => {
@@ -37,10 +51,12 @@ describe('loadRuntimeConfig', () => {
       NODE_ENV: 'production',
       API_DIAGNOSTICS_ENABLED: 'true',
       API_METRICS_ENABLED: 'true',
+      API_CORS_ORIGINS: 'https://app.shipgate.example',
     })
 
     expect(config.api.diagnosticsEnabled).toBe(true)
     expect(config.api.metricsEnabled).toBe(true)
+    expect(config.api.corsOrigins).toEqual(['https://app.shipgate.example'])
   })
 
   it('enables GitHub App startup validation in production', () => {

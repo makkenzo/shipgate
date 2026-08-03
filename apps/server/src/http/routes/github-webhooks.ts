@@ -8,6 +8,7 @@ import { parseGitHubWebhookMetadata } from '../../github-webhooks/policy.js'
 import { acceptGitHubWebhookDelivery } from '../../github-webhooks/store.js'
 import { ApiHttpError } from '../api-error.js'
 import { ApiErrorSchema } from '../schemas.js'
+
 const Response = Type.Object(
   {
     deliveryId: Type.String(),

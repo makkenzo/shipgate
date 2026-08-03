@@ -23,7 +23,7 @@ export async function startWorkerHeartbeat(options: {
     workerId: options.workerId,
   })
 
-  let heartbeatPromise = Promise.resolve()
+  let heartbeatPromise: Promise<void> | undefined
 
   const writeHeartbeat = async () => {
     const now = new Date()
@@ -54,16 +54,24 @@ export async function startWorkerHeartbeat(options: {
   await writeHeartbeat()
 
   const timer = setInterval(() => {
-    heartbeatPromise = heartbeatPromise.then(writeHeartbeat).catch((error: unknown) => {
-      logger.error(
-        {
-          event: 'worker.heartbeat.failed',
+    if (heartbeatPromise) {
+      return
+    }
 
-          err: error instanceof Error ? error : new Error(String(error)),
-        },
-        'Worker heartbeat failed',
-      )
-    })
+    heartbeatPromise = writeHeartbeat()
+      .catch((error: unknown) => {
+        logger.error(
+          {
+            event: 'worker.heartbeat.failed',
+
+            err: error instanceof Error ? error : new Error(String(error)),
+          },
+          'Worker heartbeat failed',
+        )
+      })
+      .finally(() => {
+        heartbeatPromise = undefined
+      })
   }, options.intervalMs)
 
   return {

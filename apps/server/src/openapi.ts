@@ -16,6 +16,15 @@ const context = createApplicationContext({
     ...process.env,
 
     /*
+     * Building the contract creates the normal composition context so routes
+     * receive their real dependencies, but it never opens a database
+     * connection. Keep generation deterministic in clean build environments
+     * where deployment secrets are intentionally unavailable.
+     */
+    DATABASE_URL:
+      process.env.DATABASE_URL ?? 'postgresql://shipgate:shipgate@127.0.0.1:5432/shipgate',
+
+    /*
      * The contract describes every implemented API operation.
      * Runtime exposure remains controlled independently.
      */

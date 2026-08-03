@@ -1,14 +1,15 @@
 import { type FastifyPluginAsyncTypebox, Type } from '@fastify/type-provider-typebox'
 
 import type { ApplicationContext } from '../../application-context.js'
+import { createExpiredSessionCookies } from '../../auth/cookies.js'
 import type { AuthenticatedSession } from '../../auth/model.js'
 import {
   deleteLocalAccount,
   getConnectionInstallation,
   listConnectionInstallations,
 } from '../../connection/store.js'
-import { createExpiredSessionCookies } from '../../auth/cookies.js'
 import { ApiHttpError } from '../api-error.js'
+import { CsrfHeadersSchema } from '../auth-schemas.js'
 import {
   ConnectionConfigurationSchema,
   InstallationDetailSchema,
@@ -25,7 +26,9 @@ export const connectionRoutes: FastifyPluginAsyncTypebox<{
     '/connection',
     {
       schema: {
-        hide: true,
+        operationId: 'getConnectionConfiguration',
+        summary: 'Get GitHub connection configuration',
+        tags: ['Connections'],
         response: {
           200: ConnectionConfigurationSchema,
           default: ApiErrorSchema,
@@ -43,7 +46,10 @@ export const connectionRoutes: FastifyPluginAsyncTypebox<{
         githubInstallationConfigured: Boolean(slug),
         loginUrl: '/api/v1/auth/github?returnTo=%2Fsetup',
         installUrl: slug
-          ? new URL(`/apps/${encodeURIComponent(slug)}/installations/new`, context.runtimeConfig.githubApp.oauthUrl).href
+          ? new URL(
+              `/apps/${encodeURIComponent(slug)}/installations/new`,
+              context.runtimeConfig.githubApp.oauthUrl,
+            ).href
           : null,
       }
     },
@@ -54,7 +60,10 @@ export const connectionRoutes: FastifyPluginAsyncTypebox<{
     {
       preHandler: [requireAuthenticatedSession],
       schema: {
-        hide: true,
+        operationId: 'getInstallations',
+        summary: 'List installations visible to the current user',
+        tags: ['Connections'],
+        security: [{ shipgateSession: [] }],
         response: {
           200: InstallationListSchema,
           default: ApiErrorSchema,
@@ -64,17 +73,11 @@ export const connectionRoutes: FastifyPluginAsyncTypebox<{
     async (request) => {
       const session = requireSession(request.shipgateSession)
 
-      let installations = await listConnectionInstallations(
-        context.database,
-        session.githubUserId,
-      )
+      let installations = await listConnectionInstallations(context.database, session.githubUserId)
 
       if (installations.length === 0 && session.user.installations.length > 0) {
         await reconcileSessionInstallations(context, session)
-        installations = await listConnectionInstallations(
-          context.database,
-          session.githubUserId,
-        )
+        installations = await listConnectionInstallations(context.database, session.githubUserId)
       }
 
       return {
@@ -91,7 +94,10 @@ export const connectionRoutes: FastifyPluginAsyncTypebox<{
     {
       preHandler: [requireAuthenticatedSession],
       schema: {
-        hide: true,
+        operationId: 'getInstallation',
+        summary: 'Get an installation visible to the current user',
+        tags: ['Connections'],
+        security: [{ shipgateSession: [] }],
         params: InstallationParamsSchema,
         response: {
           200: InstallationDetailSchema,
@@ -145,7 +151,11 @@ export const connectionRoutes: FastifyPluginAsyncTypebox<{
     {
       preHandler: [requireAuthenticatedSession, requireCsrfProtection],
       schema: {
-        hide: true,
+        operationId: 'deleteLocalAccount',
+        summary: 'Delete the local Shipgate account',
+        tags: ['Connections'],
+        security: [{ shipgateSession: [] }],
+        headers: CsrfHeadersSchema,
         response: {
           204: Type.Null(),
           default: ApiErrorSchema,

@@ -133,11 +133,7 @@ describe.sequential('GitHub connection UI integration contract', () => {
       ],
     })
 
-    const detail = await authenticatedGet(
-      app,
-      session,
-      `/api/v1/installations/${installationId}`,
-    )
+    const detail = await authenticatedGet(app, session, `/api/v1/installations/${installationId}`)
     expect(detail.json()).toMatchObject({
       id: installationId,
       permissionUpgradePending: false,
@@ -629,7 +625,8 @@ async function sendWebhook(
 ) {
   const rawBody = JSON.stringify(payload)
   const signature =
-    signatureOverride ?? `sha256=${createHmac('sha256', webhookSecret).update(rawBody).digest('hex')}`
+    signatureOverride ??
+    `sha256=${createHmac('sha256', webhookSecret).update(rawBody).digest('hex')}`
 
   return app.inject({
     method: 'POST',
@@ -687,10 +684,12 @@ async function startWorker(context: ApplicationContext): Promise<JobWorkerRuntim
   })
 }
 
-function createInstallation(input: {
-  readonly permissions?: Readonly<Record<string, 'read' | 'write'>>
-  readonly suspendedAt?: string | null
-} = {}) {
+function createInstallation(
+  input: {
+    readonly permissions?: Readonly<Record<string, 'read' | 'write'>>
+    readonly suspendedAt?: string | null
+  } = {},
+) {
   return {
     id: installationId,
     account: {

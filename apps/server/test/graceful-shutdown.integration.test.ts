@@ -127,6 +127,34 @@ describe.sequential('graceful shutdown', () => {
       }
     }
   }, 15_000)
+
+  it('does not enter the runtime after a signal interrupts startup', async () => {
+    const child = spawnEntrypoint(
+      'test/fixtures/slow-startup.ts',
+      createTestEnvironment(postgres.connectionString, {
+        LOG_LEVEL: 'info',
+      }),
+    )
+
+    const output = collectOutput(child)
+
+    try {
+      await waitForOutput(output, '"event":"application.starting"')
+
+      expect(child.kill('SIGTERM')).toBe(true)
+
+      const [code, signal] = (await once(child, 'exit')) as [number | null, NodeJS.Signals | null]
+
+      expect(signal).toBeNull()
+      expect(code).toBe(0)
+      expect(output.value).not.toContain('"event":"application.started"')
+      expect(output.value).toContain('"event":"application.stopped"')
+    } finally {
+      if (child.exitCode === null) {
+        child.kill('SIGKILL')
+      }
+    }
+  }, 15_000)
 })
 
 function spawnEntrypoint(entrypoint: string, environment: NodeJS.ProcessEnv): SpawnedProcess {

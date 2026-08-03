@@ -28,9 +28,29 @@ export async function startWorker(context: ApplicationContext): Promise<StartedA
     shutdownAbortTimeoutMs: Math.min(5_000, context.runtimeConfig.shutdownTimeoutMs),
   })
 
-  context.shutdown.addHook('graphile-worker', async () => {
+  if (context.shutdown.isShuttingDown) {
     await worker.stop()
-  })
+
+    return {
+      waitUntilStopped: worker.promise,
+    }
+  }
+
+  try {
+    context.shutdown.addHook('graphile-worker', async () => {
+      await worker.stop()
+    })
+  } catch (error) {
+    if (!context.shutdown.isShuttingDown) {
+      throw error
+    }
+
+    await worker.stop()
+
+    return {
+      waitUntilStopped: worker.promise,
+    }
+  }
 
   return {
     startupFields: {

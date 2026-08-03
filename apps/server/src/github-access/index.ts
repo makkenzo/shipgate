@@ -8,5 +8,5 @@ export {
   createGitHubRepositoryAccessService,
   type GitHubRepositoryAccessService,
   GitHubRepositoryAccessVerificationError,
-  type GitHubRepositoryAccessVerificationStage,
+  type GitHubRepositoryAccessVerificationPhase,
 } from './service.js'

@@ -11,6 +11,14 @@ export async function startApi(context: ApplicationContext): Promise<StartedAppl
     app.server.once('close', resolve)
   })
 
+  if (context.shutdown.isShuttingDown) {
+    await app.close()
+
+    return {
+      waitUntilStopped,
+    }
+  }
+
   /*
    * Database hook зарегистрирован
    * раньше в ApplicationContext.
@@ -18,15 +26,36 @@ export async function startApi(context: ApplicationContext): Promise<StartedAppl
    * Hooks идут в обратном порядке:
    * сначала Fastify, затем pool.
    */
-  context.shutdown.addHook('fastify-api', async () => {
+  try {
+    context.shutdown.addHook('fastify-api', async () => {
+      await app.close()
+    })
+  } catch (error) {
+    if (!context.shutdown.isShuttingDown) {
+      throw error
+    }
+
     await app.close()
-  })
+
+    return {
+      waitUntilStopped,
+    }
+  }
 
   await app.listen({
     host: context.runtimeConfig.api.host,
 
     port: context.runtimeConfig.api.port,
   })
+
+  /*
+   * Shutdown may have completed its registered hook while listen was still
+   * settling. Close once more so a late listener cannot outlive the process
+   * lifecycle that owns it.
+   */
+  if (context.shutdown.isShuttingDown) {
+    await app.close()
+  }
 
   const address = app.server.address()
 

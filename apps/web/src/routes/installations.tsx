@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge'
 import { buttonVariants } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { requireAuthenticatedRoute } from '@/lib/auth-route'
+import { toSafeHttpUrl } from '@/lib/safe-url'
 
 export const Route = createFileRoute('/installations')({
   beforeLoad: ({ context }) => requireAuthenticatedRoute(context.queryClient),
@@ -68,9 +69,9 @@ function InstallationsPage() {
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex items-start gap-3">
                       <div className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-muted">
-                        {installation.owner.avatarUrl ? (
+                        {toSafeHttpUrl(installation.owner.avatarUrl) ? (
                           <img
-                            src={installation.owner.avatarUrl}
+                            src={toSafeHttpUrl(installation.owner.avatarUrl)}
                             alt=""
                             className="size-full object-cover"
                           />
@@ -102,11 +103,7 @@ function InstallationsPage() {
   )
 }
 
-function InstallationStateBadge({
-  installation,
-}: {
-  readonly installation: InstallationSummary
-}) {
+function InstallationStateBadge({ installation }: { readonly installation: InstallationSummary }) {
   if (installation.lifecycleState === 'pending_deletion') {
     return <Badge variant="secondary">Removing</Badge>
   }
