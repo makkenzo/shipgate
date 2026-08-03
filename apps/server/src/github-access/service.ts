@@ -177,6 +177,13 @@ class DefaultGitHubRepositoryAccessService implements GitHubRepositoryAccessServ
     assertPositiveGitHubId(input.repositoryId, 'repositoryId')
     assertRequiredRepositoryPermission(input.requiredPermission)
 
+    const localDenial = await this.#getLocalDenial(input)
+
+    if (localDenial) {
+      this.#cache.invalidateInstallation(input.installationId)
+      return localDenial
+    }
+
     const cached = this.#cache.get(input)
 
     if (cached) {
@@ -321,6 +328,8 @@ class DefaultGitHubRepositoryAccessService implements GitHubRepositoryAccessServ
       reconciledAt,
     }
 
+    await this.#assertInstallationAcceptsReconciliation(input.githubUserId, input.installationId)
+
     try {
       await replaceGitHubInstallationSnapshot(this.#database, metadataSnapshot, {
         replaceRepositories: false,
@@ -393,6 +402,10 @@ class DefaultGitHubRepositoryAccessService implements GitHubRepositoryAccessServ
         }
 
         this.#assertReconciliationCurrent(input)
+        await this.#assertInstallationAcceptsReconciliation(
+          input.githubUserId,
+          input.installationId,
+        )
 
         try {
           await replaceGitHubInstallationSnapshot(this.#database, snapshot)
@@ -434,6 +447,8 @@ class DefaultGitHubRepositoryAccessService implements GitHubRepositoryAccessServ
       reconciledAt,
     }
 
+    await this.#assertInstallationAcceptsReconciliation(input.githubUserId, input.installationId)
+
     try {
       await replaceGitHubInstallationSnapshot(this.#database, snapshot)
     } catch (error) {
@@ -456,6 +471,96 @@ class DefaultGitHubRepositoryAccessService implements GitHubRepositoryAccessServ
       type: 'reconciled',
       snapshot,
     }
+  }
+
+  async #assertInstallationAcceptsReconciliation(
+    githubUserId: number,
+    installationId: number,
+  ): Promise<void> {
+    const row = await this.#database.kysely
+      .selectFrom('github_installations')
+      .select('lifecycle_state')
+      .where('installation_id', '=', String(installationId))
+      .executeTakeFirst()
+
+    if (row?.lifecycle_state === 'pending_deletion' || row?.lifecycle_state === 'deleted') {
+      throw new GitHubRepositoryAccessVerificationError(
+        `GitHub installation ${installationId} is pending deletion`,
+        { githubUserId, installationId, stage: 'reconciliation_invalidated' },
+      )
+    }
+  }
+
+  async #getLocalDenial(input: {
+    readonly githubUserId: number
+    readonly installationId: number
+    readonly repositoryId: number
+    readonly requiredPermission: RequiredRepositoryPermission
+  }): Promise<RepositoryAccessDecision | undefined> {
+    const verifiedAt = this.#now()
+    const cacheExpiresAt = this.#cache.createExpiry(verifiedAt)
+    const installationId = String(input.installationId)
+    const repositoryId = String(input.repositoryId)
+    const installation = await this.#database.kysely
+      .selectFrom('github_installations')
+      .select(['lifecycle_state', 'permission_state'])
+      .where('installation_id', '=', installationId)
+      .executeTakeFirst()
+
+    if (
+      installation?.lifecycle_state === 'suspended' ||
+      installation?.permission_state === 'suspended'
+    ) {
+      return {
+        allowed: false,
+        reason: 'installation_suspended',
+        githubUserId: input.githubUserId,
+        installationId: input.installationId,
+        repositoryId: input.repositoryId,
+        repositoryPermission: 'none',
+        requiredPermission: input.requiredPermission,
+        verifiedAt,
+        cacheExpiresAt,
+      }
+    }
+
+    if (
+      installation?.lifecycle_state === 'pending_deletion' ||
+      installation?.lifecycle_state === 'deleted' ||
+      installation?.permission_state === 'revoked'
+    ) {
+      return createInaccessibleRepositoryAccessDecision({
+        ...input,
+        reason: 'installation_revoked',
+        verifiedAt,
+        cacheExpiresAt,
+      })
+    }
+
+    if (installation) {
+      const repository = await this.#database.kysely
+        .selectFrom('github_installation_repositories')
+        .select('repository_id')
+        .where('installation_id', '=', installationId)
+        .where('repository_id', '=', repositoryId)
+        .executeTakeFirst()
+
+      if (!repository) {
+        return {
+          allowed: false,
+          reason: 'repository_not_selected',
+          githubUserId: input.githubUserId,
+          installationId: input.installationId,
+          repositoryId: input.repositoryId,
+          repositoryPermission: 'none',
+          requiredPermission: input.requiredPermission,
+          verifiedAt,
+          cacheExpiresAt,
+        }
+      }
+    }
+
+    return undefined
   }
 
   #captureGeneration(githubUserId: number, installationId: number): ReconciliationGeneration {

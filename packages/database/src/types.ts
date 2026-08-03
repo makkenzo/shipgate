@@ -29,6 +29,8 @@ export interface DatabaseSchema {
 
   github_webhook_deliveries: GitHubWebhookDeliveryTable
 
+  github_integration_events: GitHubIntegrationEventTable
+
   shipgate_job_execution: ShipgateJobExecutionTable
 
   shipgate_worker_heartbeat: ShipgateWorkerHeartbeatTable
@@ -122,6 +124,12 @@ export interface OAuthAttemptTable {
 
 export type GitHubInstallationPermissionState = 'current' | 'stale' | 'suspended' | 'revoked'
 
+export type GitHubInstallationLifecycleState =
+  | 'active'
+  | 'suspended'
+  | 'pending_deletion'
+  | 'deleted'
+
 export interface GitHubInstallationTable {
   installation_id: string
   owner_id: string
@@ -131,6 +139,9 @@ export interface GitHubInstallationTable {
   repository_selection: 'all' | 'selected'
   suspended_at: Date | null
   permission_state: GitHubInstallationPermissionState
+  lifecycle_state: Generated<GitHubInstallationLifecycleState>
+  deletion_requested_at: Generated<Date | null>
+  deleted_at: Generated<Date | null>
   last_successful_confirmation_at: Date | null
   last_reconciled_at: Date
   created_at: Generated<Date>
@@ -183,6 +194,30 @@ export interface GitHubWebhookDeliveryTable {
   raw_payload_expires_at: Date
   raw_payload_purged_at: Date | null
   updated_at: Generated<Date>
+}
+
+export type GitHubIntegrationEventType =
+  | 'github.installation.created'
+  | 'github.installation.suspended'
+  | 'github.installation.unsuspended'
+  | 'github.installation.permissions_changed'
+  | 'github.installation.reconciliation_requested'
+  | 'github.installation.deletion_requested'
+  | 'github.repository.access_added'
+  | 'github.repository.access_removed'
+  | 'github.repository.identity_changed'
+  | 'github.repository.deleted'
+  | 'github.user.authorization_revoked'
+
+export interface GitHubIntegrationEventTable {
+  id: string
+  event_type: GitHubIntegrationEventType
+  installation_id: string | null
+  repository_id: string | null
+  github_user_id: string | null
+  payload: JsonValue
+  occurred_at: Date
+  created_at: Generated<Date>
 }
 
 export type JobExecutionStatus = 'queued' | 'running' | 'retrying' | 'succeeded' | 'failed'

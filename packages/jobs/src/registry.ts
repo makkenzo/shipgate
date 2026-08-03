@@ -3,6 +3,7 @@ import { setTimeout as delay } from 'node:timers/promises'
 import { z } from 'zod'
 
 import { PermanentJobError, RetryableJobError } from './errors.js'
+import { processGitHubWebhookDelivery } from './github-webhook.js'
 import type { JobTaskContext, JobTaskDefinition } from './types.js'
 
 export const diagnosticJobPayloadSchema = z
@@ -44,42 +45,11 @@ export const taskDefinitions = {
     dataSchema: githubWebhookProcessPayloadSchema,
     retry: { maxAttempts: 10 },
     async execute(payload, context) {
-      const now = new Date()
-      const delivery = await context.database.kysely
-        .updateTable('github_webhook_deliveries')
-        .set({
-          processing_state: 'processing',
-          processing_started_at: now,
-          attempt_count: context.job.attempt,
-          error_code: null,
-          updated_at: now,
-        })
-        .where('delivery_id', '=', payload.deliveryId)
-        .where('processing_state', '!=', 'succeeded')
-        .returning(['delivery_id', 'event', 'action'])
-        .executeTakeFirst()
-      if (!delivery) return { deliveryId: payload.deliveryId, skipped: true }
-
-      // Event-specific dispatch is introduced by the following roadmap tasks.
-      await context.database.kysely
-        .updateTable('github_webhook_deliveries')
-        .set({
-          processing_state: 'succeeded',
-          processed_at: new Date(),
-          error_code: null,
-          updated_at: new Date(),
-        })
-        .where('delivery_id', '=', payload.deliveryId)
-        .execute()
-
-      await context.database.kysely
-        .updateTable('github_webhook_deliveries')
-        .set({ raw_payload: null, raw_payload_purged_at: new Date(), updated_at: new Date() })
-        .where('raw_payload_expires_at', '<=', new Date())
-        .where('raw_payload', 'is not', null)
-        .execute()
-
-      return { deliveryId: payload.deliveryId, event: delivery.event, action: delivery.action }
+      return processGitHubWebhookDelivery({
+        database: context.database,
+        deliveryId: payload.deliveryId,
+        attempt: context.job.attempt,
+      })
     },
   }),
   diagnostic_echo: defineTask({
