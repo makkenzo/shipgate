@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 
-test('serves the production SPA and reports system readiness', async ({ page, request }) => {
+test('serves the production connection UI and operational endpoints', async ({ page, request }) => {
   await expect
     .poll(
       async () => {
@@ -16,19 +16,7 @@ test('serves the production SPA and reports system readiness', async ({ page, re
 
   await page.goto('/')
 
-  await expect(
-    page.getByRole('heading', {
-      name: 'System status',
-    }),
-  ).toBeVisible()
-
-  await expect(page.getByText('All systems operational')).toBeVisible({
-    timeout: 30_000,
-  })
-
-  await expect(page.getByText('API status')).toBeVisible()
-
-  await expect(page.getByText('Worker status')).toBeVisible()
-
-  await expect(page.getByText('Database status')).toBeVisible()
+  await expect(page).toHaveURL(/\/login$/)
+  await expect(page.getByRole('heading', { name: 'Connect Shipgate to GitHub' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Continue with GitHub' })).toBeVisible()
 })

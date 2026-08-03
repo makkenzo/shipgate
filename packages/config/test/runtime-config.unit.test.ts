@@ -61,6 +61,7 @@ describe('loadRuntimeConfig', () => {
       APP_ORIGIN: 'https://shipgate.example',
       GITHUB_APP_ID: '123456',
       GITHUB_APP_CLIENT_ID: 'Iv1.shipgate',
+      GITHUB_APP_SLUG: 'shipgate-release',
       GITHUB_APP_USER_TOKENS_EXPIRE: 'true',
     })
 
@@ -68,6 +69,7 @@ describe('loadRuntimeConfig', () => {
       appOrigin: 'https://shipgate.example',
       appId: 123456,
       clientId: 'Iv1.shipgate',
+      slug: 'shipgate-release',
       userTokensExpire: true,
     })
   })

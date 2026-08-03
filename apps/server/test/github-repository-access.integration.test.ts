@@ -28,6 +28,19 @@ describe.sequential('GitHub installation and repository access', () => {
     })
 
     await migrateToLatest(context.database.kysely)
+
+    await context.database.kysely
+      .insertInto('github_user_credentials')
+      .values({
+        github_user_id: '99',
+        encrypted_access_token: 'test-access-token',
+        access_token_expires_at: new Date('2026-08-02T12:00:00.000Z'),
+        encrypted_refresh_token: 'test-refresh-token',
+        refresh_token_expires_at: new Date('2026-09-01T12:00:00.000Z'),
+        refresh_lease_id: null,
+        refresh_lease_expires_at: null,
+      })
+      .execute()
   }, 60_000)
 
   afterAll(async () => {
@@ -361,6 +374,44 @@ describe.sequential('GitHub installation and repository access', () => {
 
     expect(recovered.allowed).toBe(true)
     expect(userRepositoryRequests).toBe(1)
+  })
+
+  it('does not serve cached access after the user authorization is revoked', async () => {
+    const githubAuth = createFakeGitHubAuthentication({
+      repositoryPermission: 'read',
+      contentsPermission: 'write',
+      rejectUserRepositories: false,
+      onUserRepositoryRequest() {},
+      invalidateInstallation: vi.fn(),
+      invalidateUser: vi.fn(),
+    })
+    const service = createGitHubRepositoryAccessService({
+      database: context.database,
+      githubAuth,
+    })
+    const allowed = await service.authorizeRepositoryAccess({
+      githubUserId: 99,
+      installationId: 126,
+      repositoryId: 456,
+      requiredPermission: { repository: 'read' },
+    })
+    expect(allowed.allowed).toBe(true)
+
+    await context.database.kysely
+      .deleteFrom('github_user_credentials')
+      .where('github_user_id', '=', '99')
+      .execute()
+
+    const revoked = await service.authorizeRepositoryAccess({
+      githubUserId: 99,
+      installationId: 126,
+      repositoryId: 456,
+      requiredPermission: { repository: 'read' },
+    })
+    expect(revoked).toMatchObject({
+      allowed: false,
+      reason: 'installation_not_accessible',
+    })
   })
 })
 

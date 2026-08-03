@@ -254,14 +254,24 @@ export async function processGitHubWebhookDelivery(input: {
     throw error
   }
 
-  await input.database.kysely
-    .updateTable('github_webhook_deliveries')
-    .set({ raw_payload: null, raw_payload_purged_at: new Date(), updated_at: new Date() })
-    .where('raw_payload_expires_at', '<=', new Date())
-    .where('raw_payload', 'is not', null)
-    .execute()
+  await purgeExpiredGitHubWebhookPayloads(input.database)
 
   return { deliveryId: delivery.deliveryId, event: delivery.event, action: delivery.action }
+}
+
+export async function purgeExpiredGitHubWebhookPayloads(
+  database: DatabaseClient,
+  now = new Date(),
+): Promise<number> {
+  const purged = await database.kysely
+    .updateTable('github_webhook_deliveries')
+    .set({ raw_payload: null, raw_payload_purged_at: now, updated_at: now })
+    .where('raw_payload_expires_at', '<=', now)
+    .where('raw_payload', 'is not', null)
+    .returning('delivery_id')
+    .execute()
+
+  return purged.length
 }
 
 async function loadDelivery(

@@ -109,7 +109,6 @@ export const createGitHubClient: GitHubClientFactory = (options) => {
     userAgent: options.userAgent,
     request: {
       timeout: options.requestTimeoutMs,
-      retries: 0,
       ...(options.fetchImplementation !== undefined
         ? {
             fetch: options.fetchImplementation,
@@ -225,7 +224,8 @@ export function prepareGitHubRestRequest(input: {
   readonly parameters: Readonly<Record<string, unknown>>
 } {
   const { method, path } = parseRoute(input.route)
-  const retries = method === 'GET' || method === 'HEAD' ? 2 : 0
+  const requestOptions = getCallerRequestOptions(input.parameters?.request)
+  const retryOptions = method === 'GET' || method === 'HEAD' ? {} : { retries: 0 }
 
   return {
     route: input.route,
@@ -240,8 +240,8 @@ export function prepareGitHubRestRequest(input: {
         'x-github-api-version': input.apiVersion,
       },
       request: {
-        ...getCallerRequestOptions(input.parameters?.request),
-        retries,
+        ...requestOptions,
+        ...retryOptions,
       },
     },
   }

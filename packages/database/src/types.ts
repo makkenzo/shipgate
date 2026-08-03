@@ -27,6 +27,10 @@ export interface DatabaseSchema {
 
   github_installation_permissions: GitHubInstallationPermissionTable
 
+  github_user_installations: GitHubUserInstallationTable
+
+  github_user_installation_repositories: GitHubUserInstallationRepositoryTable
+
   github_webhook_deliveries: GitHubWebhookDeliveryTable
 
   github_integration_events: GitHubIntegrationEventTable
@@ -148,6 +152,14 @@ export interface GitHubInstallationTable {
   updated_at: Generated<Date>
 }
 
+export type GitHubRepositoryPermission =
+  | 'none'
+  | 'read'
+  | 'triage'
+  | 'write'
+  | 'maintain'
+  | 'admin'
+
 export interface GitHubInstallationRepositoryTable {
   installation_id: string
   repository_id: string
@@ -170,6 +182,24 @@ export interface GitHubInstallationPermissionTable {
   installation_id: string
   permission_name: string
   permission_level: 'read' | 'write'
+  last_reconciled_at: Date
+  created_at: Generated<Date>
+  updated_at: Generated<Date>
+}
+
+export interface GitHubUserInstallationTable {
+  github_user_id: string
+  installation_id: string
+  last_reconciled_at: Date
+  created_at: Generated<Date>
+  updated_at: Generated<Date>
+}
+
+export interface GitHubUserInstallationRepositoryTable {
+  github_user_id: string
+  installation_id: string
+  repository_id: string
+  repository_permission: Exclude<GitHubRepositoryPermission, 'none'>
   last_reconciled_at: Date
   created_at: Generated<Date>
   updated_at: Generated<Date>

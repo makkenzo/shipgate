@@ -3,7 +3,10 @@ import { setTimeout as delay } from 'node:timers/promises'
 import { z } from 'zod'
 
 import { PermanentJobError, RetryableJobError } from './errors.js'
-import { processGitHubWebhookDelivery } from './github-webhook.js'
+import {
+  processGitHubWebhookDelivery,
+  purgeExpiredGitHubWebhookPayloads,
+} from './github-webhook.js'
 import type { JobTaskContext, JobTaskDefinition } from './types.js'
 
 export const diagnosticJobPayloadSchema = z
@@ -34,6 +37,8 @@ export const githubWebhookProcessPayloadSchema = z
   .strict()
 export type GitHubWebhookProcessPayload = z.output<typeof githubWebhookProcessPayloadSchema>
 
+export const githubWebhookRetentionCleanupPayloadSchema = z.object({}).strict()
+
 function defineTask<Schema extends z.ZodTypeAny>(
   definition: JobTaskDefinition<Schema>,
 ): JobTaskDefinition<Schema> {
@@ -41,6 +46,13 @@ function defineTask<Schema extends z.ZodTypeAny>(
 }
 
 export const taskDefinitions = {
+  github_webhook_retention_cleanup: defineTask({
+    dataSchema: githubWebhookRetentionCleanupPayloadSchema,
+    retry: { maxAttempts: 5 },
+    async execute(_payload, context) {
+      return { purged: await purgeExpiredGitHubWebhookPayloads(context.database) }
+    },
+  }),
   github_webhook_process: defineTask({
     dataSchema: githubWebhookProcessPayloadSchema,
     retry: { maxAttempts: 10 },

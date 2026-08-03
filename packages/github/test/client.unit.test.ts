@@ -45,7 +45,6 @@ describe('GitHub client request boundary', () => {
         },
         request: {
           signal,
-          retries: 2,
         },
       },
     })

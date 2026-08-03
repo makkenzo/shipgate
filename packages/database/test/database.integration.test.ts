@@ -13,6 +13,18 @@ import {
 import { type PostgresTestDatabase, startPostgresTestDatabase } from '@shipgate/testing'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
+const expectedMigrationNames = [
+  '20260730_000001_create_system_metadata',
+  '20260730_000002_create_job_infrastructure',
+  '20260730_000003_drop_system_metadata',
+  '20260731_000004_create_github_auth_infrastructure',
+  '20260801_000005_create_github_sessions',
+  '20260801_000006_create_github_installation_access',
+  '20260802_000007_create_github_webhook_deliveries',
+  '20260802_000008_create_github_lifecycle_state',
+  '20260803_000009_create_github_connection_read_model',
+] as const
+
 describe.sequential('PostgreSQL infrastructure', () => {
   let testDatabase: PostgresTestDatabase
   let database: DatabaseClient
@@ -59,53 +71,24 @@ describe.sequential('PostgreSQL infrastructure', () => {
         name: migration.name,
         status: migration.status,
       })),
-    ).toEqual([
-      {
-        name: '20260730_000001_create_system_metadata',
-
+    ).toEqual(
+      expectedMigrationNames.map((name) => ({
+        name,
         status: 'pending',
-      },
-      {
-        name: '20260730_000002_create_job_infrastructure',
-
-        status: 'pending',
-      },
-      {
-        name: '20260730_000003_drop_system_metadata',
-
-        status: 'pending',
-      },
-      {
-        name: '20260731_000004_create_github_auth_infrastructure',
-
-        status: 'pending',
-      },
-    ])
+      })),
+    )
 
     const migrationResults = await migrateToLatest(database.kysely)
 
-    expect(migrationResults).toEqual([
-      expect.objectContaining({
-        migrationName: '20260730_000001_create_system_metadata',
-        direction: 'Up',
-        status: 'Success',
-      }),
-      expect.objectContaining({
-        migrationName: '20260730_000002_create_job_infrastructure',
-        direction: 'Up',
-        status: 'Success',
-      }),
-      expect.objectContaining({
-        migrationName: '20260730_000003_drop_system_metadata',
-        direction: 'Up',
-        status: 'Success',
-      }),
-      expect.objectContaining({
-        migrationName: '20260731_000004_create_github_auth_infrastructure',
-        direction: 'Up',
-        status: 'Success',
-      }),
-    ])
+    expect(migrationResults).toEqual(
+      expectedMigrationNames.map((migrationName) =>
+        expect.objectContaining({
+          migrationName,
+          direction: 'Up',
+          status: 'Success',
+        }),
+      ),
+    )
 
     const readiness = await checkDatabaseReadiness(database.kysely, 2_000)
 
@@ -176,33 +159,23 @@ describe.sequential('PostgreSQL infrastructure', () => {
       await firstLock
     }
 
-    const firstRollback = await rollbackLastMigration(database.kysely)
-    const secondRollback = await rollbackLastMigration(database.kysely)
-    const thirdRollback = await rollbackLastMigration(database.kysely)
-    const fourthRollback = await rollbackLastMigration(database.kysely)
+    const rollbackResults: Array<
+      Awaited<ReturnType<typeof rollbackLastMigration>>[number]
+    > = []
 
-    expect([...firstRollback, ...secondRollback, ...thirdRollback, ...fourthRollback]).toEqual([
-      expect.objectContaining({
-        migrationName: '20260731_000004_create_github_auth_infrastructure',
-        direction: 'Down',
-        status: 'Success',
-      }),
-      expect.objectContaining({
-        migrationName: '20260730_000003_drop_system_metadata',
-        direction: 'Down',
-        status: 'Success',
-      }),
-      expect.objectContaining({
-        migrationName: '20260730_000002_create_job_infrastructure',
-        direction: 'Down',
-        status: 'Success',
-      }),
-      expect.objectContaining({
-        migrationName: '20260730_000001_create_system_metadata',
-        direction: 'Down',
-        status: 'Success',
-      }),
-    ])
+    for (let index = 0; index < expectedMigrationNames.length; index += 1) {
+      rollbackResults.push(...(await rollbackLastMigration(database.kysely)))
+    }
+
+    expect(rollbackResults).toEqual(
+      [...expectedMigrationNames].reverse().map((migrationName) =>
+        expect.objectContaining({
+          migrationName,
+          direction: 'Down',
+          status: 'Success',
+        }),
+      ),
+    )
 
     const rolledBackStatus = await getMigrationStatus(database.kysely)
 
@@ -210,12 +183,12 @@ describe.sequential('PostgreSQL infrastructure', () => {
 
     const firstRun = await migrateToLatest(database.kysely)
 
-    expect(firstRun).toHaveLength(4)
+    expect(firstRun).toHaveLength(expectedMigrationNames.length)
 
     const secondRun = await migrateToLatest(database.kysely)
 
     expect(secondRun).toEqual([])
 
     expect(poolErrors).toEqual([])
-  }, 30_000)
+  }, 60_000)
 })

@@ -10,33 +10,103 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AccountRouteImport } from './routes/account'
+import { Route as InstallationsRouteImport } from './routes/installations'
+import { Route as LoginRouteImport } from './routes/login'
+import { Route as SetupRouteImport } from './routes/setup'
+import { Route as InstallationsInstallationIdRouteImport } from './routes/installations_.$installationId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AccountRoute = AccountRouteImport.update({
+  id: '/account',
+  path: '/account',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const InstallationsRoute = InstallationsRouteImport.update({
+  id: '/installations',
+  path: '/installations',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SetupRoute = SetupRouteImport.update({
+  id: '/setup',
+  path: '/setup',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const InstallationsInstallationIdRoute =
+  InstallationsInstallationIdRouteImport.update({
+    id: '/installations_/$installationId',
+    path: '/installations/$installationId',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/account': typeof AccountRoute
+  '/installations': typeof InstallationsRoute
+  '/login': typeof LoginRoute
+  '/setup': typeof SetupRoute
+  '/installations/$installationId': typeof InstallationsInstallationIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/account': typeof AccountRoute
+  '/installations': typeof InstallationsRoute
+  '/login': typeof LoginRoute
+  '/setup': typeof SetupRoute
+  '/installations/$installationId': typeof InstallationsInstallationIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/account': typeof AccountRoute
+  '/installations': typeof InstallationsRoute
+  '/login': typeof LoginRoute
+  '/setup': typeof SetupRoute
+  '/installations_/$installationId': typeof InstallationsInstallationIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/account'
+    | '/installations'
+    | '/login'
+    | '/setup'
+    | '/installations/$installationId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/account'
+    | '/installations'
+    | '/login'
+    | '/setup'
+    | '/installations/$installationId'
+  id:
+    | '__root__'
+    | '/'
+    | '/account'
+    | '/installations'
+    | '/login'
+    | '/setup'
+    | '/installations_/$installationId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AccountRoute: typeof AccountRoute
+  InstallationsRoute: typeof InstallationsRoute
+  LoginRoute: typeof LoginRoute
+  SetupRoute: typeof SetupRoute
+  InstallationsInstallationIdRoute: typeof InstallationsInstallationIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -48,11 +118,51 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/account': {
+      id: '/account'
+      path: '/account'
+      fullPath: '/account'
+      preLoaderRoute: typeof AccountRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/installations': {
+      id: '/installations'
+      path: '/installations'
+      fullPath: '/installations'
+      preLoaderRoute: typeof InstallationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/setup': {
+      id: '/setup'
+      path: '/setup'
+      fullPath: '/setup'
+      preLoaderRoute: typeof SetupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/installations_/$installationId': {
+      id: '/installations_/$installationId'
+      path: '/installations/$installationId'
+      fullPath: '/installations/$installationId'
+      preLoaderRoute: typeof InstallationsInstallationIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AccountRoute: AccountRoute,
+  InstallationsRoute: InstallationsRoute,
+  LoginRoute: LoginRoute,
+  SetupRoute: SetupRoute,
+  InstallationsInstallationIdRoute: InstallationsInstallationIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

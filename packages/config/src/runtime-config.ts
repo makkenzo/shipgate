@@ -72,6 +72,16 @@ const githubRuntimeEnvironmentShape = {
   APP_ORIGIN: optionalHttpsOriginEnvironmentSchema,
   GITHUB_APP_ID: optionalPositiveIntegerEnvironmentSchema,
   GITHUB_APP_CLIENT_ID: optionalNonEmptyStringEnvironmentSchema,
+  GITHUB_APP_SLUG: z.preprocess(
+    (value) => (value === '' || value === undefined ? undefined : value),
+    z
+      .string()
+      .trim()
+      .regex(/^[a-z0-9](?:[a-z0-9-]{0,98}[a-z0-9])?$/, {
+        message: 'GITHUB_APP_SLUG must be a valid GitHub App slug',
+      })
+      .optional(),
+  ),
   GITHUB_APP_USER_TOKENS_EXPIRE: optionalBooleanEnvironmentSchema,
   GITHUB_API_URL: z
     .string()
@@ -241,6 +251,7 @@ export interface GitHubRuntimeConfig {
   readonly appOrigin: string | undefined
   readonly appId: number | undefined
   readonly clientId: string | undefined
+  readonly slug: string | undefined
   readonly userTokensExpire: boolean | undefined
   readonly apiUrl: string
   readonly oauthUrl: string
@@ -264,6 +275,7 @@ export interface RuntimeConfig {
     readonly startupValidationEnabled: boolean
     readonly appId: number | undefined
     readonly clientId: string | undefined
+    readonly slug: string | undefined
     readonly userTokensExpire: boolean | undefined
     readonly apiUrl: string
     readonly oauthUrl: string
@@ -322,6 +334,7 @@ export function loadGitHubRuntimeConfig(
     appOrigin: result.data.APP_ORIGIN,
     appId: result.data.GITHUB_APP_ID,
     clientId: result.data.GITHUB_APP_CLIENT_ID,
+    slug: result.data.GITHUB_APP_SLUG,
     userTokensExpire: result.data.GITHUB_APP_USER_TOKENS_EXPIRE,
     apiUrl: result.data.GITHUB_API_URL,
     oauthUrl: result.data.GITHUB_OAUTH_URL,
@@ -355,6 +368,7 @@ export function loadRuntimeConfig(environment: NodeJS.ProcessEnv = process.env):
 
       appId: result.data.GITHUB_APP_ID,
       clientId: result.data.GITHUB_APP_CLIENT_ID,
+      slug: result.data.GITHUB_APP_SLUG,
       userTokensExpire: result.data.GITHUB_APP_USER_TOKENS_EXPIRE,
       apiUrl: result.data.GITHUB_API_URL,
       oauthUrl: result.data.GITHUB_OAUTH_URL,

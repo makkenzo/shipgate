@@ -12,6 +12,7 @@ export interface EnqueueJobOptions {
   readonly correlationId: string
   readonly causationId?: string
   readonly jobKey?: string
+  readonly runAt?: Date
 }
 
 export interface EnqueuedJob {
@@ -55,7 +56,8 @@ export async function enqueueJobInTransaction<Name extends TaskName>(
       payload := ${JSON.stringify(jsonEnvelope)}::json,
       max_attempts := ${maxAttempts}::smallint,
       job_key := ${options.jobKey ?? null}::text,
-      job_key_mode := 'unsafe_dedupe'::text
+      job_key_mode := 'unsafe_dedupe'::text,
+      run_at := coalesce(${options.runAt ?? null}::timestamptz, now())
     )).id::text as id
   `.execute(transaction)
   const jobId = result.rows[0]?.id

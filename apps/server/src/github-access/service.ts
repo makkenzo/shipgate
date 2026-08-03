@@ -26,6 +26,8 @@ import {
 } from './permissions.js'
 import {
   markGitHubInstallationPermissionState,
+  pruneGitHubUserInstallations,
+  removeGitHubUserInstallationAccess,
   replaceGitHubInstallationSnapshot,
 } from './store.js'
 
@@ -162,6 +164,12 @@ class DefaultGitHubRepositoryAccessService implements GitHubRepositoryAccessServ
         reconciled.push(outcome.snapshot.installation.summary)
       }
     }
+
+    await pruneGitHubUserInstallations({
+      database: this.#database,
+      githubUserId: input.githubUserId,
+      installationIds: reconciled.map((installation) => installation.id),
+    })
 
     return reconciled
   }
@@ -334,6 +342,8 @@ class DefaultGitHubRepositoryAccessService implements GitHubRepositoryAccessServ
       await replaceGitHubInstallationSnapshot(this.#database, metadataSnapshot, {
         replaceRepositories: false,
         permissionState: installation.summary.suspendedAt === null ? 'stale' : 'suspended',
+        githubUserId: input.githubUserId,
+        replaceUserRepositories: false,
       })
     } catch (error) {
       return this.#throwVerificationFailure(
@@ -408,7 +418,14 @@ class DefaultGitHubRepositoryAccessService implements GitHubRepositoryAccessServ
         )
 
         try {
-          await replaceGitHubInstallationSnapshot(this.#database, snapshot)
+          await replaceGitHubInstallationSnapshot(this.#database, snapshot, {
+            githubUserId: input.githubUserId,
+          })
+          await removeGitHubUserInstallationAccess({
+            database: this.#database,
+            githubUserId: input.githubUserId,
+            installationId: input.installationId,
+          })
         } catch (persistError) {
           return this.#throwVerificationFailure(
             input,
@@ -450,7 +467,9 @@ class DefaultGitHubRepositoryAccessService implements GitHubRepositoryAccessServ
     await this.#assertInstallationAcceptsReconciliation(input.githubUserId, input.installationId)
 
     try {
-      await replaceGitHubInstallationSnapshot(this.#database, snapshot)
+      await replaceGitHubInstallationSnapshot(this.#database, snapshot, {
+        githubUserId: input.githubUserId,
+      })
     } catch (error) {
       return this.#throwVerificationFailure(
         input,
@@ -501,6 +520,21 @@ class DefaultGitHubRepositoryAccessService implements GitHubRepositoryAccessServ
     const cacheExpiresAt = this.#cache.createExpiry(verifiedAt)
     const installationId = String(input.installationId)
     const repositoryId = String(input.repositoryId)
+    const credential = await this.#database.kysely
+      .selectFrom('github_user_credentials')
+      .select('github_user_id')
+      .where('github_user_id', '=', String(input.githubUserId))
+      .executeTakeFirst()
+
+    if (!credential) {
+      return createInaccessibleRepositoryAccessDecision({
+        ...input,
+        reason: 'installation_not_accessible',
+        verifiedAt,
+        cacheExpiresAt,
+      })
+    }
+
     const installation = await this.#database.kysely
       .selectFrom('github_installations')
       .select(['lifecycle_state', 'permission_state'])
@@ -538,6 +572,22 @@ class DefaultGitHubRepositoryAccessService implements GitHubRepositoryAccessServ
     }
 
     if (installation) {
+      const userInstallation = await this.#database.kysely
+        .selectFrom('github_user_installations')
+        .select('installation_id')
+        .where('github_user_id', '=', String(input.githubUserId))
+        .where('installation_id', '=', installationId)
+        .executeTakeFirst()
+
+      if (!userInstallation) {
+        return createInaccessibleRepositoryAccessDecision({
+          ...input,
+          reason: 'installation_not_accessible',
+          verifiedAt,
+          cacheExpiresAt,
+        })
+      }
+
       const repository = await this.#database.kysely
         .selectFrom('github_installation_repositories')
         .select('repository_id')

@@ -52,6 +52,17 @@ export async function acceptGitHubWebhookDelivery(input: {
             jobKey: `github-webhook:${input.deliveryId}`,
           },
         )
+        await enqueueJobInTransaction(
+          transaction,
+          'github_webhook_retention_cleanup',
+          {},
+          {
+            correlationId: input.correlationId,
+            causationId: `github-webhook:${input.deliveryId}`,
+            jobKey: `github-webhook-retention:${input.deliveryId}`,
+            runAt: new Date(receivedAt.getTime() + retentionMs),
+          },
+        )
         return { status: 'queued', jobId: job.jobId }
       }
       const existing = await transaction

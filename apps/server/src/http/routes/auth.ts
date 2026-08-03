@@ -372,6 +372,7 @@ export const authRoutes: FastifyPluginAsyncTypebox<AuthRoutesOptions> = async (a
         throw mapGitHubAuthError(error)
       }
 
+      context.githubRepositoryAccess.invalidateUser(session.githubUserId)
       reply.header('set-cookie', createExpiredSessionCookies())
 
       request.log.info(
@@ -445,7 +446,7 @@ function redirectInstallationSetupToLogin(
     readonly setupAction: 'install' | 'update' | 'request'
   },
 ): FastifyReply {
-  const returnTo = new URL('/api/v1/auth/session', appOrigin)
+  const returnTo = new URL('/setup', appOrigin)
   returnTo.searchParams.set('installation_action', input.setupAction)
 
   if (input.installationId) {

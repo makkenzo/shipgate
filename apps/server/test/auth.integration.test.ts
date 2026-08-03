@@ -79,7 +79,7 @@ describe.sequential('GitHub login and Shipgate sessions', () => {
 
     expect(loginUrl.pathname).toBe('/api/v1/auth/github')
     expect(loginUrl.searchParams.get('returnTo')).toBe(
-      '/api/v1/auth/session?installation_action=install&installation_id=123',
+      '/setup?installation_action=install&installation_id=123',
     )
 
     const started = await app.inject({
@@ -94,6 +94,38 @@ describe.sequential('GitHub login and Shipgate sessions', () => {
     expect(authorizeUrl.pathname).toBe('/login/oauth/authorize')
     expect(authorizeUrl.searchParams.get('state')).toBeTruthy()
     expect(authorizeUrl.searchParams.get('code_challenge')).toBeTruthy()
+  })
+
+  it('rejects OAuth state that was not issued or has expired', async () => {
+    const invalid = await app.inject({
+      method: 'GET',
+      url: '/api/v1/auth/github/callback?code=authorization-code&state=not-issued',
+    })
+
+    expect(invalid.statusCode).toBe(400)
+    expect(invalid.json()).toMatchObject({ code: 'INVALID_OAUTH_STATE' })
+
+    const started = await app.inject({
+      method: 'GET',
+      url: '/api/v1/auth/github',
+    })
+    const authorizeUrl = new URL(requireHeader(started.headers.location, 'location'))
+    const state = requireValue(authorizeUrl.searchParams.get('state'), 'state')
+    const stateHash = createHash('sha256').update(state, 'utf8').digest('hex')
+
+    await context.database.kysely
+      .updateTable('oauth_attempts')
+      .set({ expires_at: new Date(Date.now() - 1_000) })
+      .where('state_hash', '=', stateHash)
+      .execute()
+
+    const expired = await app.inject({
+      method: 'GET',
+      url: `/api/v1/auth/github/callback?code=authorization-code&state=${encodeURIComponent(state)}`,
+    })
+
+    expect(expired.statusCode).toBe(400)
+    expect(expired.json()).toMatchObject({ code: 'INVALID_OAUTH_STATE' })
   })
 
   it('uses one-time state and PKCE, persists the session, and enforces CSRF', async () => {

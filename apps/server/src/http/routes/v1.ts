@@ -4,6 +4,7 @@ import type { ApplicationContext } from '../../application-context.js'
 import { enforceJsonContentType } from '../content-type.js'
 import { registerSessionMiddleware } from '../session-middleware.js'
 import { authRoutes } from './auth.js'
+import { connectionRoutes } from './connection.js'
 import { diagnosticJobRoutes } from './diagnostic-jobs.js'
 import { githubWebhookRoutes } from './github-webhooks.js'
 
@@ -19,6 +20,10 @@ export const apiV1Routes: FastifyPluginAsyncTypebox<ApiV1RoutesOptions> = async 
   registerSessionMiddleware(app, options.context)
 
   await app.register(authRoutes, {
+    context: options.context,
+  })
+
+  await app.register(connectionRoutes, {
     context: options.context,
   })
 
