@@ -98,6 +98,66 @@ export async function recoverRepositoryInitialSyncJobs(database: DatabaseClient)
   return withTransaction(
     database.kysely,
     async (transaction: Transaction<DatabaseSchema>) => {
+      const topologyUpgradeProjects = await sql<{
+        readonly project_id: string
+        readonly repository_id: string
+        readonly configuration_version: number
+        readonly source_sha: string
+        readonly production_sha: string
+      }>`
+        select
+          project.id as project_id,
+          project.repository_id,
+          project.configuration_version,
+          project.source_sha,
+          project.production_sha
+        from projects as project
+        where project.status = 'degraded'
+          and project.last_successful_sync_at is not null
+          and project.source_sha is not null
+          and project.production_sha is not null
+          and not exists (
+            select 1
+            from repository_commits as commit
+            where commit.project_id = project.id
+              and commit.source_delta_position is not null
+          )
+          and not exists (
+            select 1
+            from repository_reconciliation_requests as request
+            where request.project_id = project.id
+              and request.idempotency_key =
+                'commit-topology-upgrade:' || project.id || ':' ||
+                project.configuration_version::text || ':' || project.source_sha || ':' ||
+                project.production_sha
+          )
+        order by project.updated_at
+        for update of project skip locked
+      `.execute(transaction)
+
+      for (const project of topologyUpgradeProjects.rows) {
+        await queueRepositoryInitialSync({
+          transaction,
+          projectId: project.project_id,
+          repositoryId: project.repository_id,
+          configurationVersion: project.configuration_version,
+          reason: 'commit_topology_upgrade',
+          requestedByGitHubUserId: null,
+          sourceSha: project.source_sha,
+          productionSha: project.production_sha,
+          idempotencyKey: [
+            'commit-topology-upgrade',
+            project.project_id,
+            project.configuration_version,
+            project.source_sha,
+            project.production_sha,
+          ].join(':'),
+          correlationId: `repository.initial-sync:topology-upgrade:${project.project_id}`,
+          causationId: `project:${project.project_id}:commit-topology-upgrade`,
+          now: new Date(),
+        })
+      }
+
       const result = await sql<{ readonly request_id: string }>`
         select request.id as request_id
         from repository_reconciliation_requests as request
@@ -116,7 +176,7 @@ export async function recoverRepositoryInitialSyncJobs(database: DatabaseClient)
         })
       }
 
-      return result.rows.length
+      return topologyUpgradeProjects.rows.length + result.rows.length
     },
     { operation: 'projects.repository-initial-sync.recover' },
   )

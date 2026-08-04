@@ -34,11 +34,26 @@ export interface GitRepositoryCommit {
   readonly committedAt: Date
   readonly parentShas: readonly string[]
   readonly sourceDeltaPosition: number | null
+  readonly firstParentPosition: number | null
+  readonly integrationPointSha: string | null
+  readonly productionPatchEquivalent: boolean
+}
+
+export interface GitIntegrationWindow {
+  readonly integrationSha: string
+  readonly firstParentSha: string
+  readonly secondParentSha: string | null
+  readonly firstParentPosition: number
+  readonly commitShas: readonly string[]
+  readonly introducedCommitShas: readonly string[]
 }
 
 export interface GitRepositorySnapshot {
   readonly sourceSha: string
   readonly productionSha: string
+  readonly mergeBaseSha: string
+  readonly firstParentShas: readonly string[]
+  readonly integrationWindows: readonly GitIntegrationWindow[]
   readonly commits: readonly GitRepositoryCommit[]
 }
 
@@ -192,10 +207,10 @@ export function createReadOnlyGitWorkspace(
             maximumCommitCount,
             input.signal,
           )
-          const commits: GitRepositoryCommit[] = []
+          const baseCommits: GitRepositoryCommit[] = []
 
           if (deltaShas.length === 0) {
-            commits.push(
+            baseCommits.push(
               await readCommit(
                 gitCommand,
                 workspace,
@@ -207,15 +222,87 @@ export function createReadOnlyGitWorkspace(
             )
           } else {
             for (const [position, sha] of deltaShas.entries()) {
-              commits.push(
+              baseCommits.push(
                 await readCommit(gitCommand, workspace, sha, position, timeoutMs, input.signal),
               )
             }
           }
 
+          const mergeBaseSha = await readMergeBase(
+            gitCommand,
+            workspace,
+            input.productionSha,
+            input.sourceSha,
+            timeoutMs,
+            input.signal,
+          )
+          const firstParentShas = await readFirstParentHistory(
+            gitCommand,
+            workspace,
+            input.productionSha,
+            input.sourceSha,
+            timeoutMs,
+            input.signal,
+          )
+          const integrationWindows = await readIntegrationWindows({
+            gitCommand,
+            workspace,
+            productionSha: input.productionSha,
+            deltaShas,
+            firstParentShas,
+            commits: baseCommits,
+            timeoutMs,
+            signal: input.signal,
+          })
+          const productionEquivalentShas = await readProductionPatchEquivalence(
+            gitCommand,
+            workspace,
+            input.productionSha,
+            input.sourceSha,
+            timeoutMs,
+            input.signal,
+          )
+          const firstParentPositions = new Map(
+            firstParentShas.map((sha, position) => [sha, position] as const),
+          )
+          const integrationByCommit = new Map<string, string>()
+
+          for (const window of integrationWindows) {
+            for (const sha of window.commitShas) {
+              if (integrationByCommit.has(sha)) {
+                throw createGitWorkspaceFailure(
+                  `Commit ${sha} belongs to multiple first-parent integration windows`,
+                )
+              }
+
+              integrationByCommit.set(sha, window.integrationSha)
+            }
+          }
+
+          const commits = baseCommits.map(
+            (commit): GitRepositoryCommit => ({
+              ...commit,
+              firstParentPosition: firstParentPositions.get(commit.sha) ?? null,
+              integrationPointSha:
+                commit.sourceDeltaPosition === null
+                  ? null
+                  : (integrationByCommit.get(commit.sha) ?? null),
+              productionPatchEquivalent: productionEquivalentShas.has(commit.sha),
+            }),
+          )
+
+          if (deltaShas.some((sha) => !integrationByCommit.has(sha))) {
+            throw createGitWorkspaceFailure(
+              'The first-parent integration windows do not cover the complete source delta',
+            )
+          }
+
           return {
             sourceSha: fetchedSourceSha,
             productionSha: fetchedProductionSha,
+            mergeBaseSha,
+            firstParentShas,
+            integrationWindows,
             commits,
           }
         },
@@ -301,6 +388,225 @@ async function readSourceDelta(
   return shas
 }
 
+async function readMergeBase(
+  gitCommand: string,
+  workspace: string,
+  productionSha: string,
+  sourceSha: string,
+  timeoutMs: number,
+  signal: AbortSignal | undefined,
+): Promise<string> {
+  const result = await runGit(
+    gitCommand,
+    ['-C', workspace, 'merge-base', productionSha, sourceSha],
+    { timeoutMs, signal },
+  )
+  const mergeBaseSha = result.stdout.trim().toLowerCase()
+
+  assertSha(mergeBaseSha, 'merge base SHA')
+
+  return mergeBaseSha
+}
+
+async function readFirstParentHistory(
+  gitCommand: string,
+  workspace: string,
+  productionSha: string,
+  sourceSha: string,
+  timeoutMs: number,
+  signal: AbortSignal | undefined,
+): Promise<readonly string[]> {
+  if (productionSha === sourceSha) {
+    return []
+  }
+
+  const result = await runGit(
+    gitCommand,
+    ['-C', workspace, 'rev-list', '--first-parent', '--reverse', `${productionSha}..${sourceSha}`],
+    { timeoutMs, signal },
+  )
+
+  return parseShaLines(result.stdout, 'first-parent commit SHA')
+}
+
+async function readIntegrationWindows(input: {
+  readonly gitCommand: string
+  readonly workspace: string
+  readonly productionSha: string
+  readonly deltaShas: readonly string[]
+  readonly firstParentShas: readonly string[]
+  readonly commits: readonly GitRepositoryCommit[]
+  readonly timeoutMs: number
+  readonly signal: AbortSignal | undefined
+}): Promise<readonly GitIntegrationWindow[]> {
+  if (input.deltaShas.length === 0) {
+    return []
+  }
+
+  const deltaSet = new Set(input.deltaShas)
+  const commits = new Map(input.commits.map((commit) => [commit.sha, commit] as const))
+  const assigned = new Set<string>()
+  const windows: GitIntegrationWindow[] = []
+
+  for (const [firstParentPosition, integrationSha] of input.firstParentShas.entries()) {
+    const integration = commits.get(integrationSha)
+
+    if (integration === undefined) {
+      throw createGitWorkspaceFailure(
+        `First-parent integration commit ${integrationSha} is outside the source delta`,
+      )
+    }
+
+    if (integration.sourceDeltaPosition === null) {
+      throw createGitWorkspaceFailure(
+        `First-parent integration commit ${integrationSha} is outside the source delta`,
+      )
+    }
+
+    const firstParentSha = integration.parentShas[0]
+
+    if (!firstParentSha) {
+      throw createGitWorkspaceFailure(
+        `First-parent integration commit ${integrationSha} has no first parent`,
+      )
+    }
+
+    const secondParentSha = integration.parentShas[1] ?? null
+    const windowResult = await runGit(
+      input.gitCommand,
+      [
+        '-C',
+        input.workspace,
+        'rev-list',
+        '--reverse',
+        '--topo-order',
+        `${firstParentSha}..${integrationSha}`,
+      ],
+      { timeoutMs: input.timeoutMs, signal: input.signal },
+    )
+    const windowShas = parseShaLines(windowResult.stdout, 'integration-window commit SHA').filter(
+      (sha) => deltaSet.has(sha) && !assigned.has(sha),
+    )
+
+    if (!windowShas.includes(integrationSha)) {
+      windowShas.push(integrationSha)
+    }
+
+    const introducedCommitShas = secondParentSha
+      ? await readIntroducedCommits({
+          gitCommand: input.gitCommand,
+          workspace: input.workspace,
+          firstParentSha,
+          secondParentSha,
+          timeoutMs: input.timeoutMs,
+          signal: input.signal,
+        })
+      : []
+
+    for (const sha of windowShas) {
+      assigned.add(sha)
+    }
+
+    windows.push({
+      integrationSha,
+      firstParentSha,
+      secondParentSha,
+      firstParentPosition,
+      commitShas: windowShas,
+      introducedCommitShas,
+    })
+  }
+
+  const unassigned = input.deltaShas.filter((sha) => !assigned.has(sha))
+
+  if (unassigned.length > 0) {
+    throw createGitWorkspaceFailure(
+      `Source commits are outside every first-parent integration window: ${unassigned.join(', ')}`,
+    )
+  }
+
+  return windows
+}
+
+async function readIntroducedCommits(input: {
+  readonly gitCommand: string
+  readonly workspace: string
+  readonly firstParentSha: string
+  readonly secondParentSha: string
+  readonly timeoutMs: number
+  readonly signal: AbortSignal | undefined
+}): Promise<readonly string[]> {
+  const result = await runGit(
+    input.gitCommand,
+    [
+      '-C',
+      input.workspace,
+      'rev-list',
+      '--reverse',
+      '--topo-order',
+      `${input.firstParentSha}..${input.secondParentSha}`,
+    ],
+    { timeoutMs: input.timeoutMs, signal: input.signal },
+  )
+
+  return parseShaLines(result.stdout, 'introduced commit SHA')
+}
+
+async function readProductionPatchEquivalence(
+  gitCommand: string,
+  workspace: string,
+  productionSha: string,
+  sourceSha: string,
+  timeoutMs: number,
+  signal: AbortSignal | undefined,
+): Promise<ReadonlySet<string>> {
+  if (productionSha === sourceSha) {
+    return new Set()
+  }
+
+  const result = await runGit(gitCommand, ['-C', workspace, 'cherry', productionSha, sourceSha], {
+    timeoutMs,
+    signal,
+  })
+  const equivalents = new Set<string>()
+
+  for (const line of result.stdout.split('\n')) {
+    const trimmed = line.trim()
+
+    if (trimmed.length === 0) {
+      continue
+    }
+
+    const match = /^([+-])\s+([0-9a-f]{40,64})$/i.exec(trimmed)
+
+    if (!match?.[1] || !match[2]) {
+      throw createGitWorkspaceFailure(`Git returned an invalid cherry record: ${trimmed}`)
+    }
+
+    const sha = match[2].toLowerCase()
+    assertSha(sha, 'git cherry commit SHA')
+
+    if (match[1] === '-') {
+      equivalents.add(sha)
+    }
+  }
+
+  return equivalents
+}
+
+function parseShaLines(value: string, name: string): string[] {
+  const shas = value
+    .split('\n')
+    .map((item) => item.trim().toLowerCase())
+    .filter((item) => item.length > 0)
+
+  for (const sha of shas) {
+    assertSha(sha, name)
+  }
+
+  return shas
+}
+
 async function readCommit(
   gitCommand: string,
   workspace: string,
@@ -364,6 +670,9 @@ async function readCommit(
     committedAt: parseRequiredDate(committedAt, `committed time for ${sha}`),
     parentShas: parentShas.map((parentSha) => parentSha.toLowerCase()),
     sourceDeltaPosition,
+    firstParentPosition: null,
+    integrationPointSha: null,
+    productionPatchEquivalent: false,
   }
 }
 

@@ -1,7 +1,6 @@
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 
 import type {
-  ChangeMergeMethod,
   ChangeProductionPresence,
   DatabaseClient,
   DatabaseSchema,
@@ -321,6 +320,10 @@ export async function applyRepositoryProjectionInTransaction(
           committed_at: commit.committedAt,
           parent_shas: JSON.stringify(commit.parentShas),
           source_delta_position: commit.sourceDeltaPosition,
+          first_parent_position: commit.firstParentPosition,
+          integration_point_sha: commit.integrationPointSha,
+          production_patch_equivalent: commit.productionPatchEquivalent,
+          attribution_state: commit.attributionState,
           observed_at: observedAt,
           updated_at: observedAt,
         })),
@@ -346,6 +349,8 @@ export async function applyRepositoryProjectionInTransaction(
       final_head_sha: stored.input.finalHeadSha,
       merge_commit_sha: stored.input.mergeCommitSha,
       source_integration_sha: stored.input.sourceIntegrationSha,
+      integration_first_parent_sha: stored.input.integrationFirstParentSha,
+      integration_second_parent_sha: stored.input.integrationSecondParentSha,
       merge_method: stored.input.mergeMethod,
       commit_set_fingerprint: stored.input.commitSetFingerprint,
       synchronization_state: stored.input.synchronizationState,
@@ -464,6 +469,7 @@ export async function applyRepositoryProjectionInTransaction(
       status: 'active',
       source_sha: input.snapshot.sourceSha,
       production_sha: input.snapshot.productionSha,
+      merge_base_sha: input.snapshot.mergeBaseSha,
       last_successful_sync_at: input.completedAt,
       deletion_requested_at: null,
       deleted_at: null,
@@ -596,7 +602,7 @@ export async function listChangesAheadOfProduction(
     ])
     .where('project_id', '=', projectId)
     .where('synchronization_state', '=', 'known')
-    .where('production_presence', 'in', ['missing', 'not_applicable'])
+    .where('production_presence', 'in', ['unreleased', 'partially_present'])
     .orderBy('merged_at')
     .orderBy('pull_request_number')
     .execute()
@@ -625,7 +631,7 @@ export async function listChangesAheadOfProduction(
   }
 
   return rows.map((row) => {
-    const mergeMethod = assertKnownMergeMethod(row.merge_method)
+    const mergeMethod = row.merge_method
     const fingerprint = row.commit_set_fingerprint
     const productionPresence = assertAheadProductionPresence(row.production_presence)
 
@@ -672,6 +678,7 @@ export async function listUnmanagedCommits(
     ])
     .where('commit.project_id', '=', projectId)
     .where('commit.source_delta_position', 'is not', null)
+    .where('commit.attribution_state', '=', 'unmanaged')
     .where('membership.change_id', 'is', null)
     .orderBy('commit.source_delta_position')
     .execute()
@@ -951,7 +958,14 @@ export function validateRepositoryProjectionSnapshot(snapshot: RepositoryProject
   assertNonEmpty(snapshot.repositoryFullName, 'repository full name')
   assertCommitSha(snapshot.sourceSha, 'source SHA')
   assertCommitSha(snapshot.productionSha, 'production SHA')
+  assertCommitSha(snapshot.mergeBaseSha, 'merge base SHA')
   assertValidDate(snapshot.observedAt, 'projection observation time')
+
+  if (snapshot.mergeBaseSha !== snapshot.productionSha) {
+    throw new RepositoryProjectionInvariantError(
+      `Merge base ${snapshot.mergeBaseSha} must equal production SHA ${snapshot.productionSha}`,
+    )
+  }
 
   if (snapshot.defaultBranch !== null) {
     assertBranchName(snapshot.defaultBranch, 'default branch')
@@ -967,9 +981,11 @@ export function validateRepositoryProjectionSnapshot(snapshot: RepositoryProject
 
   const commits = new Map<string, RepositoryProjectionSnapshot['commits'][number]>()
   const sourcePositions = new Set<number>()
+  const firstParentPositions = new Set<number>()
 
   for (const commit of snapshot.commits) {
     assertCommitSha(commit.sha, 'repository commit SHA')
+
     if (commits.has(commit.sha)) {
       throw new RepositoryProjectionInvariantError(`Duplicate repository commit ${commit.sha}`)
     }
@@ -992,6 +1008,34 @@ export function validateRepositoryProjectionSnapshot(snapshot: RepositoryProject
       assertCommitSha(parentSha, `parent SHA for commit ${commit.sha}`)
     }
 
+    if (typeof commit.productionPatchEquivalent !== 'boolean') {
+      throw new RepositoryProjectionInvariantError(
+        `Commit ${commit.sha} has an invalid production patch-equivalence flag`,
+      )
+    }
+
+    if (!['managed', 'unmanaged', 'ambiguous'].includes(commit.attributionState)) {
+      throw new RepositoryProjectionInvariantError(
+        `Commit ${commit.sha} has an invalid attribution state`,
+      )
+    }
+
+    if (commit.integrationPointSha !== null) {
+      assertCommitSha(commit.integrationPointSha, `integration point for commit ${commit.sha}`)
+    }
+
+    if (commit.firstParentPosition !== null) {
+      assertNonNegativeInteger(
+        commit.firstParentPosition,
+        `first-parent position for commit ${commit.sha}`,
+      )
+      assertUnique(
+        firstParentPositions,
+        commit.firstParentPosition,
+        `Duplicate first-parent position ${commit.firstParentPosition}`,
+      )
+    }
+
     if (commit.sourceDeltaPosition !== null) {
       assertNonNegativeInteger(
         commit.sourceDeltaPosition,
@@ -1002,34 +1046,64 @@ export function validateRepositoryProjectionSnapshot(snapshot: RepositoryProject
         commit.sourceDeltaPosition,
         `Duplicate source delta position ${commit.sourceDeltaPosition}`,
       )
+
+      if (commit.integrationPointSha === null) {
+        throw new RepositoryProjectionInvariantError(
+          `Source commit ${commit.sha} has no first-parent integration point`,
+        )
+      }
+    }
+  }
+
+  assertContiguousPositions(sourcePositions, 'Source delta')
+  assertContiguousPositions(firstParentPositions, 'First-parent history')
+
+  for (const commit of commits.values()) {
+    if (commit.integrationPointSha === null) {
+      continue
+    }
+
+    const integration = commits.get(commit.integrationPointSha)
+
+    if (integration === undefined) {
+      throw new RepositoryProjectionInvariantError(
+        `Commit ${commit.sha} references invalid integration point ${commit.integrationPointSha}`,
+      )
+    }
+
+    if (integration.firstParentPosition === null) {
+      throw new RepositoryProjectionInvariantError(
+        `Commit ${commit.sha} references invalid integration point ${commit.integrationPointSha}`,
+      )
     }
   }
 
   const orderedSourcePositions = [...sourcePositions].sort((left, right) => left - right)
-
-  for (const [expectedPosition, actualPosition] of orderedSourcePositions.entries()) {
-    if (actualPosition !== expectedPosition) {
-      throw new RepositoryProjectionInvariantError(
-        [
-          'Source delta positions must be contiguous from zero;',
-          `expected ${expectedPosition}, received ${actualPosition}`,
-        ].join(' '),
-      )
-    }
-  }
+  const orderedFirstParentPositions = [...firstParentPositions].sort((left, right) => left - right)
 
   if (snapshot.sourceSha !== snapshot.productionSha) {
     const sourceHead = commits.get(snapshot.sourceSha)
-    const expectedSourcePosition = orderedSourcePositions.length - 1
 
-    if (!sourceHead || sourceHead.sourceDeltaPosition !== expectedSourcePosition) {
+    if (sourceHead === undefined) {
       throw new RepositoryProjectionInvariantError(
         `Source SHA ${snapshot.sourceSha} must be the final commit in the source delta`,
       )
     }
-  } else if (orderedSourcePositions.length > 0) {
+
+    if (sourceHead.sourceDeltaPosition !== orderedSourcePositions.length - 1) {
+      throw new RepositoryProjectionInvariantError(
+        `Source SHA ${snapshot.sourceSha} must be the final commit in the source delta`,
+      )
+    }
+
+    if (sourceHead.firstParentPosition !== orderedFirstParentPositions.length - 1) {
+      throw new RepositoryProjectionInvariantError(
+        `Source SHA ${snapshot.sourceSha} must be the final first-parent integration point`,
+      )
+    }
+  } else if (orderedSourcePositions.length > 0 || orderedFirstParentPositions.length > 0) {
     throw new RepositoryProjectionInvariantError(
-      'Source delta must be empty when source and production SHA are equal',
+      'Source delta and first-parent history must be empty when source and production are equal',
     )
   }
 
@@ -1039,6 +1113,50 @@ export function validateRepositoryProjectionSnapshot(snapshot: RepositoryProject
 
   for (const change of snapshot.changes) {
     validateChange(change, commits, pullRequestIds, pullRequestNumbers, attributedCommits)
+  }
+
+  validateIssues(snapshot.issues)
+  const unmanagedIssues = new Set(
+    snapshot.issues
+      .filter((issue) => issue.code === 'unmanaged_commit' && issue.scope === 'commit')
+      .map((issue) => issue.subjectId),
+  )
+  const ambiguousIssues = new Set(
+    snapshot.issues
+      .filter((issue) => issue.code === 'ambiguous_commit_attribution' && issue.scope === 'commit')
+      .map((issue) => issue.subjectId),
+  )
+
+  for (const commit of commits.values()) {
+    if (commit.sourceDeltaPosition === null) {
+      continue
+    }
+
+    const attributed = attributedCommits.has(commit.sha)
+
+    if (commit.attributionState === 'managed' && !attributed) {
+      throw new RepositoryProjectionInvariantError(
+        `Managed commit ${commit.sha} is not assigned to a Change`,
+      )
+    }
+
+    if (commit.attributionState !== 'managed' && attributed) {
+      throw new RepositoryProjectionInvariantError(
+        `${commit.attributionState} commit ${commit.sha} is assigned to a Change`,
+      )
+    }
+
+    if (commit.attributionState === 'unmanaged' && !unmanagedIssues.has(commit.sha)) {
+      throw new RepositoryProjectionInvariantError(
+        `Unmanaged commit ${commit.sha} has no synchronization issue`,
+      )
+    }
+
+    if (commit.attributionState === 'ambiguous' && !ambiguousIssues.has(commit.sha)) {
+      throw new RepositoryProjectionInvariantError(
+        `Ambiguous commit ${commit.sha} has no synchronization issue`,
+      )
+    }
   }
 
   const requiredChecks = new Set<string>()
@@ -1105,8 +1223,18 @@ export function validateRepositoryProjectionSnapshot(snapshot: RepositoryProject
     const identity = [result.type, githubObjectId, result.attempt ?? 0].join(':')
     assertUnique(checkResults, identity, `Duplicate check result ${identity}`)
   }
+}
 
-  validateIssues(snapshot.issues)
+function assertContiguousPositions(positions: ReadonlySet<number>, name: string): void {
+  const ordered = [...positions].sort((left, right) => left - right)
+
+  for (const [expected, actual] of ordered.entries()) {
+    if (actual !== expected) {
+      throw new RepositoryProjectionInvariantError(
+        `${name} positions must be contiguous from zero; expected ${expected}, received ${actual}`,
+      )
+    }
+  }
 }
 
 function validateSnapshotAgainstProject(
@@ -1118,7 +1246,7 @@ function validateSnapshotAgainstProject(
     (branch) => branch.name === project.production_branch,
   )
 
-  if (!sourceBranch || sourceBranch.headSha !== snapshot.sourceSha) {
+  if (sourceBranch === undefined) {
     throw new RepositoryProjectionInvariantError(
       [
         `Projection does not contain configured source branch ${project.source_branch}`,
@@ -1127,7 +1255,25 @@ function validateSnapshotAgainstProject(
     )
   }
 
-  if (!productionBranch || productionBranch.headSha !== snapshot.productionSha) {
+  if (sourceBranch.headSha !== snapshot.sourceSha) {
+    throw new RepositoryProjectionInvariantError(
+      [
+        `Projection does not contain configured source branch ${project.source_branch}`,
+        `at ${snapshot.sourceSha}`,
+      ].join(' '),
+    )
+  }
+
+  if (productionBranch === undefined) {
+    throw new RepositoryProjectionInvariantError(
+      [
+        `Projection does not contain configured production branch ${project.production_branch}`,
+        `at ${snapshot.productionSha}`,
+      ].join(' '),
+    )
+  }
+
+  if (productionBranch.headSha !== snapshot.productionSha) {
     throw new RepositoryProjectionInvariantError(
       [
         `Projection does not contain configured production branch ${project.production_branch}`,
@@ -1165,35 +1311,60 @@ function validateChange(
   assertValidDate(change.mergedAt, 'change merged time')
   assertCommitSha(change.finalHeadSha, 'change final head SHA')
 
-  if (change.mergeCommitSha !== null) {
-    assertCommitSha(change.mergeCommitSha, 'change merge commit SHA')
-  }
-
-  if (change.sourceIntegrationSha !== null) {
-    assertCommitSha(change.sourceIntegrationSha, 'change source integration SHA')
+  for (const [value, name] of [
+    [change.mergeCommitSha, 'change merge commit SHA'],
+    [change.sourceIntegrationSha, 'change source integration SHA'],
+    [change.integrationFirstParentSha, 'change integration first parent SHA'],
+    [change.integrationSecondParentSha, 'change integration second parent SHA'],
+  ] as const) {
+    if (value !== null) {
+      assertCommitSha(value, name)
+    }
   }
 
   if (change.commitSetFingerprint !== null) {
     assertFingerprint(change.commitSetFingerprint, 'change commit set fingerprint')
   }
 
-  if (change.synchronizationState === 'known') {
-    if (
-      change.mergeMethod === 'unknown' ||
-      change.commitSetFingerprint === null ||
-      change.sourceIntegrationSha === null ||
-      change.commitShas.length === 0
-    ) {
-      throw new RepositoryProjectionInvariantError(
-        [
-          `Known change #${change.pullRequestNumber} requires a merge method,`,
-          'integration SHA, fingerprint and non-empty commit set',
-        ].join(' '),
-      )
-    }
+  if (
+    change.synchronizationState !== 'known' ||
+    change.commitSetFingerprint === null ||
+    change.sourceIntegrationSha === null ||
+    change.integrationFirstParentSha === null ||
+    change.commitShas.length === 0 ||
+    change.productionPresence === 'unknown'
+  ) {
+    throw new RepositoryProjectionInvariantError(
+      `Managed change #${change.pullRequestNumber} is missing deterministic topology`,
+    )
+  }
+
+  const expectedFingerprint = createHash('sha256')
+    .update(change.commitShas.join('\0'))
+    .digest('hex')
+
+  if (expectedFingerprint !== change.commitSetFingerprint) {
+    throw new RepositoryProjectionInvariantError(
+      `Change #${change.pullRequestNumber} commit-set fingerprint is inconsistent`,
+    )
+  }
+
+  const integration = commits.get(change.sourceIntegrationSha)
+
+  if (integration === undefined) {
+    throw new RepositoryProjectionInvariantError(
+      `Change #${change.pullRequestNumber} has an invalid integration commit`,
+    )
+  }
+
+  if (integration.sourceDeltaPosition === null) {
+    throw new RepositoryProjectionInvariantError(
+      `Change #${change.pullRequestNumber} has an invalid integration commit`,
+    )
   }
 
   const changeCommits = new Set<string>()
+  let previousPosition = -1
 
   for (const commitSha of change.commitShas) {
     assertCommitSha(commitSha, `commit SHA for change #${change.pullRequestNumber}`)
@@ -1205,25 +1376,108 @@ function validateChange(
 
     const commit = commits.get(commitSha)
 
-    if (!commit) {
+    if (commit === undefined) {
       throw new RepositoryProjectionInvariantError(
-        `Change #${change.pullRequestNumber} references unknown commit ${commitSha}`,
+        `Change #${change.pullRequestNumber} references commit ${commitSha} outside the source delta`,
       )
     }
 
     if (commit.sourceDeltaPosition === null) {
       throw new RepositoryProjectionInvariantError(
-        [
-          `Change #${change.pullRequestNumber} references commit ${commitSha}`,
-          'outside the source delta',
-        ].join(' '),
+        `Change #${change.pullRequestNumber} references commit ${commitSha} outside the source delta`,
       )
     }
 
+    if (commit.sourceDeltaPosition <= previousPosition) {
+      throw new RepositoryProjectionInvariantError(
+        `Change #${change.pullRequestNumber} commit set is not in source topology order`,
+      )
+    }
+
+    if (
+      change.mergeMethod !== 'rebase' &&
+      commit.integrationPointSha !== change.sourceIntegrationSha
+    ) {
+      throw new RepositoryProjectionInvariantError(
+        `Change #${change.pullRequestNumber} crosses an invalid integration window`,
+      )
+    }
+
+    if (
+      change.mergeMethod === 'rebase' &&
+      (commit.firstParentPosition === null || commit.integrationPointSha !== commit.sha)
+    ) {
+      throw new RepositoryProjectionInvariantError(
+        `Rebase change #${change.pullRequestNumber} contains a non-first-parent commit`,
+      )
+    }
+
+    previousPosition = commit.sourceDeltaPosition
     assertUnique(
       attributedCommits,
       commitSha,
       `Source commit ${commitSha} is attributed to more than one change`,
+    )
+  }
+
+  if (change.commitShas.at(-1) !== change.sourceIntegrationSha) {
+    throw new RepositoryProjectionInvariantError(
+      `Change #${change.pullRequestNumber} integration commit must be last in its commit set`,
+    )
+  }
+
+  const firstCommit = commits.get(change.commitShas[0] as string)
+
+  if (
+    change.mergeMethod !== 'merge' &&
+    firstCommit?.parentShas[0] !== change.integrationFirstParentSha
+  ) {
+    throw new RepositoryProjectionInvariantError(
+      `Change #${change.pullRequestNumber} first-parent boundary is inconsistent`,
+    )
+  }
+
+  if (change.mergeMethod === 'unknown' && change.commitShas.length !== 1) {
+    throw new RepositoryProjectionInvariantError(
+      `Unknown linear merge method is only valid for one-commit change #${change.pullRequestNumber}`,
+    )
+  }
+
+  if (change.mergeMethod === 'rebase') {
+    const positions = change.commitShas.map((sha) => commits.get(sha)?.firstParentPosition ?? -1)
+
+    for (let index = 1; index < positions.length; index += 1) {
+      const previousPosition = positions[index - 1]
+      const currentPosition = positions[index]
+
+      if (previousPosition === undefined || currentPosition === undefined) {
+        throw new RepositoryProjectionInvariantError(
+          `Rebase change #${change.pullRequestNumber} is not contiguous in first-parent history`,
+        )
+      }
+
+      if (currentPosition !== previousPosition + 1) {
+        throw new RepositoryProjectionInvariantError(
+          `Rebase change #${change.pullRequestNumber} is not contiguous in first-parent history`,
+        )
+      }
+    }
+  }
+
+  if (change.mergeMethod === 'merge') {
+    if (
+      change.mergeCommitSha !== change.sourceIntegrationSha ||
+      integration.parentShas[0] !== change.integrationFirstParentSha ||
+      integration.parentShas[1] !== change.integrationSecondParentSha ||
+      change.integrationSecondParentSha === null
+    ) {
+      throw new RepositoryProjectionInvariantError(
+        `Merge change #${change.pullRequestNumber} has inconsistent parent topology`,
+      )
+    }
+  } else if (change.integrationSecondParentSha !== null) {
+    throw new RepositoryProjectionInvariantError(
+      `Linear change #${change.pullRequestNumber} cannot have a second integration parent`,
     )
   }
 }
@@ -1259,6 +1513,7 @@ function mapProject(row: ProjectRow): ProjectRecord {
     status: row.status,
     sourceSha: row.source_sha,
     productionSha: row.production_sha,
+    mergeBaseSha: row.merge_base_sha,
     lastSuccessfulSyncAt: row.last_successful_sync_at,
     configurationVersion: row.configuration_version,
     deletionRequestedAt: row.deletion_requested_at,
@@ -1275,18 +1530,10 @@ function serializeNullableGitHubNumericId(
   return value === null ? null : serializeGitHubNumericId(value, name)
 }
 
-function assertKnownMergeMethod(value: ChangeMergeMethod): Exclude<ChangeMergeMethod, 'unknown'> {
-  if (value === 'unknown') {
-    throw new Error('A known change cannot have an unknown merge method')
-  }
-
-  return value
-}
-
 function assertAheadProductionPresence(
   value: ChangeProductionPresence,
-): Extract<ChangeProductionPresence, 'missing' | 'not_applicable'> {
-  if (value !== 'missing' && value !== 'not_applicable') {
+): Extract<ChangeProductionPresence, 'unreleased' | 'partially_present'> {
+  if (value !== 'unreleased' && value !== 'partially_present') {
     throw new Error(`Change is not ahead of production: ${value}`)
   }
 

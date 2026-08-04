@@ -120,19 +120,64 @@ describe.sequential('Repository initial synchronization', () => {
 
     const project = await database.kysely
       .selectFrom('projects')
-      .select(['status', 'source_sha', 'production_sha', 'last_successful_sync_at'])
+      .select([
+        'status',
+        'source_sha',
+        'production_sha',
+        'merge_base_sha',
+        'last_successful_sync_at',
+      ])
       .where('id', '=', created.project.id)
       .executeTakeFirstOrThrow()
     expect(project).toMatchObject({
       status: 'active',
       source_sha: sourceSha,
       production_sha: productionSha,
+      merge_base_sha: productionSha,
       last_successful_sync_at: expect.any(Date),
     })
     expect(await count(database, 'repository_commits', created.project.id)).toBe(1)
     expect(await count(database, 'changes', created.project.id)).toBe(1)
     expect(await count(database, 'required_checks', created.project.id)).toBe(1)
     expect(await count(database, 'commit_check_results', created.project.id)).toBe(1)
+
+    const persistedCommit = await database.kysely
+      .selectFrom('repository_commits')
+      .select([
+        'sha',
+        'first_parent_position',
+        'integration_point_sha',
+        'production_patch_equivalent',
+        'attribution_state',
+      ])
+      .where('project_id', '=', created.project.id)
+      .executeTakeFirstOrThrow()
+    expect(persistedCommit).toEqual({
+      sha: sourceSha,
+      first_parent_position: 0,
+      integration_point_sha: sourceSha,
+      production_patch_equivalent: false,
+      attribution_state: 'managed',
+    })
+
+    const persistedChange = await database.kysely
+      .selectFrom('changes')
+      .select([
+        'merge_method',
+        'source_integration_sha',
+        'integration_first_parent_sha',
+        'integration_second_parent_sha',
+        'production_presence',
+      ])
+      .where('project_id', '=', created.project.id)
+      .executeTakeFirstOrThrow()
+    expect(persistedChange).toEqual({
+      merge_method: 'squash',
+      source_integration_sha: sourceSha,
+      integration_first_parent_sha: productionSha,
+      integration_second_parent_sha: null,
+      production_presence: 'unreleased',
+    })
 
     await expect(
       handler({
@@ -406,7 +451,44 @@ function createGitHubAuth(input: {
 
       throw new Error(`Unexpected GitHub route: ${route}`)
     },
-    async graphql<Data = unknown>() {
+    async graphql<Data = unknown>(
+      query: string,
+      parameters?: Readonly<Record<string, unknown>>,
+    ): Promise<Data> {
+      if (query.includes('ShipgateAssociatedPullRequests')) {
+        return {
+          repository: {
+            object: {
+              associatedPullRequests: {
+                nodes: [
+                  {
+                    number: 42,
+                    merged: true,
+                    mergedAt: '2026-08-04T10:00:00.000Z',
+                    baseRefName: 'develop',
+                  },
+                ],
+                pageInfo: { hasNextPage: false, endCursor: null },
+              },
+            },
+          },
+        } as Data
+      }
+
+      if (query.includes('ShipgatePullRequestCommits')) {
+        expect(parameters?.number).toBe(42)
+        return {
+          repository: {
+            pullRequest: {
+              commits: {
+                nodes: [{ commit: { oid: '4'.repeat(40) } }, { commit: { oid: '5'.repeat(40) } }],
+                pageInfo: { hasNextPage: false, endCursor: null },
+              },
+            },
+          },
+        } as Data
+      }
+
       return {} as Data
     },
   }
@@ -479,6 +561,18 @@ function createGitWorkspace(expectedSourceSha: string): ReadOnlyGitWorkspace {
       return {
         sourceSha: input.sourceSha,
         productionSha: input.productionSha,
+        mergeBaseSha: input.productionSha,
+        firstParentShas: [input.sourceSha],
+        integrationWindows: [
+          {
+            integrationSha: input.sourceSha,
+            firstParentSha: input.productionSha,
+            secondParentSha: null,
+            firstParentPosition: 0,
+            commitShas: [input.sourceSha],
+            introducedCommitShas: [],
+          },
+        ],
         commits: [
           {
             sha: input.sourceSha,
@@ -492,6 +586,9 @@ function createGitWorkspace(expectedSourceSha: string): ReadOnlyGitWorkspace {
             committedAt: new Date('2026-08-04T10:00:00.000Z'),
             parentShas: [productionSha],
             sourceDeltaPosition: 0,
+            firstParentPosition: 0,
+            integrationPointSha: input.sourceSha,
+            productionPatchEquivalent: false,
           },
         ],
       }

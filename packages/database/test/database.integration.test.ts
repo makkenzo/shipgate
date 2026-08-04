@@ -26,6 +26,7 @@ const expectedMigrationNames = [
   '20260803_000010_create_project_repository_projection',
   '20260804_000011_create_project_configuration',
   '20260804_000012_create_repository_initial_sync',
+  '20260804_000013_create_commit_topology_and_pr_attribution',
 ] as const
 
 describe.sequential('PostgreSQL infrastructure', () => {

@@ -289,6 +289,7 @@ export interface ProjectTable {
   source_sha: string | null
   production_sha: string | null
   last_successful_sync_at: Date | null
+  merge_base_sha: Generated<string | null>
   configuration_version: Generated<number>
   deletion_requested_at: Date | null
   deleted_at: Date | null
@@ -324,16 +325,22 @@ export interface RepositoryCommitTable {
   committed_at: Date
   parent_shas: ColumnType<JsonValue, string, string>
   source_delta_position: number | null
+  first_parent_position: Generated<number | null>
+  integration_point_sha: Generated<string | null>
+  production_patch_equivalent: Generated<boolean>
+  attribution_state: Generated<CommitAttributionState>
   observed_at: Date
   created_at: Generated<Date>
   updated_at: Generated<Date>
 }
 
+export type CommitAttributionState = 'managed' | 'unmanaged' | 'ambiguous'
+
 export type ChangeMergeMethod = 'merge' | 'squash' | 'rebase' | 'unknown'
 
 export type ChangeSynchronizationState = 'known' | 'unknown'
 
-export type ChangeProductionPresence = 'present' | 'missing' | 'unknown' | 'not_applicable'
+export type ChangeProductionPresence = 'unreleased' | 'partially_present' | 'released' | 'unknown'
 
 export interface ChangeTable {
   id: string
@@ -350,6 +357,8 @@ export interface ChangeTable {
   final_head_sha: string
   merge_commit_sha: string | null
   source_integration_sha: string | null
+  integration_first_parent_sha: Generated<string | null>
+  integration_second_parent_sha: Generated<string | null>
   merge_method: ChangeMergeMethod
   commit_set_fingerprint: string | null
   synchronization_state: ChangeSynchronizationState

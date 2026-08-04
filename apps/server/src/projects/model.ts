@@ -2,6 +2,7 @@ import type {
   ChangeMergeMethod,
   ChangeProductionPresence,
   ChangeSynchronizationState,
+  CommitAttributionState,
   CommitCheckConclusion,
   CommitCheckStatus,
   JsonValue,
@@ -29,6 +30,7 @@ export interface ProjectRecord {
   readonly sourceSha: string | null
   readonly productionSha: string | null
   readonly lastSuccessfulSyncAt: Date | null
+  readonly mergeBaseSha: string | null
   readonly configurationVersion: number
   readonly deletionRequestedAt: Date | null
   readonly deletedAt: Date | null
@@ -80,6 +82,10 @@ export interface RepositoryCommitProjection {
   readonly committedAt: Date
   readonly parentShas: readonly string[]
   readonly sourceDeltaPosition: number | null
+  readonly firstParentPosition: number | null
+  readonly integrationPointSha: string | null
+  readonly productionPatchEquivalent: boolean
+  readonly attributionState: CommitAttributionState
 }
 
 export interface ChangeProjection {
@@ -95,6 +101,8 @@ export interface ChangeProjection {
   readonly finalHeadSha: string
   readonly mergeCommitSha: string | null
   readonly sourceIntegrationSha: string | null
+  readonly integrationFirstParentSha: string | null
+  readonly integrationSecondParentSha: string | null
   readonly mergeMethod: ChangeMergeMethod
   readonly commitSetFingerprint: string | null
   readonly synchronizationState: ChangeSynchronizationState
@@ -147,6 +155,7 @@ export interface RepositoryProjectionSnapshot {
   readonly defaultBranch: string | null
   readonly sourceSha: string
   readonly productionSha: string
+  readonly mergeBaseSha: string
   readonly observedAt: Date
   readonly branches: readonly RepositoryBranchProjection[]
   readonly commits: readonly RepositoryCommitProjection[]
@@ -215,9 +224,9 @@ export interface ChangeAheadOfProduction {
   readonly authorId: string | null
   readonly authorLogin: string | null
   readonly mergedAt: Date
-  readonly mergeMethod: Exclude<ChangeMergeMethod, 'unknown'>
+  readonly mergeMethod: ChangeMergeMethod
   readonly commitSetFingerprint: string
-  readonly productionPresence: Extract<ChangeProductionPresence, 'missing' | 'not_applicable'>
+  readonly productionPresence: Extract<ChangeProductionPresence, 'unreleased' | 'partially_present'>
   readonly commitShas: readonly string[]
 }
 

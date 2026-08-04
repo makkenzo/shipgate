@@ -4,14 +4,13 @@ import type { InstallationGitHubClient, InstallationPermissions } from '@shipgat
 import { ProjectConfigurationValidationError } from './errors.js'
 import type { GitRepositorySnapshot } from './git-workspace.js'
 import type {
-  ChangeProjection,
   CommitCheckResultProjection,
   RepositoryBranchProjection,
   RepositoryCommitProjection,
   RepositoryProjectionSnapshot,
-  RepositorySyncIssueProjection,
   RequiredCheckProjection,
 } from './model.js'
+import { attributePullRequestChanges } from './pr-attribution.js'
 
 const pageSize = 100
 const maximumPages = 100
@@ -140,11 +139,19 @@ export async function buildRepositoryProjectionSnapshot(input: {
     committedAt: commit.committedAt,
     parentShas: commit.parentShas,
     sourceDeltaPosition: commit.sourceDeltaPosition,
+    firstParentPosition: commit.firstParentPosition,
+    integrationPointSha: commit.integrationPointSha,
+    productionPatchEquivalent: commit.productionPatchEquivalent,
+    attributionState: 'unmanaged',
   }))
-  const attribution = await loadMergedPullRequestChanges({
+  const attribution = await attributePullRequestChanges({
     client: input.client,
-    metadata: input.metadata,
+    repository: {
+      ownerLogin: input.metadata.ownerLogin,
+      name: input.metadata.name,
+    },
     sourceBranch: input.target.sourceBranch,
+    git: input.git,
     commits,
   })
   const requiredChecks = await loadRequiredChecks({
@@ -169,9 +176,10 @@ export async function buildRepositoryProjectionSnapshot(input: {
     defaultBranch: input.metadata.defaultBranch,
     sourceSha: input.heads.sourceSha,
     productionSha: input.heads.productionSha,
+    mergeBaseSha: input.git.mergeBaseSha,
     observedAt: input.observedAt,
     branches: createBranchProjection(input),
-    commits,
+    commits: attribution.commits,
     changes: attribution.changes,
     requiredChecks,
     checkResults,
@@ -280,164 +288,6 @@ async function loadBranch(
   }
 
   return { sha, protected: branchValue.protected === true }
-}
-
-async function loadMergedPullRequestChanges(input: {
-  readonly client: InstallationGitHubClient
-  readonly metadata: RepositoryMetadata
-  readonly sourceBranch: string
-  readonly commits: readonly RepositoryCommitProjection[]
-}): Promise<{
-  readonly changes: readonly ChangeProjection[]
-  readonly issues: readonly RepositorySyncIssueProjection[]
-}> {
-  const groups = new Map<number, { pull: Record<string, unknown>; commitShas: string[] }>()
-  const issues: RepositorySyncIssueProjection[] = []
-
-  for (const commit of input.commits) {
-    if (commit.sourceDeltaPosition === null) {
-      continue
-    }
-
-    const candidates = (await listCommitPullRequests(input, commit.sha)).filter((pull) => {
-      const base = isRecord(pull.base) ? pull.base : undefined
-      return typeof pull.merged_at === 'string' && base?.ref === input.sourceBranch
-    })
-
-    if (candidates.length === 0) {
-      continue
-    }
-
-    if (candidates.length > 1) {
-      issues.push({
-        severity: 'warning',
-        code: 'ambiguous_pull_request_attribution',
-        scope: 'commit',
-        subjectId: commit.sha,
-        message: `Commit ${commit.sha} is associated with multiple merged pull requests`,
-        details: { pullRequestNumbers: candidates.map((pull) => pull.number as number) },
-      })
-      continue
-    }
-
-    const pull = candidates[0]
-    if (!pull) {
-      continue
-    }
-    const number = requirePositiveInteger(pull.number, 'pull request number')
-    const group = groups.get(number) ?? { pull, commitShas: [] }
-    group.commitShas.push(commit.sha)
-    groups.set(number, group)
-  }
-
-  for (const [number, group] of groups) {
-    const response = await input.client.request('GET /repos/{owner}/{repo}/pulls/{pull_number}', {
-      owner: input.metadata.ownerLogin,
-      repo: input.metadata.name,
-      pull_number: number,
-    })
-    group.pull = requireRecord(response.data, `pull request #${number}`)
-  }
-
-  const commitsBySha = new Map(input.commits.map((commit) => [commit.sha, commit] as const))
-  const changes = [...groups.values()]
-    .map(({ pull, commitShas }): ChangeProjection => {
-      const author = isRecord(pull.user) ? pull.user : undefined
-      const head = requireRecord(pull.head, 'pull request head')
-      const base = requireRecord(pull.base, 'pull request base')
-      const integrationSha = chooseIntegrationSha(pull, commitShas)
-      const mergeMethod = inferMergeMethod(pull, commitShas, commitsBySha.get(integrationSha))
-
-      return {
-        githubPullRequestId: requirePositiveInteger(pull.id, 'pull request ID'),
-        pullRequestNumber: requirePositiveInteger(pull.number, 'pull request number'),
-        title: requireString(pull.title, 'pull request title'),
-        url: nullableString(pull.html_url),
-        authorId: author ? nullablePositiveInteger(author.id) : null,
-        authorLogin: author ? nullableString(author.login) : null,
-        baseBranch: requireString(base.ref, 'pull request base branch'),
-        mergedAt: requireDate(pull.merged_at, 'pull request merged time'),
-        finalHeadSha: requireSha(head.sha, 'pull request final head SHA'),
-        mergeCommitSha: nullableSha(pull.merge_commit_sha),
-        sourceIntegrationSha: integrationSha,
-        mergeMethod,
-        commitSetFingerprint: createHash('sha256').update(commitShas.join('\0')).digest('hex'),
-        synchronizationState: 'known',
-        productionPresence: 'missing',
-        commitShas,
-      }
-    })
-    .sort((left, right) => left.mergedAt.getTime() - right.mergedAt.getTime())
-
-  return { changes, issues }
-}
-
-async function listCommitPullRequests(
-  input: {
-    readonly client: InstallationGitHubClient
-    readonly metadata: RepositoryMetadata
-  },
-  commitSha: string,
-): Promise<readonly Record<string, unknown>[]> {
-  const pulls: Record<string, unknown>[] = []
-
-  for (let page = 1; page <= maximumPages; page += 1) {
-    const response = await input.client.request(
-      'GET /repos/{owner}/{repo}/commits/{commit_sha}/pulls',
-      {
-        owner: input.metadata.ownerLogin,
-        repo: input.metadata.name,
-        commit_sha: commitSha,
-        per_page: pageSize,
-        page,
-      },
-    )
-    const pageItems = requireArray(response.data, `pull requests for ${commitSha}`)
-    pulls.push(...pageItems.map((value) => requireRecord(value, 'pull request')))
-
-    if (pageItems.length < pageSize) {
-      return pulls
-    }
-  }
-
-  throw incompletePaginationError(`pull requests for commit ${commitSha}`)
-}
-
-function chooseIntegrationSha(
-  pull: Readonly<Record<string, unknown>>,
-  commitShas: readonly string[],
-): string {
-  const mergeCommitSha = nullableSha(pull.merge_commit_sha)
-
-  if (mergeCommitSha && commitShas.includes(mergeCommitSha)) {
-    return mergeCommitSha
-  }
-
-  const integrationSha = commitShas.at(-1)
-
-  if (!integrationSha) {
-    throw new Error('Attributed pull request has no source commits')
-  }
-
-  return integrationSha
-}
-
-function inferMergeMethod(
-  pull: Readonly<Record<string, unknown>>,
-  attributedCommitShas: readonly string[],
-  integrationCommit: RepositoryCommitProjection | undefined,
-): 'merge' | 'squash' | 'rebase' {
-  if (integrationCommit && integrationCommit.parentShas.length > 1) {
-    return 'merge'
-  }
-
-  const pullCommitCount = nullablePositiveInteger(pull.commits)
-
-  if (attributedCommitShas.length === 1 && pullCommitCount !== null && pullCommitCount > 1) {
-    return 'squash'
-  }
-
-  return 'rebase'
 }
 
 async function loadRequiredChecks(input: {
@@ -845,20 +695,6 @@ function requireSha(value: unknown, name: string): string {
   }
 
   return sha
-}
-
-function nullableSha(value: unknown): string | null {
-  return typeof value === 'string' && /^[0-9a-f]{40,64}$/i.test(value) ? value.toLowerCase() : null
-}
-
-function requireDate(value: unknown, name: string): Date {
-  const date = nullableDate(value)
-
-  if (!date) {
-    throw new Error(`${name} is invalid`)
-  }
-
-  return date
 }
 
 function nullableDate(value: unknown): Date | null {

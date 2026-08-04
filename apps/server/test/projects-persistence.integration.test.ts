@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto'
+
 import {
   createDatabase,
   type DatabaseClient,
@@ -27,7 +29,7 @@ const projectId = 'project-repository-projection'
 const productionSha = '1'.repeat(40)
 const changeCommitSha = '2'.repeat(40)
 const sourceSha = '3'.repeat(40)
-const changeFingerprint = '4'.repeat(64)
+const changeFingerprint = createHash('sha256').update(changeCommitSha).digest('hex')
 const projectionFingerprint = '5'.repeat(64)
 
 const observedAt = new Date('2026-08-03T20:00:00.000Z')
@@ -200,7 +202,7 @@ describe.sequential('Project repository projection persistence', () => {
         authorLogin: 'contributor',
         mergeMethod: 'squash',
         commitSetFingerprint: changeFingerprint,
-        productionPresence: 'missing',
+        productionPresence: 'unreleased',
         commitShas: [changeCommitSha],
       }),
     ])
@@ -287,7 +289,7 @@ describe.sequential('Project repository projection persistence', () => {
             merge_method: 'squash',
             commit_set_fingerprint: '7'.repeat(64),
             synchronization_state: 'known',
-            production_presence: 'missing',
+            production_presence: 'unreleased',
             observed_at: observedAt,
             updated_at: observedAt,
           })
@@ -367,6 +369,7 @@ function createSnapshot() {
     defaultBranch: 'main',
     sourceSha,
     productionSha,
+    mergeBaseSha: productionSha,
     observedAt,
     branches: [
       {
@@ -397,6 +400,10 @@ function createSnapshot() {
         committedAt: new Date('2026-08-03T19:00:00.000Z'),
         parentShas: [],
         sourceDeltaPosition: null,
+        firstParentPosition: null,
+        integrationPointSha: null,
+        productionPatchEquivalent: false,
+        attributionState: 'unmanaged' as const,
       },
       {
         sha: changeCommitSha,
@@ -412,6 +419,10 @@ function createSnapshot() {
         committedAt: new Date('2026-08-03T19:20:00.000Z'),
         parentShas: [productionSha],
         sourceDeltaPosition: 0,
+        firstParentPosition: 0,
+        integrationPointSha: changeCommitSha,
+        productionPatchEquivalent: false,
+        attributionState: 'managed' as const,
       },
       {
         sha: sourceSha,
@@ -427,6 +438,10 @@ function createSnapshot() {
         committedAt: new Date('2026-08-03T19:30:00.000Z'),
         parentShas: [changeCommitSha],
         sourceDeltaPosition: 1,
+        firstParentPosition: 1,
+        integrationPointSha: sourceSha,
+        productionPatchEquivalent: false,
+        attributionState: 'unmanaged' as const,
       },
     ],
     changes: [
@@ -443,10 +458,12 @@ function createSnapshot() {
         finalHeadSha: changeCommitSha,
         mergeCommitSha: changeCommitSha,
         sourceIntegrationSha: changeCommitSha,
+        integrationFirstParentSha: productionSha,
+        integrationSecondParentSha: null,
         mergeMethod: 'squash' as const,
         commitSetFingerprint: changeFingerprint,
         synchronizationState: 'known' as const,
-        productionPresence: 'missing' as const,
+        productionPresence: 'unreleased' as const,
         commitShas: [changeCommitSha],
       },
     ],
@@ -482,7 +499,7 @@ function createSnapshot() {
       {
         id: 'sync-issue-unmanaged',
         severity: 'warning' as const,
-        code: 'unmanaged_change',
+        code: 'unmanaged_commit',
         scope: 'commit' as const,
         subjectId: sourceSha,
         message: 'Source delta contains an unmanaged commit',

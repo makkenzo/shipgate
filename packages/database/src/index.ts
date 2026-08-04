@@ -34,6 +34,7 @@ export type {
   ChangeProductionPresence,
   ChangeSynchronizationState,
   ChangeTable,
+  CommitAttributionState,
   CommitCheckConclusion,
   CommitCheckResultTable,
   CommitCheckStatus,

@@ -18,6 +18,9 @@ export {
 export {
   createReadOnlyGitWorkspace,
   type GitAncestryWorkspace,
+  type GitIntegrationWindow,
+  type GitRepositoryCommit,
+  type GitRepositorySnapshot,
   type GitWorkspaceAncestryInput,
   type ReadOnlyGitWorkspace,
 } from './git-workspace.js'
