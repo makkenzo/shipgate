@@ -471,7 +471,7 @@ export type GetProjectsResponses = {
             };
             sourceBranch: string;
             productionBranch: string;
-            status: 'active' | 'disconnected' | 'pending_deletion' | 'deleted';
+            status: 'initializing' | 'active' | 'degraded' | 'disconnected' | 'pending_deletion' | 'deleted';
             sourceSha: string | null;
             productionSha: string | null;
             lastSuccessfulSynchronization: string | null;
@@ -538,7 +538,7 @@ export type CreateProjectResponses = {
             };
             sourceBranch: string;
             productionBranch: string;
-            status: 'active' | 'disconnected' | 'pending_deletion' | 'deleted';
+            status: 'initializing' | 'active' | 'degraded' | 'disconnected' | 'pending_deletion' | 'deleted';
             sourceSha: string | null;
             productionSha: string | null;
             lastSuccessfulSynchronization: string | null;
@@ -614,7 +614,7 @@ export type DeleteProjectResponses = {
             };
             sourceBranch: string;
             productionBranch: string;
-            status: 'active' | 'disconnected' | 'pending_deletion' | 'deleted';
+            status: 'initializing' | 'active' | 'degraded' | 'disconnected' | 'pending_deletion' | 'deleted';
             sourceSha: string | null;
             productionSha: string | null;
             lastSuccessfulSynchronization: string | null;
@@ -672,7 +672,7 @@ export type GetProjectResponses = {
         };
         sourceBranch: string;
         productionBranch: string;
-        status: 'active' | 'disconnected' | 'pending_deletion' | 'deleted';
+        status: 'initializing' | 'active' | 'degraded' | 'disconnected' | 'pending_deletion' | 'deleted';
         sourceSha: string | null;
         productionSha: string | null;
         lastSuccessfulSynchronization: string | null;
@@ -739,7 +739,7 @@ export type UpdateProjectResponses = {
             };
             sourceBranch: string;
             productionBranch: string;
-            status: 'active' | 'disconnected' | 'pending_deletion' | 'deleted';
+            status: 'initializing' | 'active' | 'degraded' | 'disconnected' | 'pending_deletion' | 'deleted';
             sourceSha: string | null;
             productionSha: string | null;
             lastSuccessfulSynchronization: string | null;
@@ -780,7 +780,7 @@ export type UpdateProjectResponses = {
             };
             sourceBranch: string;
             productionBranch: string;
-            status: 'active' | 'disconnected' | 'pending_deletion' | 'deleted';
+            status: 'initializing' | 'active' | 'degraded' | 'disconnected' | 'pending_deletion' | 'deleted';
             sourceSha: string | null;
             productionSha: string | null;
             lastSuccessfulSynchronization: string | null;

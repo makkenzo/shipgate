@@ -7,6 +7,7 @@ import {
 } from '@shipgate/config'
 import { createDatabase, type DatabaseClient } from '@shipgate/database'
 import type { GitHubAuthenticationService } from '@shipgate/github'
+import type { RepositoryInitialSyncHandler } from '@shipgate/jobs'
 import type { Logger } from 'pino'
 import { createCorrelationId, withCorrelationId } from './correlation-id.js'
 import {
@@ -19,6 +20,7 @@ import {
   createProjectService,
   createProjectTopologyValidator,
   createReadOnlyGitWorkspace,
+  createRepositoryInitialSyncHandler,
   type ProjectService,
 } from './projects/index.js'
 import { createShutdownManager, type ShutdownManager } from './shutdown.js'
@@ -33,6 +35,7 @@ export interface ApplicationContext {
   readonly githubAuth: GitHubAuthenticationService
   readonly githubRepositoryAccess: GitHubRepositoryAccessService
   readonly projects: ProjectService
+  readonly repositoryInitialSync: RepositoryInitialSyncHandler
   readonly shutdown: ShutdownManager
 
   createCorrelationId(): string
@@ -141,13 +144,19 @@ export function createApplicationContext(
     githubAuth,
   })
   githubRepositoryAccess = repositoryAccess
+  const gitWorkspace = createReadOnlyGitWorkspace()
   const projects = createProjectService({
     database,
     githubRepositoryAccess: repositoryAccess,
     topologyValidator: createProjectTopologyValidator({
       githubAuth,
-      gitWorkspace: createReadOnlyGitWorkspace(),
+      gitWorkspace,
     }),
+  })
+  const repositoryInitialSync = createRepositoryInitialSyncHandler({
+    database,
+    githubAuth,
+    gitWorkspace,
   })
 
   return {
@@ -160,6 +169,7 @@ export function createApplicationContext(
     githubAuth,
     githubRepositoryAccess: repositoryAccess,
     projects,
+    repositoryInitialSync,
     shutdown,
     createCorrelationId,
 

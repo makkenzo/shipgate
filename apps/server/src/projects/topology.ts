@@ -5,7 +5,7 @@ import type {
 } from '@shipgate/github'
 
 import { ProjectConfigurationValidationError } from './errors.js'
-import type { ReadOnlyGitWorkspace } from './git-workspace.js'
+import type { GitAncestryWorkspace } from './git-workspace.js'
 
 const topologyPermissions = {
   metadata: 'read',
@@ -39,7 +39,7 @@ export interface ProjectTopologyValidator {
 
 export function createProjectTopologyValidator(options: {
   readonly githubAuth: GitHubAuthenticationService
-  readonly gitWorkspace: ReadOnlyGitWorkspace
+  readonly gitWorkspace: GitAncestryWorkspace
 }): ProjectTopologyValidator {
   return {
     async validate(input) {

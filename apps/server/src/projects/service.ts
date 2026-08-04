@@ -34,6 +34,7 @@ export interface ProjectService {
     readonly repositoryId: number
     readonly sourceBranch: string
     readonly productionBranch: string
+    readonly correlationId: string
   }): Promise<ConfigureProjectResult>
 
   list(actorGitHubUserId: number): Promise<readonly ProjectRecord[]>
@@ -46,6 +47,7 @@ export interface ProjectService {
     readonly expectedConfigurationVersion: number
     readonly sourceBranch?: string
     readonly productionBranch?: string
+    readonly correlationId: string
   }): Promise<ConfigureProjectResult>
 
   delete(input: {
@@ -87,6 +89,7 @@ export function createProjectService(options: {
           scope,
           topology,
           actorGitHubUserId: input.actorGitHubUserId,
+          correlationId: input.correlationId,
         }),
       )
     },
@@ -136,7 +139,7 @@ export function createProjectService(options: {
         permission: 'maintain',
       })
 
-      if (project.status !== 'active') {
+      if (!['initializing', 'active', 'degraded'].includes(project.status)) {
         throw new ProjectConfigurationValidationError(
           'project_not_active',
           `Project ${project.id} is ${project.status} and cannot be reconfigured`,
@@ -166,6 +169,7 @@ export function createProjectService(options: {
           expectedConfigurationVersion: input.expectedConfigurationVersion,
           topology,
           actorGitHubUserId: input.actorGitHubUserId,
+          correlationId: input.correlationId,
         }),
       )
     },

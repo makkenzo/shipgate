@@ -32,6 +32,20 @@ export interface JobAttempt {
   readonly maxAttempts: number
 }
 
+export interface RepositoryInitialSyncExecution {
+  readonly requestId: string
+  readonly attempt: number
+  readonly maxAttempts: number
+  readonly correlationId: string
+  readonly causationId: string | undefined
+  readonly signal: AbortSignal
+  readonly logger: StructuredLogger
+}
+
+export type RepositoryInitialSyncHandler = (
+  execution: RepositoryInitialSyncExecution,
+) => Promise<JsonValue | undefined>
+
 export interface JobTaskContext {
   readonly database: DatabaseClient
   readonly logger: StructuredLogger
@@ -39,11 +53,13 @@ export interface JobTaskContext {
   readonly correlationId: string
   readonly causationId: string | undefined
   readonly signal: AbortSignal
+  readonly repositoryInitialSync: RepositoryInitialSyncHandler | undefined
 }
 
 export interface JobTaskDependencies {
   readonly database: DatabaseClient
   readonly logger: StructuredLogger
+  readonly repositoryInitialSync?: RepositoryInitialSyncHandler
 }
 
 export interface JobRetryPolicy {

@@ -5,7 +5,7 @@ import type {
 } from '@shipgate/github'
 import { describe, expect, it, vi } from 'vitest'
 
-import type { ReadOnlyGitWorkspace } from './git-workspace.js'
+import type { GitAncestryWorkspace } from './git-workspace.js'
 import { createProjectTopologyValidator } from './topology.js'
 
 const sourceSha = '2'.repeat(40)
@@ -16,7 +16,7 @@ describe('project topology validator', () => {
     const assertProductionAncestor = vi.fn(async () => undefined)
     const validator = createProjectTopologyValidator({
       githubAuth: createGitHubAuth('ahead'),
-      gitWorkspace: { assertProductionAncestor } satisfies ReadOnlyGitWorkspace,
+      gitWorkspace: { assertProductionAncestor } satisfies GitAncestryWorkspace,
     })
 
     await expect(
@@ -46,7 +46,7 @@ describe('project topology validator', () => {
     const assertProductionAncestor = vi.fn(async () => undefined)
     const validator = createProjectTopologyValidator({
       githubAuth: createGitHubAuth('diverged'),
-      gitWorkspace: { assertProductionAncestor } satisfies ReadOnlyGitWorkspace,
+      gitWorkspace: { assertProductionAncestor } satisfies GitAncestryWorkspace,
     })
 
     await expect(

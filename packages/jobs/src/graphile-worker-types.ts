@@ -1,4 +1,8 @@
-import type { DiagnosticJobPayload, GitHubWebhookProcessPayload } from './registry.js'
+import type {
+  DiagnosticJobPayload,
+  GitHubWebhookProcessPayload,
+  RepositoryInitialSyncJobPayload,
+} from './registry.js'
 import type { JobEnvelope } from './types.js'
 
 declare global {
@@ -6,6 +10,7 @@ declare global {
     interface Tasks {
       diagnostic_echo: JobEnvelope<DiagnosticJobPayload>
       github_webhook_process: JobEnvelope<GitHubWebhookProcessPayload>
+      'repository.initial-sync': JobEnvelope<RepositoryInitialSyncJobPayload>
     }
   }
 }

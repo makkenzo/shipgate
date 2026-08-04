@@ -266,7 +266,13 @@ export interface GitHubIntegrationEventTable {
   created_at: Generated<Date>
 }
 
-export type ProjectStatus = 'active' | 'disconnected' | 'pending_deletion' | 'deleted'
+export type ProjectStatus =
+  | 'initializing'
+  | 'active'
+  | 'degraded'
+  | 'disconnected'
+  | 'pending_deletion'
+  | 'deleted'
 
 export interface ProjectTable {
   id: string
@@ -414,7 +420,7 @@ export interface CommitCheckResultTable {
   created_at: Generated<Date>
 }
 
-export type RepositorySyncRunStatus = 'running' | 'succeeded' | 'failed'
+export type RepositorySyncRunStatus = 'queued' | 'running' | 'succeeded' | 'superseded' | 'failed'
 
 export interface RepositorySyncRunTable {
   id: string
@@ -474,10 +480,17 @@ export interface ProjectAuditEventTable {
 
 export type RepositoryReconciliationMode = 'full'
 
-export type RepositoryReconciliationRequestStatus = 'queued' | 'claimed' | 'completed' | 'cancelled'
+export type RepositoryReconciliationRequestStatus =
+  | 'queued'
+  | 'running'
+  | 'succeeded'
+  | 'superseded'
+  | 'failed'
+  | 'cancelled'
 
 export interface RepositoryReconciliationRequestTable {
   id: string
+  sync_run_id: string
   project_id: string
   repository_id: string
   configuration_version: number
@@ -488,6 +501,10 @@ export interface RepositoryReconciliationRequestTable {
   source_sha: string
   production_sha: string
   idempotency_key: string
+  superseded_by_request_id: string | null
+  attempt_count: Generated<number>
+  last_error_code: string | null
+  last_error_message: string | null
   requested_at: Date
   claimed_at: Date | null
   completed_at: Date | null

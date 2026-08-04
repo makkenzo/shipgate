@@ -57,7 +57,9 @@ export const ProjectSchema = Type.Object(
     sourceBranch: Type.String(),
     productionBranch: Type.String(),
     status: Type.Union([
+      Type.Literal('initializing'),
       Type.Literal('active'),
+      Type.Literal('degraded'),
       Type.Literal('disconnected'),
       Type.Literal('pending_deletion'),
       Type.Literal('deleted'),

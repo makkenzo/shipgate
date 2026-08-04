@@ -49,6 +49,7 @@ export const projectRoutes: FastifyPluginAsyncTypebox<{
       try {
         const result = await context.projects.create({
           actorGitHubUserId: session.githubUserId,
+          correlationId: request.id,
           ...request.body,
         })
 
@@ -137,6 +138,7 @@ export const projectRoutes: FastifyPluginAsyncTypebox<{
           actorGitHubUserId: session.githubUserId,
           projectId: request.params.projectId,
           expectedConfigurationVersion: request.body.expectedConfigurationVersion,
+          correlationId: request.id,
           ...(request.body.sourceBranch !== undefined
             ? { sourceBranch: request.body.sourceBranch }
             : {}),

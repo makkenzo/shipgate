@@ -39,6 +39,11 @@ export type GitHubWebhookProcessPayload = z.output<typeof githubWebhookProcessPa
 
 export const githubWebhookRetentionCleanupPayloadSchema = z.object({}).strict()
 
+export const repositoryInitialSyncPayloadSchema = z
+  .object({ requestId: z.string().uuid() })
+  .strict()
+export type RepositoryInitialSyncJobPayload = z.output<typeof repositoryInitialSyncPayloadSchema>
+
 function defineTask<Schema extends z.ZodTypeAny>(
   definition: JobTaskDefinition<Schema>,
 ): JobTaskDefinition<Schema> {
@@ -46,6 +51,30 @@ function defineTask<Schema extends z.ZodTypeAny>(
 }
 
 export const taskDefinitions = {
+  'repository.initial-sync': defineTask({
+    dataSchema: repositoryInitialSyncPayloadSchema,
+    retry: { maxAttempts: 10 },
+    async execute(payload, context) {
+      if (!context.repositoryInitialSync) {
+        throw new PermanentJobError(
+          'Repository initial synchronization handler is not configured',
+          {
+            code: 'REPOSITORY_INITIAL_SYNC_HANDLER_MISSING',
+          },
+        )
+      }
+
+      return context.repositoryInitialSync({
+        requestId: payload.requestId,
+        attempt: context.job.attempt,
+        maxAttempts: context.job.maxAttempts,
+        correlationId: context.correlationId,
+        causationId: context.causationId,
+        signal: context.signal,
+        logger: context.logger,
+      })
+    },
+  }),
   github_webhook_retention_cleanup: defineTask({
     dataSchema: githubWebhookRetentionCleanupPayloadSchema,
     retry: { maxAttempts: 5 },

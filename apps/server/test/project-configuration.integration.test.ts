@@ -1,5 +1,6 @@
 import { createDatabase, type DatabaseClient, migrateToLatest } from '@shipgate/database'
 import { GITHUB_APP_REPOSITORY_PERMISSIONS } from '@shipgate/github'
+import { migrateJobQueue } from '@shipgate/jobs'
 import { type PostgresTestDatabase, startPostgresTestDatabase } from '@shipgate/testing'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
@@ -38,6 +39,7 @@ describe.sequential('Project configuration persistence', () => {
       allowExitOnIdle: true,
       onPoolError: () => undefined,
     })
+    await migrateJobQueue(database)
     await migrateToLatest(database.kysely)
     await seedRepositoryAccess(database)
   }, 60_000)
@@ -59,6 +61,7 @@ describe.sequential('Project configuration persistence', () => {
       repositoryId,
       sourceBranch: 'develop',
       productionBranch: 'main',
+      correlationId: 'test:create',
     })
 
     expect(created).toMatchObject({
@@ -84,6 +87,7 @@ describe.sequential('Project configuration persistence', () => {
         repositoryId,
         sourceBranch: 'release',
         productionBranch: 'main',
+        correlationId: 'test:duplicate-create',
       }),
     ).rejects.toBeInstanceOf(RepositoryAlreadyConnectedError)
 
@@ -92,6 +96,7 @@ describe.sequential('Project configuration persistence', () => {
       projectId: created.project.id,
       expectedConfigurationVersion: 1,
       sourceBranch: 'develop',
+      correlationId: 'test:same-update',
     })
     expect(same).toMatchObject({ status: 'already_applied', reconciliation: null })
     await seedProjection(database, created.project.id)
@@ -101,6 +106,7 @@ describe.sequential('Project configuration persistence', () => {
       projectId: created.project.id,
       expectedConfigurationVersion: 1,
       sourceBranch: 'release',
+      correlationId: 'test:update',
     })
     expect(updated).toMatchObject({
       status: 'updated',
@@ -144,7 +150,7 @@ describe.sequential('Project configuration persistence', () => {
       .selectFrom('repository_reconciliation_requests')
       .select('id')
       .where('project_id', '=', created.project.id)
-      .where('status', 'in', ['queued', 'claimed'])
+      .where('status', 'in', ['queued', 'running'])
       .execute()
     expect(activeRequests).toEqual([])
   })
@@ -163,6 +169,7 @@ describe.sequential('Project configuration persistence', () => {
         repositoryId: 457,
         sourceBranch: 'develop',
         productionBranch: 'main',
+        correlationId: 'test:permission',
       }),
     ).rejects.toMatchObject({ code: 'permission_missing' })
   })

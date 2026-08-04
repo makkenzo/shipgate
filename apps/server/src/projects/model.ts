@@ -36,6 +36,20 @@ export interface ProjectRecord {
   readonly updatedAt: Date
 }
 
+export interface ReconciliationRequestRecord {
+  readonly id: string
+  readonly syncRunId: string
+  readonly projectId: string
+  readonly repositoryId: string
+  readonly configurationVersion: number
+  readonly reason: string
+  readonly mode: 'full'
+  readonly status: 'queued' | 'running' | 'succeeded' | 'superseded' | 'failed' | 'cancelled'
+  readonly sourceSha: string
+  readonly productionSha: string
+  readonly requestedAt: Date
+}
+
 export interface CreateProjectInput {
   readonly projectId?: string
   readonly installationId: GitHubNumericId
@@ -144,6 +158,7 @@ export interface RepositoryProjectionSnapshot {
 
 export interface ApplyRepositoryProjectionInput {
   readonly projectId: string
+  readonly syncRunId?: string
   readonly repositoryId: GitHubNumericId
   readonly expectedConfigurationVersion: number
   readonly reason: string

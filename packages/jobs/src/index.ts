@@ -4,6 +4,7 @@ export {
   enqueueJob,
   enqueueJobInTransaction,
 } from './enqueue.js'
+export { PermanentJobError, RetryableJobError } from './errors.js'
 
 export * from './graphile-worker-types.js'
 export {
@@ -24,6 +25,11 @@ export {
   type JobExecutionRecord,
   waitForJobExecution,
 } from './store.js'
+export type {
+  RepositoryInitialSyncExecution,
+  RepositoryInitialSyncHandler,
+  StructuredLogger,
+} from './types.js'
 export {
   type JobWorkerRuntime,
   startJobWorker,

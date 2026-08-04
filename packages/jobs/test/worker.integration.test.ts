@@ -19,6 +19,8 @@ describe.sequential('Graphile Worker', () => {
 
   let worker: JobWorkerRuntime
 
+  const repositorySyncExecutions: string[] = []
+
   beforeAll(async () => {
     postgres = await startPostgresTestDatabase()
 
@@ -51,6 +53,11 @@ describe.sequential('Graphile Worker', () => {
         database,
 
         logger: createNoopJobLogger(),
+
+        async repositoryInitialSync(execution) {
+          repositorySyncExecutions.push(execution.requestId)
+          return { requestId: execution.requestId, status: 'succeeded' }
+        },
       },
 
       appVersion: 'test',
@@ -88,6 +95,29 @@ describe.sequential('Graphile Worker', () => {
       status: 'succeeded',
       attempts: 1,
     })
+  })
+
+  it('dispatches the durable repository.initial-sync task', async () => {
+    const requestId = randomUUID()
+    const queued = await enqueueJob(
+      database,
+      'repository.initial-sync',
+      { requestId },
+      {
+        correlationId: `worker-test-repository-initial-sync-${requestId}`,
+        jobKey: `repository.initial-sync:${requestId}`,
+      },
+    )
+    const execution = await waitForJobExecution(database, queued.jobId, {
+      timeoutMs: 20_000,
+    })
+
+    expect(execution).toMatchObject({
+      taskIdentifier: 'repository.initial-sync',
+      status: 'succeeded',
+      attempts: 1,
+    })
+    expect(repositorySyncExecutions).toContain(requestId)
   })
 
   it('retries a failed attempt', async () => {

@@ -2,7 +2,6 @@ export {
   type ConfigureProjectResult,
   createConfiguredProject,
   listStoredProjects,
-  type ReconciliationRequestRecord,
   requestProjectDeletion,
   updateConfiguredProject,
 } from './configuration-store.js'
@@ -18,9 +17,11 @@ export {
 } from './errors.js'
 export {
   createReadOnlyGitWorkspace,
+  type GitAncestryWorkspace,
   type GitWorkspaceAncestryInput,
   type ReadOnlyGitWorkspace,
 } from './git-workspace.js'
+export { createRepositoryInitialSyncHandler } from './initial-sync.js'
 export type {
   ApplyRepositoryProjectionInput,
   ApplyRepositoryProjectionResult,
@@ -30,6 +31,7 @@ export type {
   CreateProjectInput,
   GitHubNumericId,
   ProjectRecord,
+  ReconciliationRequestRecord,
   RecordRepositorySyncFailureInput,
   RecordRepositorySyncFailureResult,
   RepositoryBranchProjection,
@@ -40,20 +42,30 @@ export type {
   UnmanagedCommitRecord,
 } from './model.js'
 export {
+  assertRepositoryLock,
   assertRepositoryTransaction,
+  type RepositoryLock,
   type RepositoryTransaction,
   serializeGitHubNumericId,
+  withRepositoryLock,
   withRepositoryTransaction,
+  withRepositoryTransactionInLock,
 } from './repository-transaction.js'
 export { createProjectService, type ProjectService } from './service.js'
 export {
   applyRepositoryProjection,
+  applyRepositoryProjectionInTransaction,
   createProject,
   getProject,
   listChangesAheadOfProduction,
   listUnmanagedCommits,
   recordRepositorySyncFailure,
+  validateRepositoryProjectionSnapshot,
 } from './store.js'
+export {
+  queueRepositoryInitialSync,
+  recoverRepositoryInitialSyncJobs,
+} from './sync-queue.js'
 export {
   createProjectTopologyValidator,
   type ProjectTopologyValidator,

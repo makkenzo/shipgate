@@ -25,16 +25,28 @@ describe('read-only Git workspace', () => {
       allowFileProtocol: true,
     })
 
-    await expect(
-      workspace.assertProductionAncestor({
-        cloneUrl: pathToFileURL(fixture.origin).href,
-        installationToken: 'installation-token',
-        sourceBranch: 'source',
-        productionBranch: 'production',
-        sourceSha: fixture.sourceSha,
-        productionSha: fixture.productionSha,
-      }),
-    ).resolves.toBeUndefined()
+    const topology = {
+      cloneUrl: pathToFileURL(fixture.origin).href,
+      installationToken: 'installation-token',
+      sourceBranch: 'source',
+      productionBranch: 'production',
+      sourceSha: fixture.sourceSha,
+      productionSha: fixture.productionSha,
+    }
+
+    await expect(workspace.assertProductionAncestor(topology)).resolves.toBeUndefined()
+
+    await expect(workspace.loadRepositorySnapshot(topology)).resolves.toMatchObject({
+      sourceSha: fixture.sourceSha,
+      productionSha: fixture.productionSha,
+      commits: [
+        {
+          sha: fixture.sourceSha,
+          parentShas: [fixture.productionSha],
+          sourceDeltaPosition: 0,
+        },
+      ],
+    })
 
     await expect(
       workspace.assertProductionAncestor({

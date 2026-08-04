@@ -1434,7 +1434,15 @@
                           "anyOf": [
                             {
                               "type": "string",
+                              "enum": ["initializing"]
+                            },
+                            {
+                              "type": "string",
                               "enum": ["active"]
+                            },
+                            {
+                              "type": "string",
+                              "enum": ["degraded"]
                             },
                             {
                               "type": "string",
@@ -1688,7 +1696,15 @@
                             "anyOf": [
                               {
                                 "type": "string",
+                                "enum": ["initializing"]
+                              },
+                              {
+                                "type": "string",
                                 "enum": ["active"]
+                              },
+                              {
+                                "type": "string",
+                                "enum": ["degraded"]
                               },
                               {
                                 "type": "string",
@@ -1895,7 +1911,15 @@
                       "anyOf": [
                         {
                           "type": "string",
+                          "enum": ["initializing"]
+                        },
+                        {
+                          "type": "string",
                           "enum": ["active"]
+                        },
+                        {
+                          "type": "string",
+                          "enum": ["degraded"]
                         },
                         {
                           "type": "string",
@@ -2163,7 +2187,15 @@
                           "anyOf": [
                             {
                               "type": "string",
+                              "enum": ["initializing"]
+                            },
+                            {
+                              "type": "string",
                               "enum": ["active"]
+                            },
+                            {
+                              "type": "string",
+                              "enum": ["degraded"]
                             },
                             {
                               "type": "string",
@@ -2389,7 +2421,15 @@
                           "anyOf": [
                             {
                               "type": "string",
+                              "enum": ["initializing"]
+                            },
+                            {
+                              "type": "string",
                               "enum": ["active"]
+                            },
+                            {
+                              "type": "string",
+                              "enum": ["degraded"]
                             },
                             {
                               "type": "string",
@@ -2676,7 +2716,15 @@
                           "anyOf": [
                             {
                               "type": "string",
+                              "enum": ["initializing"]
+                            },
+                            {
+                              "type": "string",
                               "enum": ["active"]
+                            },
+                            {
+                              "type": "string",
+                              "enum": ["degraded"]
                             },
                             {
                               "type": "string",

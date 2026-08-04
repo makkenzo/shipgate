@@ -170,6 +170,7 @@ async function executeJobAttempt(options: ExecuteJobAttemptOptions): Promise<Job
       correlationId,
       causationId,
       signal: options.signal,
+      repositoryInitialSync: dependencies.repositoryInitialSync,
     })
 
     if (persist) {

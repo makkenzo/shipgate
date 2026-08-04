@@ -6,7 +6,6 @@ import type {
   JsonValue,
   ProjectAuditEventType,
   ProjectTable,
-  RepositoryReconciliationRequestTable,
 } from '@shipgate/database'
 import type { Selectable, Transaction } from 'kysely'
 
@@ -16,26 +15,14 @@ import {
   ProjectVersionConflictError,
   RepositoryAlreadyConnectedError,
 } from './errors.js'
-import type { ProjectRecord } from './model.js'
+import type { ProjectRecord, ReconciliationRequestRecord } from './model.js'
 import {
   assertRepositoryTransaction,
   type RepositoryTransaction,
   serializeGitHubNumericId,
 } from './repository-transaction.js'
+import { queueRepositoryInitialSync } from './sync-queue.js'
 import type { ValidatedProjectTopology } from './topology.js'
-
-export interface ReconciliationRequestRecord {
-  readonly id: string
-  readonly projectId: string
-  readonly repositoryId: string
-  readonly configurationVersion: number
-  readonly reason: string
-  readonly mode: 'full'
-  readonly status: 'queued' | 'claimed' | 'completed' | 'cancelled'
-  readonly sourceSha: string
-  readonly productionSha: string
-  readonly requestedAt: Date
-}
 
 export type ConfigureProjectResult =
   | {
@@ -68,6 +55,7 @@ export async function createConfiguredProject(input: {
   readonly actorGitHubUserId: number
   readonly now?: Date
   readonly projectId?: string
+  readonly correlationId: string
 }): Promise<ConfigureProjectResult> {
   const repositoryId = assertRepositoryTransaction(input.scope, input.topology.repositoryId)
   const installationId = serializeGitHubNumericId(input.topology.installationId, 'installation ID')
@@ -102,7 +90,7 @@ export async function createConfiguredProject(input: {
       default_branch: input.topology.defaultBranch,
       source_branch: input.topology.sourceBranch,
       production_branch: input.topology.productionBranch,
-      status: 'active',
+      status: 'initializing',
       source_sha: input.topology.sourceSha,
       production_sha: input.topology.productionSha,
       last_successful_sync_at: null,
@@ -132,15 +120,18 @@ export async function createConfiguredProject(input: {
     },
     now,
   })
-  const reconciliation = await insertReconciliationRequest(transaction, {
+  const reconciliation = await queueRepositoryInitialSync({
+    transaction,
     projectId,
     repositoryId,
     configurationVersion: 1,
     reason: 'project_created',
-    actorId,
+    requestedByGitHubUserId: actorId,
     sourceSha: input.topology.sourceSha,
     productionSha: input.topology.productionSha,
     idempotencyKey: `project-configuration:${projectId}:1`,
+    correlationId: input.correlationId,
+    causationId: `project:${projectId}:created`,
     now,
   })
 
@@ -153,6 +144,7 @@ export async function updateConfiguredProject(input: {
   readonly expectedConfigurationVersion: number
   readonly topology: ValidatedProjectTopology
   readonly actorGitHubUserId: number
+  readonly correlationId: string
   readonly now?: Date
 }): Promise<ConfigureProjectResult> {
   const repositoryId = assertRepositoryTransaction(input.scope, input.topology.repositoryId)
@@ -163,7 +155,7 @@ export async function updateConfiguredProject(input: {
 
   assertExpectedVersion(project, input.expectedConfigurationVersion)
 
-  if (project.status !== 'active') {
+  if (!['initializing', 'active', 'degraded'].includes(project.status)) {
     throw new ProjectConfigurationValidationError(
       'project_not_active',
       `Project ${project.id} is ${project.status} and cannot be reconfigured`,
@@ -192,6 +184,7 @@ export async function updateConfiguredProject(input: {
       production_branch: input.topology.productionBranch,
       source_sha: input.topology.sourceSha,
       production_sha: input.topology.productionSha,
+      status: 'initializing',
       last_successful_sync_at: null,
       configuration_version: nextVersion,
       updated_at: now,
@@ -237,15 +230,18 @@ export async function updateConfiguredProject(input: {
     },
     now,
   })
-  const reconciliation = await insertReconciliationRequest(transaction, {
+  const reconciliation = await queueRepositoryInitialSync({
+    transaction,
     projectId: project.id,
     repositoryId,
     configurationVersion: nextVersion,
     reason: 'project_configuration_changed',
-    actorId,
+    requestedByGitHubUserId: actorId,
     sourceSha: input.topology.sourceSha,
     productionSha: input.topology.productionSha,
     idempotencyKey: `project-configuration:${project.id}:${nextVersion}`,
+    correlationId: input.correlationId,
+    causationId: `project:${project.id}:configuration:${nextVersion}`,
     now,
   })
 
@@ -273,12 +269,46 @@ export async function requestProjectDeletion(input: {
   }
 
   const nextVersion = project.configuration_version + 1
-  await transaction
-    .updateTable('repository_reconciliation_requests')
-    .set({ status: 'cancelled', completed_at: now, updated_at: now })
+  const activeRequests = await transaction
+    .selectFrom('repository_reconciliation_requests')
+    .select(['id', 'sync_run_id'])
     .where('project_id', '=', project.id)
-    .where('status', 'in', ['queued', 'claimed'])
+    .where('status', 'in', ['queued', 'running'])
     .execute()
+
+  if (activeRequests.length > 0) {
+    await transaction
+      .updateTable('repository_sync_runs')
+      .set({
+        status: 'superseded',
+        completed_at: now,
+        error_code: 'synchronization_superseded',
+        error_message: 'Project deletion was requested',
+      })
+      .where(
+        'id',
+        'in',
+        activeRequests.map((request) => request.sync_run_id),
+      )
+      .where('status', 'in', ['queued', 'running'])
+      .execute()
+
+    await transaction
+      .updateTable('repository_reconciliation_requests')
+      .set({
+        status: 'cancelled',
+        completed_at: now,
+        last_error_code: 'synchronization_cancelled',
+        last_error_message: 'Project deletion was requested',
+        updated_at: now,
+      })
+      .where(
+        'id',
+        'in',
+        activeRequests.map((request) => request.id),
+      )
+      .execute()
+  }
   const row = await transaction
     .updateTable('projects')
     .set({
@@ -433,45 +463,6 @@ async function insertAuditEvent(
     .execute()
 }
 
-async function insertReconciliationRequest(
-  transaction: Transaction<DatabaseSchema>,
-  input: {
-    readonly projectId: string
-    readonly repositoryId: string
-    readonly configurationVersion: number
-    readonly reason: string
-    readonly actorId: string
-    readonly sourceSha: string
-    readonly productionSha: string
-    readonly idempotencyKey: string
-    readonly now: Date
-  },
-): Promise<ReconciliationRequestRecord> {
-  const row = await transaction
-    .insertInto('repository_reconciliation_requests')
-    .values({
-      id: randomUUID(),
-      project_id: input.projectId,
-      repository_id: input.repositoryId,
-      configuration_version: input.configurationVersion,
-      reason: input.reason,
-      mode: 'full',
-      status: 'queued',
-      requested_by_github_user_id: input.actorId,
-      source_sha: input.sourceSha,
-      production_sha: input.productionSha,
-      idempotency_key: input.idempotencyKey,
-      requested_at: input.now,
-      claimed_at: null,
-      completed_at: null,
-      updated_at: input.now,
-    })
-    .returningAll()
-    .executeTakeFirstOrThrow()
-
-  return mapReconciliation(row)
-}
-
 function mapProject(row: Selectable<ProjectTable>): ProjectRecord {
   return {
     id: row.id,
@@ -493,22 +484,5 @@ function mapProject(row: Selectable<ProjectTable>): ProjectRecord {
     deletedAt: row.deleted_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
-  }
-}
-
-function mapReconciliation(
-  row: Selectable<RepositoryReconciliationRequestTable>,
-): ReconciliationRequestRecord {
-  return {
-    id: row.id,
-    projectId: row.project_id,
-    repositoryId: row.repository_id,
-    configurationVersion: row.configuration_version,
-    reason: row.reason,
-    mode: row.mode,
-    status: row.status,
-    sourceSha: row.source_sha,
-    productionSha: row.production_sha,
-    requestedAt: row.requested_at,
   }
 }

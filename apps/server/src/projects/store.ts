@@ -31,7 +31,12 @@ import type {
   RepositorySyncIssueProjection,
   UnmanagedCommitRecord,
 } from './model.js'
-import { serializeGitHubNumericId, withRepositoryTransaction } from './repository-transaction.js'
+import {
+  assertRepositoryTransaction,
+  type RepositoryTransaction,
+  serializeGitHubNumericId,
+  withRepositoryTransaction,
+} from './repository-transaction.js'
 
 export async function createProject(
   database: DatabaseClient,
@@ -157,61 +162,104 @@ export async function applyRepositoryProjection(
   database: DatabaseClient,
   input: ApplyRepositoryProjectionInput,
 ): Promise<ApplyRepositoryProjectionResult> {
-  validateApplyInput(input)
   const repositoryId = serializeGitHubNumericId(input.repositoryId, 'repository ID')
 
-  return withRepositoryTransaction(database, repositoryId, async ({ transaction }) => {
-    const project = await requireProjectForWrite(
-      transaction,
-      input.projectId,
-      repositoryId,
-      input.expectedConfigurationVersion,
-    )
+  return withRepositoryTransaction(database, repositoryId, (scope) =>
+    applyRepositoryProjectionInTransaction(scope, input),
+  )
+}
 
-    validateSnapshotAgainstProject(input.snapshot, project)
+export async function applyRepositoryProjectionInTransaction(
+  scope: RepositoryTransaction,
+  input: ApplyRepositoryProjectionInput,
+): Promise<ApplyRepositoryProjectionResult> {
+  validateApplyInput(input)
+  const repositoryId = assertRepositoryTransaction(scope, input.repositoryId)
+  const transaction = scope.transaction
+  const project = await requireProjectForWrite(
+    transaction,
+    input.projectId,
+    repositoryId,
+    input.expectedConfigurationVersion,
+  )
 
-    const existingRun = await transaction
-      .selectFrom('repository_sync_runs')
-      .select(['id', 'status', 'projection_fingerprint', 'source_sha', 'production_sha'])
-      .where('project_id', '=', input.projectId)
-      .where('idempotency_key', '=', input.idempotencyKey)
-      .executeTakeFirst()
+  validateSnapshotAgainstProject(input.snapshot, project)
 
-    if (existingRun) {
-      const sameProjection =
-        existingRun.status === 'succeeded' &&
-        existingRun.projection_fingerprint === input.projectionFingerprint &&
-        existingRun.source_sha === input.snapshot.sourceSha &&
-        existingRun.production_sha === input.snapshot.productionSha
+  const existingRun = await transaction
+    .selectFrom('repository_sync_runs')
+    .select([
+      'id',
+      'status',
+      'configuration_version',
+      'projection_fingerprint',
+      'source_sha',
+      'production_sha',
+    ])
+    .where('project_id', '=', input.projectId)
+    .where('idempotency_key', '=', input.idempotencyKey)
+    .executeTakeFirst()
 
-      if (!sameProjection) {
-        throw new RepositoryProjectionIdempotencyConflictError(
-          input.projectId,
-          input.idempotencyKey,
-        )
-      }
+  if (existingRun?.status === 'succeeded') {
+    const sameProjection =
+      existingRun.projection_fingerprint === input.projectionFingerprint &&
+      existingRun.source_sha === input.snapshot.sourceSha &&
+      existingRun.production_sha === input.snapshot.productionSha
 
-      const currentProject = await transaction
-        .selectFrom('projects')
-        .selectAll()
-        .where('id', '=', input.projectId)
-        .executeTakeFirstOrThrow()
-
-      return {
-        status: 'already_applied',
-        syncRunId: existingRun.id,
-        project: mapProject(currentProject),
-      }
+    if (!sameProjection) {
+      throw new RepositoryProjectionIdempotencyConflictError(input.projectId, input.idempotencyKey)
     }
 
-    const storedChanges = await prepareStoredChanges(
-      transaction,
-      input.projectId,
-      input.snapshot.changes,
-    )
-    const syncRunId = randomUUID()
-    const observedAt = input.snapshot.observedAt
+    const currentProject = await transaction
+      .selectFrom('projects')
+      .selectAll()
+      .where('id', '=', input.projectId)
+      .executeTakeFirstOrThrow()
 
+    return {
+      status: 'already_applied',
+      syncRunId: existingRun.id,
+      project: mapProject(currentProject),
+    }
+  }
+
+  if (existingRun && ['failed', 'superseded'].includes(existingRun.status)) {
+    throw new RepositoryProjectionIdempotencyConflictError(input.projectId, input.idempotencyKey)
+  }
+
+  const storedChanges = await prepareStoredChanges(
+    transaction,
+    input.projectId,
+    input.snapshot.changes,
+  )
+  const syncRunId = existingRun?.id ?? input.syncRunId ?? randomUUID()
+  const observedAt = input.snapshot.observedAt
+
+  if (existingRun) {
+    const samePendingRun =
+      input.syncRunId === existingRun.id &&
+      existingRun.configuration_version === input.expectedConfigurationVersion &&
+      existingRun.source_sha === input.snapshot.sourceSha &&
+      existingRun.production_sha === input.snapshot.productionSha
+
+    if (!samePendingRun) {
+      throw new RepositoryProjectionIdempotencyConflictError(input.projectId, input.idempotencyKey)
+    }
+
+    await transaction
+      .updateTable('repository_sync_runs')
+      .set({
+        status: 'succeeded',
+        projection_fingerprint: input.projectionFingerprint,
+        source_sha: input.snapshot.sourceSha,
+        production_sha: input.snapshot.productionSha,
+        completed_at: input.completedAt,
+        error_code: null,
+        error_message: null,
+      })
+      .where('id', '=', existingRun.id)
+      .where('status', 'in', ['queued', 'running'])
+      .executeTakeFirstOrThrow()
+  } else {
     await transaction
       .insertInto('repository_sync_runs')
       .values({
@@ -231,217 +279,214 @@ export async function applyRepositoryProjection(
         error_message: null,
       })
       .execute()
+  }
 
-    await clearCurrentProjection(transaction, input.projectId)
+  await clearCurrentProjection(transaction, input.projectId)
 
-    if (input.snapshot.branches.length > 0) {
-      await transaction
-        .insertInto('repository_branches')
-        .values(
-          input.snapshot.branches.map((branch) => ({
-            project_id: input.projectId,
-            repository_id: repositoryId,
-            name: branch.name,
-            head_sha: branch.headSha,
-            protected: branch.protected,
-            default_branch: branch.defaultBranch,
-            observed_at: observedAt,
-            updated_at: observedAt,
-          })),
-        )
-        .execute()
-    }
-
-    if (input.snapshot.commits.length > 0) {
-      await transaction
-        .insertInto('repository_commits')
-        .values(
-          input.snapshot.commits.map((commit) => ({
-            project_id: input.projectId,
-            repository_id: repositoryId,
-            sha: commit.sha,
-            tree_sha: commit.treeSha,
-            message: commit.message,
-            author_id: serializeNullableGitHubNumericId(commit.authorId, 'commit author ID'),
-            author_login: commit.authorLogin,
-            author_name: commit.authorName,
-            author_email: commit.authorEmail,
-            committer_id: serializeNullableGitHubNumericId(
-              commit.committerId,
-              'commit committer ID',
-            ),
-            committer_login: commit.committerLogin,
-            authored_at: commit.authoredAt,
-            committed_at: commit.committedAt,
-            parent_shas: JSON.stringify(commit.parentShas),
-            source_delta_position: commit.sourceDeltaPosition,
-            observed_at: observedAt,
-            updated_at: observedAt,
-          })),
-        )
-        .execute()
-    }
-
-    await pruneMissingChanges(
-      transaction,
-      input.projectId,
-      storedChanges.map((change) => change.githubPullRequestId),
-    )
-
-    for (const stored of storedChanges) {
-      const values = {
-        pull_request_number: stored.input.pullRequestNumber,
-        title: stored.input.title,
-        url: stored.input.url,
-        author_id: stored.authorId,
-        author_login: stored.input.authorLogin,
-        base_branch: stored.input.baseBranch,
-        merged_at: stored.input.mergedAt,
-        final_head_sha: stored.input.finalHeadSha,
-        merge_commit_sha: stored.input.mergeCommitSha,
-        source_integration_sha: stored.input.sourceIntegrationSha,
-        merge_method: stored.input.mergeMethod,
-        commit_set_fingerprint: stored.input.commitSetFingerprint,
-        synchronization_state: stored.input.synchronizationState,
-        production_presence: stored.input.productionPresence,
-        observed_at: observedAt,
-        updated_at: observedAt,
-      }
-
-      if (stored.existing) {
-        await transaction
-          .updateTable('changes')
-          .set(values)
-          .where('id', '=', stored.id)
-          .where('github_pull_request_id', '=', stored.githubPullRequestId)
-          .executeTakeFirstOrThrow()
-      } else {
-        await transaction
-          .insertInto('changes')
-          .values({
-            id: stored.id,
-            project_id: input.projectId,
-            repository_id: repositoryId,
-            github_pull_request_id: stored.githubPullRequestId,
-            ...values,
-          })
-          .execute()
-      }
-    }
-
-    const changeCommitRows = storedChanges.flatMap((stored) =>
-      stored.input.commitShas.map((commitSha, position) => ({
-        project_id: input.projectId,
-        repository_id: repositoryId,
-        change_id: stored.id,
-        commit_sha: commitSha,
-        position,
-      })),
-    )
-
-    if (changeCommitRows.length > 0) {
-      await transaction.insertInto('change_commits').values(changeCommitRows).execute()
-    }
-
-    if (input.snapshot.requiredChecks.length > 0) {
-      await transaction
-        .insertInto('required_checks')
-        .values(
-          input.snapshot.requiredChecks.map((check) => ({
-            id: check.id ?? randomUUID(),
-            project_id: input.projectId,
-            repository_id: repositoryId,
-            policy_version: check.policyVersion,
-            check_type: check.type,
-            context: check.context,
-            integration_id: serializeNullableGitHubNumericId(
-              check.integrationId,
-              'required check integration ID',
-            ),
-            source: check.source,
-            source_reference: check.sourceReference,
-            observed_at: observedAt,
-            updated_at: observedAt,
-          })),
-        )
-        .execute()
-    }
-
-    if (input.snapshot.checkResults.length > 0) {
-      await transaction
-        .insertInto('commit_check_results')
-        .values(
-          input.snapshot.checkResults.map((result) => ({
-            id: result.id ?? randomUUID(),
-            project_id: input.projectId,
-            repository_id: repositoryId,
-            commit_sha: result.commitSha,
-            check_type: result.type,
-            context: result.context,
-            integration_id: serializeNullableGitHubNumericId(
-              result.integrationId,
-              'check result integration ID',
-            ),
-            github_object_id: serializeGitHubNumericId(
-              result.githubObjectId,
-              'check result GitHub object ID',
-            ),
-            attempt: result.attempt,
-            status: result.status,
-            conclusion: result.conclusion,
-            details_url: result.detailsUrl,
-            started_at: result.startedAt,
-            completed_at: result.completedAt,
-            observed_at: result.observedAt,
-          })),
-        )
-        .execute()
-    }
-
-    await insertSynchronizationIssues(
-      transaction,
-      input.projectId,
-      repositoryId,
-      syncRunId,
-      input.snapshot.issues,
-    )
-
-    const updated = await transaction
-      .updateTable('projects')
-      .set({
-        installation_id: serializeGitHubNumericId(input.snapshot.installationId, 'installation ID'),
-        owner_id: serializeGitHubNumericId(input.snapshot.ownerId, 'repository owner ID'),
-        owner_login: input.snapshot.ownerLogin,
-        repository_name: input.snapshot.repositoryName,
-        repository_full_name: input.snapshot.repositoryFullName,
-        default_branch: input.snapshot.defaultBranch,
-        status: 'active',
-        source_sha: input.snapshot.sourceSha,
-        production_sha: input.snapshot.productionSha,
-        last_successful_sync_at: input.completedAt,
-        deletion_requested_at: null,
-        deleted_at: null,
-        updated_at: input.completedAt,
-      })
-      .where('id', '=', input.projectId)
-      .where('configuration_version', '=', input.expectedConfigurationVersion)
-      .returningAll()
-      .executeTakeFirst()
-
-    if (!updated) {
-      throw new ProjectVersionConflictError(
-        input.projectId,
-        input.expectedConfigurationVersion,
-        project.configuration_version,
+  if (input.snapshot.branches.length > 0) {
+    await transaction
+      .insertInto('repository_branches')
+      .values(
+        input.snapshot.branches.map((branch) => ({
+          project_id: input.projectId,
+          repository_id: repositoryId,
+          name: branch.name,
+          head_sha: branch.headSha,
+          protected: branch.protected,
+          default_branch: branch.defaultBranch,
+          observed_at: observedAt,
+          updated_at: observedAt,
+        })),
       )
+      .execute()
+  }
+
+  if (input.snapshot.commits.length > 0) {
+    await transaction
+      .insertInto('repository_commits')
+      .values(
+        input.snapshot.commits.map((commit) => ({
+          project_id: input.projectId,
+          repository_id: repositoryId,
+          sha: commit.sha,
+          tree_sha: commit.treeSha,
+          message: commit.message,
+          author_id: serializeNullableGitHubNumericId(commit.authorId, 'commit author ID'),
+          author_login: commit.authorLogin,
+          author_name: commit.authorName,
+          author_email: commit.authorEmail,
+          committer_id: serializeNullableGitHubNumericId(commit.committerId, 'commit committer ID'),
+          committer_login: commit.committerLogin,
+          authored_at: commit.authoredAt,
+          committed_at: commit.committedAt,
+          parent_shas: JSON.stringify(commit.parentShas),
+          source_delta_position: commit.sourceDeltaPosition,
+          observed_at: observedAt,
+          updated_at: observedAt,
+        })),
+      )
+      .execute()
+  }
+
+  await pruneMissingChanges(
+    transaction,
+    input.projectId,
+    storedChanges.map((change) => change.githubPullRequestId),
+  )
+
+  for (const stored of storedChanges) {
+    const values = {
+      pull_request_number: stored.input.pullRequestNumber,
+      title: stored.input.title,
+      url: stored.input.url,
+      author_id: stored.authorId,
+      author_login: stored.input.authorLogin,
+      base_branch: stored.input.baseBranch,
+      merged_at: stored.input.mergedAt,
+      final_head_sha: stored.input.finalHeadSha,
+      merge_commit_sha: stored.input.mergeCommitSha,
+      source_integration_sha: stored.input.sourceIntegrationSha,
+      merge_method: stored.input.mergeMethod,
+      commit_set_fingerprint: stored.input.commitSetFingerprint,
+      synchronization_state: stored.input.synchronizationState,
+      production_presence: stored.input.productionPresence,
+      observed_at: observedAt,
+      updated_at: observedAt,
     }
 
-    return {
-      status: 'applied',
-      syncRunId,
-      project: mapProject(updated),
+    if (stored.existing) {
+      await transaction
+        .updateTable('changes')
+        .set(values)
+        .where('id', '=', stored.id)
+        .where('github_pull_request_id', '=', stored.githubPullRequestId)
+        .executeTakeFirstOrThrow()
+    } else {
+      await transaction
+        .insertInto('changes')
+        .values({
+          id: stored.id,
+          project_id: input.projectId,
+          repository_id: repositoryId,
+          github_pull_request_id: stored.githubPullRequestId,
+          ...values,
+        })
+        .execute()
     }
-  })
+  }
+
+  const changeCommitRows = storedChanges.flatMap((stored) =>
+    stored.input.commitShas.map((commitSha, position) => ({
+      project_id: input.projectId,
+      repository_id: repositoryId,
+      change_id: stored.id,
+      commit_sha: commitSha,
+      position,
+    })),
+  )
+
+  if (changeCommitRows.length > 0) {
+    await transaction.insertInto('change_commits').values(changeCommitRows).execute()
+  }
+
+  if (input.snapshot.requiredChecks.length > 0) {
+    await transaction
+      .insertInto('required_checks')
+      .values(
+        input.snapshot.requiredChecks.map((check) => ({
+          id: check.id ?? randomUUID(),
+          project_id: input.projectId,
+          repository_id: repositoryId,
+          policy_version: check.policyVersion,
+          check_type: check.type,
+          context: check.context,
+          integration_id: serializeNullableGitHubNumericId(
+            check.integrationId,
+            'required check integration ID',
+          ),
+          source: check.source,
+          source_reference: check.sourceReference,
+          observed_at: observedAt,
+          updated_at: observedAt,
+        })),
+      )
+      .execute()
+  }
+
+  if (input.snapshot.checkResults.length > 0) {
+    await transaction
+      .insertInto('commit_check_results')
+      .values(
+        input.snapshot.checkResults.map((result) => ({
+          id: result.id ?? randomUUID(),
+          project_id: input.projectId,
+          repository_id: repositoryId,
+          commit_sha: result.commitSha,
+          check_type: result.type,
+          context: result.context,
+          integration_id: serializeNullableGitHubNumericId(
+            result.integrationId,
+            'check result integration ID',
+          ),
+          github_object_id: serializeGitHubNumericId(
+            result.githubObjectId,
+            'check result GitHub object ID',
+          ),
+          attempt: result.attempt,
+          status: result.status,
+          conclusion: result.conclusion,
+          details_url: result.detailsUrl,
+          started_at: result.startedAt,
+          completed_at: result.completedAt,
+          observed_at: result.observedAt,
+        })),
+      )
+      .execute()
+  }
+
+  await insertSynchronizationIssues(
+    transaction,
+    input.projectId,
+    repositoryId,
+    syncRunId,
+    input.snapshot.issues,
+  )
+
+  const updated = await transaction
+    .updateTable('projects')
+    .set({
+      installation_id: serializeGitHubNumericId(input.snapshot.installationId, 'installation ID'),
+      owner_id: serializeGitHubNumericId(input.snapshot.ownerId, 'repository owner ID'),
+      owner_login: input.snapshot.ownerLogin,
+      repository_name: input.snapshot.repositoryName,
+      repository_full_name: input.snapshot.repositoryFullName,
+      default_branch: input.snapshot.defaultBranch,
+      status: 'active',
+      source_sha: input.snapshot.sourceSha,
+      production_sha: input.snapshot.productionSha,
+      last_successful_sync_at: input.completedAt,
+      deletion_requested_at: null,
+      deleted_at: null,
+      updated_at: input.completedAt,
+    })
+    .where('id', '=', input.projectId)
+    .where('configuration_version', '=', input.expectedConfigurationVersion)
+    .returningAll()
+    .executeTakeFirst()
+
+  if (!updated) {
+    throw new ProjectVersionConflictError(
+      input.projectId,
+      input.expectedConfigurationVersion,
+      project.configuration_version,
+    )
+  }
+
+  return {
+    status: 'applied',
+    syncRunId,
+    project: mapProject(updated),
+  }
 }
 
 export async function recordRepositorySyncFailure(
@@ -866,7 +911,7 @@ function validateApplyInput(input: ApplyRepositoryProjectionInput): void {
     )
   }
 
-  validateSnapshot(input.snapshot)
+  validateRepositoryProjectionSnapshot(input.snapshot)
 }
 
 function validateFailureInput(input: RecordRepositorySyncFailureInput): void {
@@ -898,7 +943,7 @@ function validateFailureInput(input: RecordRepositorySyncFailureInput): void {
   validateIssues(input.issues)
 }
 
-function validateSnapshot(snapshot: RepositoryProjectionSnapshot): void {
+export function validateRepositoryProjectionSnapshot(snapshot: RepositoryProjectionSnapshot): void {
   serializeGitHubNumericId(snapshot.installationId, 'installation ID')
   serializeGitHubNumericId(snapshot.ownerId, 'repository owner ID')
   assertNonEmpty(snapshot.ownerLogin, 'repository owner login')

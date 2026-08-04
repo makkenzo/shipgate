@@ -2,6 +2,7 @@ import { assertDatabaseReady } from '@shipgate/database'
 import { startJobWorker } from '@shipgate/jobs'
 
 import type { ApplicationContext } from './application-context.js'
+import { recoverRepositoryInitialSyncJobs } from './projects/index.js'
 import type { StartedApplication } from './run-application.js'
 
 export async function startWorker(context: ApplicationContext): Promise<StartedApplication> {
@@ -10,11 +11,24 @@ export async function startWorker(context: ApplicationContext): Promise<StartedA
     context.runtimeConfig.database.readinessTimeoutMs,
   )
 
+  const recoveredRepositorySyncJobs = await recoverRepositoryInitialSyncJobs(context.database)
+
+  if (recoveredRepositorySyncJobs > 0) {
+    context.logger.info(
+      {
+        event: 'repository.initial_sync.jobs_recovered',
+        recoveredJobs: recoveredRepositorySyncJobs,
+      },
+      'Recovered repository synchronization jobs',
+    )
+  }
+
   const worker = await startJobWorker({
     dependencies: {
       database: context.database,
 
       logger: context.logger,
+      repositoryInitialSync: context.repositoryInitialSync,
     },
 
     appVersion: context.runtimeConfig.appVersion,

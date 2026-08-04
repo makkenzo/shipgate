@@ -24,6 +24,8 @@ const expectedMigrationNames = [
   '20260802_000008_create_github_lifecycle_state',
   '20260803_000009_create_github_connection_read_model',
   '20260803_000010_create_project_repository_projection',
+  '20260804_000011_create_project_configuration',
+  '20260804_000012_create_repository_initial_sync',
 ] as const
 
 describe.sequential('PostgreSQL infrastructure', () => {
