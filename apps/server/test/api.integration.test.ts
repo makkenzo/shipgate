@@ -133,6 +133,11 @@ describe.sequential('Fastify API', () => {
       'getInstallation',
     )
     expect(paths['/api/v1/account']?.delete?.operationId).toBe('deleteLocalAccount')
+    expect(paths['/api/v1/projects']?.post?.operationId).toBe('createProject')
+    expect(paths['/api/v1/projects']?.get?.operationId).toBe('getProjects')
+    expect(paths['/api/v1/projects/{projectId}']?.get?.operationId).toBe('getProject')
+    expect(paths['/api/v1/projects/{projectId}']?.patch?.operationId).toBe('updateProject')
+    expect(paths['/api/v1/projects/{projectId}']?.delete?.operationId).toBe('deleteProject')
 
     expect(paths['/api/v1/auth/github']).toBeUndefined()
     expect(paths['/api/v1/auth/github/callback']).toBeUndefined()

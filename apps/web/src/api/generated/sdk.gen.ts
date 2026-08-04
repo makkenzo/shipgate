@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { CreateDiagnosticJobData, CreateDiagnosticJobErrors, CreateDiagnosticJobResponses, DeleteLocalAccountData, DeleteLocalAccountErrors, DeleteLocalAccountResponses, DisconnectGitHubData, DisconnectGitHubErrors, DisconnectGitHubResponses, GetAuthSessionData, GetAuthSessionErrors, GetAuthSessionResponses, GetConnectionConfigurationData, GetConnectionConfigurationErrors, GetConnectionConfigurationResponses, GetDiagnosticJobData, GetDiagnosticJobErrors, GetDiagnosticJobResponses, GetHealthData, GetHealthErrors, GetHealthResponses, GetInstallationData, GetInstallationErrors, GetInstallationResponses, GetInstallationsData, GetInstallationsErrors, GetInstallationsResponses, GetReadinessData, GetReadinessErrors, GetReadinessResponses, LogoutData, LogoutErrors, LogoutResponses } from './types.gen';
+import type { CreateDiagnosticJobData, CreateDiagnosticJobErrors, CreateDiagnosticJobResponses, CreateProjectData, CreateProjectErrors, CreateProjectResponses, DeleteLocalAccountData, DeleteLocalAccountErrors, DeleteLocalAccountResponses, DeleteProjectData, DeleteProjectErrors, DeleteProjectResponses, DisconnectGitHubData, DisconnectGitHubErrors, DisconnectGitHubResponses, GetAuthSessionData, GetAuthSessionErrors, GetAuthSessionResponses, GetConnectionConfigurationData, GetConnectionConfigurationErrors, GetConnectionConfigurationResponses, GetDiagnosticJobData, GetDiagnosticJobErrors, GetDiagnosticJobResponses, GetHealthData, GetHealthErrors, GetHealthResponses, GetInstallationData, GetInstallationErrors, GetInstallationResponses, GetInstallationsData, GetInstallationsErrors, GetInstallationsResponses, GetProjectData, GetProjectErrors, GetProjectResponses, GetProjectsData, GetProjectsErrors, GetProjectsResponses, GetReadinessData, GetReadinessErrors, GetReadinessResponses, LogoutData, LogoutErrors, LogoutResponses, UpdateProjectData, UpdateProjectErrors, UpdateProjectResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -109,6 +109,79 @@ export const deleteLocalAccount = <ThrowOnError extends boolean = false>(options
         }],
     url: '/api/v1/account',
     ...options
+});
+
+/**
+ * List projects visible to the current user
+ */
+export const getProjects = <ThrowOnError extends boolean = false>(options?: Options<GetProjectsData, ThrowOnError>): RequestResult<GetProjectsResponses, GetProjectsErrors, ThrowOnError> => (options?.client ?? client).get<GetProjectsResponses, GetProjectsErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: '__Host-shipgate_session',
+            type: 'apiKey'
+        }],
+    url: '/api/v1/projects',
+    ...options
+});
+
+/**
+ * Create a Shipgate project from a GitHub repository
+ */
+export const createProject = <ThrowOnError extends boolean = false>(options: Options<CreateProjectData, ThrowOnError>): RequestResult<CreateProjectResponses, CreateProjectErrors, ThrowOnError> => (options.client ?? client).post<CreateProjectResponses, CreateProjectErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: '__Host-shipgate_session',
+            type: 'apiKey'
+        }],
+    url: '/api/v1/projects',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Request deletion of a Shipgate project
+ */
+export const deleteProject = <ThrowOnError extends boolean = false>(options: Options<DeleteProjectData, ThrowOnError>): RequestResult<DeleteProjectResponses, DeleteProjectErrors, ThrowOnError> => (options.client ?? client).delete<DeleteProjectResponses, DeleteProjectErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: '__Host-shipgate_session',
+            type: 'apiKey'
+        }],
+    url: '/api/v1/projects/{projectId}',
+    ...options
+});
+
+/**
+ * Get a Shipgate project
+ */
+export const getProject = <ThrowOnError extends boolean = false>(options: Options<GetProjectData, ThrowOnError>): RequestResult<GetProjectResponses, GetProjectErrors, ThrowOnError> => (options.client ?? client).get<GetProjectResponses, GetProjectErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: '__Host-shipgate_session',
+            type: 'apiKey'
+        }],
+    url: '/api/v1/projects/{projectId}',
+    ...options
+});
+
+/**
+ * Change source or production branch
+ */
+export const updateProject = <ThrowOnError extends boolean = false>(options: Options<UpdateProjectData, ThrowOnError>): RequestResult<UpdateProjectResponses, UpdateProjectErrors, ThrowOnError> => (options.client ?? client).patch<UpdateProjectResponses, UpdateProjectErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: '__Host-shipgate_session',
+            type: 'apiKey'
+        }],
+    url: '/api/v1/projects/{projectId}',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
 });
 
 /**

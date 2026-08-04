@@ -430,6 +430,380 @@ export type DeleteLocalAccountResponses = {
 
 export type DeleteLocalAccountResponse = DeleteLocalAccountResponses[keyof DeleteLocalAccountResponses];
 
+export type GetProjectsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/projects';
+};
+
+export type GetProjectsErrors = {
+    /**
+     * ApiError
+     *
+     * Common error response returned by the Shipgate API.
+     */
+    default: {
+        code: string;
+        message: string;
+        requestId: string;
+        details?: unknown;
+    };
+};
+
+export type GetProjectsError = GetProjectsErrors[keyof GetProjectsErrors];
+
+export type GetProjectsResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        projects: Array<{
+            id: string;
+            installationId: number;
+            repositoryId: number;
+            repository: {
+                ownerId: number;
+                ownerLogin: string;
+                name: string;
+                fullName: string;
+                defaultBranch: string | null;
+            };
+            sourceBranch: string;
+            productionBranch: string;
+            status: 'active' | 'disconnected' | 'pending_deletion' | 'deleted';
+            sourceSha: string | null;
+            productionSha: string | null;
+            lastSuccessfulSynchronization: string | null;
+            configurationVersion: number;
+            deletionRequestedAt: string | null;
+            createdAt: string;
+            updatedAt: string;
+        }>;
+    };
+};
+
+export type GetProjectsResponse = GetProjectsResponses[keyof GetProjectsResponses];
+
+export type CreateProjectData = {
+    body: {
+        installationId: number;
+        repositoryId: number;
+        sourceBranch: string;
+        productionBranch: string;
+    };
+    headers?: {
+        'x-csrf-token'?: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/v1/projects';
+};
+
+export type CreateProjectErrors = {
+    /**
+     * ApiError
+     *
+     * Common error response returned by the Shipgate API.
+     */
+    default: {
+        code: string;
+        message: string;
+        requestId: string;
+        details?: unknown;
+    };
+};
+
+export type CreateProjectError = CreateProjectErrors[keyof CreateProjectErrors];
+
+export type CreateProjectResponses = {
+    /**
+     * Default Response
+     */
+    201: {
+        status: 'created' | 'updated' | 'already_applied';
+        /**
+         * Project
+         */
+        project: {
+            id: string;
+            installationId: number;
+            repositoryId: number;
+            repository: {
+                ownerId: number;
+                ownerLogin: string;
+                name: string;
+                fullName: string;
+                defaultBranch: string | null;
+            };
+            sourceBranch: string;
+            productionBranch: string;
+            status: 'active' | 'disconnected' | 'pending_deletion' | 'deleted';
+            sourceSha: string | null;
+            productionSha: string | null;
+            lastSuccessfulSynchronization: string | null;
+            configurationVersion: number;
+            deletionRequestedAt: string | null;
+            createdAt: string;
+            updatedAt: string;
+        };
+        reconciliation: {
+            requestId: string;
+            status: 'queued';
+            configurationVersion: number;
+            reason: string;
+            mode: 'full';
+            sourceSha: string;
+            productionSha: string;
+            requestedAt: string;
+        } | null;
+    };
+};
+
+export type CreateProjectResponse = CreateProjectResponses[keyof CreateProjectResponses];
+
+export type DeleteProjectData = {
+    body?: never;
+    headers?: {
+        'x-csrf-token'?: string;
+    };
+    path: {
+        projectId: string;
+    };
+    query: {
+        expectedConfigurationVersion: number;
+    };
+    url: '/api/v1/projects/{projectId}';
+};
+
+export type DeleteProjectErrors = {
+    /**
+     * ApiError
+     *
+     * Common error response returned by the Shipgate API.
+     */
+    default: {
+        code: string;
+        message: string;
+        requestId: string;
+        details?: unknown;
+    };
+};
+
+export type DeleteProjectError = DeleteProjectErrors[keyof DeleteProjectErrors];
+
+export type DeleteProjectResponses = {
+    /**
+     * Default Response
+     */
+    202: {
+        status: 'pending_deletion';
+        /**
+         * Project
+         */
+        project: {
+            id: string;
+            installationId: number;
+            repositoryId: number;
+            repository: {
+                ownerId: number;
+                ownerLogin: string;
+                name: string;
+                fullName: string;
+                defaultBranch: string | null;
+            };
+            sourceBranch: string;
+            productionBranch: string;
+            status: 'active' | 'disconnected' | 'pending_deletion' | 'deleted';
+            sourceSha: string | null;
+            productionSha: string | null;
+            lastSuccessfulSynchronization: string | null;
+            configurationVersion: number;
+            deletionRequestedAt: string | null;
+            createdAt: string;
+            updatedAt: string;
+        };
+    };
+};
+
+export type DeleteProjectResponse = DeleteProjectResponses[keyof DeleteProjectResponses];
+
+export type GetProjectData = {
+    body?: never;
+    path: {
+        projectId: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{projectId}';
+};
+
+export type GetProjectErrors = {
+    /**
+     * ApiError
+     *
+     * Common error response returned by the Shipgate API.
+     */
+    default: {
+        code: string;
+        message: string;
+        requestId: string;
+        details?: unknown;
+    };
+};
+
+export type GetProjectError = GetProjectErrors[keyof GetProjectErrors];
+
+export type GetProjectResponses = {
+    /**
+     * Project
+     *
+     * Default Response
+     */
+    200: {
+        id: string;
+        installationId: number;
+        repositoryId: number;
+        repository: {
+            ownerId: number;
+            ownerLogin: string;
+            name: string;
+            fullName: string;
+            defaultBranch: string | null;
+        };
+        sourceBranch: string;
+        productionBranch: string;
+        status: 'active' | 'disconnected' | 'pending_deletion' | 'deleted';
+        sourceSha: string | null;
+        productionSha: string | null;
+        lastSuccessfulSynchronization: string | null;
+        configurationVersion: number;
+        deletionRequestedAt: string | null;
+        createdAt: string;
+        updatedAt: string;
+    };
+};
+
+export type GetProjectResponse = GetProjectResponses[keyof GetProjectResponses];
+
+export type UpdateProjectData = {
+    body: {
+        expectedConfigurationVersion: number;
+        sourceBranch?: string;
+        productionBranch?: string;
+    };
+    headers?: {
+        'x-csrf-token'?: string;
+    };
+    path: {
+        projectId: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{projectId}';
+};
+
+export type UpdateProjectErrors = {
+    /**
+     * ApiError
+     *
+     * Common error response returned by the Shipgate API.
+     */
+    default: {
+        code: string;
+        message: string;
+        requestId: string;
+        details?: unknown;
+    };
+};
+
+export type UpdateProjectError = UpdateProjectErrors[keyof UpdateProjectErrors];
+
+export type UpdateProjectResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        status: 'created' | 'updated' | 'already_applied';
+        /**
+         * Project
+         */
+        project: {
+            id: string;
+            installationId: number;
+            repositoryId: number;
+            repository: {
+                ownerId: number;
+                ownerLogin: string;
+                name: string;
+                fullName: string;
+                defaultBranch: string | null;
+            };
+            sourceBranch: string;
+            productionBranch: string;
+            status: 'active' | 'disconnected' | 'pending_deletion' | 'deleted';
+            sourceSha: string | null;
+            productionSha: string | null;
+            lastSuccessfulSynchronization: string | null;
+            configurationVersion: number;
+            deletionRequestedAt: string | null;
+            createdAt: string;
+            updatedAt: string;
+        };
+        reconciliation: {
+            requestId: string;
+            status: 'queued';
+            configurationVersion: number;
+            reason: string;
+            mode: 'full';
+            sourceSha: string;
+            productionSha: string;
+            requestedAt: string;
+        } | null;
+    };
+    /**
+     * Default Response
+     */
+    202: {
+        status: 'created' | 'updated' | 'already_applied';
+        /**
+         * Project
+         */
+        project: {
+            id: string;
+            installationId: number;
+            repositoryId: number;
+            repository: {
+                ownerId: number;
+                ownerLogin: string;
+                name: string;
+                fullName: string;
+                defaultBranch: string | null;
+            };
+            sourceBranch: string;
+            productionBranch: string;
+            status: 'active' | 'disconnected' | 'pending_deletion' | 'deleted';
+            sourceSha: string | null;
+            productionSha: string | null;
+            lastSuccessfulSynchronization: string | null;
+            configurationVersion: number;
+            deletionRequestedAt: string | null;
+            createdAt: string;
+            updatedAt: string;
+        };
+        reconciliation: {
+            requestId: string;
+            status: 'queued';
+            configurationVersion: number;
+            reason: string;
+            mode: 'full';
+            sourceSha: string;
+            productionSha: string;
+            requestedAt: string;
+        } | null;
+    };
+};
+
+export type UpdateProjectResponse = UpdateProjectResponses[keyof UpdateProjectResponses];
+
 export type CreateDiagnosticJobData = {
     /**
      * DiagnosticJobRequest

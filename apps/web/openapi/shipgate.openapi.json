@@ -1277,6 +1277,1514 @@
         }
       }
     },
+    "/api/v1/projects": {
+      "post": {
+        "operationId": "createProject",
+        "summary": "Create a Shipgate project from a GitHub repository",
+        "tags": ["Projects"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["installationId", "repositoryId", "sourceBranch", "productionBranch"],
+                "properties": {
+                  "installationId": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "repositoryId": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "sourceBranch": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 255,
+                    "pattern": "^[^\\r\\n\\u0000]+$"
+                  },
+                  "productionBranch": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 255,
+                    "pattern": "^[^\\r\\n\\u0000]+$"
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            "in": "header",
+            "name": "x-csrf-token",
+            "required": false
+          }
+        ],
+        "security": [
+          {
+            "shipgateSession": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["status", "project", "reconciliation"],
+                  "properties": {
+                    "status": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": ["created"]
+                        },
+                        {
+                          "type": "string",
+                          "enum": ["updated"]
+                        },
+                        {
+                          "type": "string",
+                          "enum": ["already_applied"]
+                        }
+                      ]
+                    },
+                    "project": {
+                      "type": "object",
+                      "required": [
+                        "id",
+                        "installationId",
+                        "repositoryId",
+                        "repository",
+                        "sourceBranch",
+                        "productionBranch",
+                        "status",
+                        "sourceSha",
+                        "productionSha",
+                        "lastSuccessfulSynchronization",
+                        "configurationVersion",
+                        "deletionRequestedAt",
+                        "createdAt",
+                        "updatedAt"
+                      ],
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "installationId": {
+                          "type": "integer",
+                          "minimum": 1
+                        },
+                        "repositoryId": {
+                          "type": "integer",
+                          "minimum": 1
+                        },
+                        "repository": {
+                          "type": "object",
+                          "required": [
+                            "ownerId",
+                            "ownerLogin",
+                            "name",
+                            "fullName",
+                            "defaultBranch"
+                          ],
+                          "properties": {
+                            "ownerId": {
+                              "type": "integer",
+                              "minimum": 1
+                            },
+                            "ownerLogin": {
+                              "type": "string"
+                            },
+                            "name": {
+                              "type": "string"
+                            },
+                            "fullName": {
+                              "type": "string"
+                            },
+                            "defaultBranch": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        "sourceBranch": {
+                          "type": "string"
+                        },
+                        "productionBranch": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": ["active"]
+                            },
+                            {
+                              "type": "string",
+                              "enum": ["disconnected"]
+                            },
+                            {
+                              "type": "string",
+                              "enum": ["pending_deletion"]
+                            },
+                            {
+                              "type": "string",
+                              "enum": ["deleted"]
+                            }
+                          ]
+                        },
+                        "sourceSha": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "productionSha": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "lastSuccessfulSynchronization": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "configurationVersion": {
+                          "type": "integer",
+                          "minimum": 1
+                        },
+                        "deletionRequestedAt": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "createdAt": {
+                          "type": "string"
+                        },
+                        "updatedAt": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false,
+                      "title": "Project"
+                    },
+                    "reconciliation": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "required": [
+                            "requestId",
+                            "status",
+                            "configurationVersion",
+                            "reason",
+                            "mode",
+                            "sourceSha",
+                            "productionSha",
+                            "requestedAt"
+                          ],
+                          "properties": {
+                            "requestId": {
+                              "type": "string"
+                            },
+                            "status": {
+                              "type": "string",
+                              "enum": ["queued"]
+                            },
+                            "configurationVersion": {
+                              "type": "integer",
+                              "minimum": 1
+                            },
+                            "reason": {
+                              "type": "string"
+                            },
+                            "mode": {
+                              "type": "string",
+                              "enum": ["full"]
+                            },
+                            "sourceSha": {
+                              "type": "string"
+                            },
+                            "productionSha": {
+                              "type": "string"
+                            },
+                            "requestedAt": {
+                              "type": "string"
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Common error response returned by the Shipgate API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["code", "message", "requestId"],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "minLength": 1,
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "details": {}
+                  },
+                  "additionalProperties": false,
+                  "title": "ApiError",
+                  "description": "Common error response returned by the Shipgate API."
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "operationId": "getProjects",
+        "summary": "List projects visible to the current user",
+        "tags": ["Projects"],
+        "security": [
+          {
+            "shipgateSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["projects"],
+                  "properties": {
+                    "projects": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "id",
+                          "installationId",
+                          "repositoryId",
+                          "repository",
+                          "sourceBranch",
+                          "productionBranch",
+                          "status",
+                          "sourceSha",
+                          "productionSha",
+                          "lastSuccessfulSynchronization",
+                          "configurationVersion",
+                          "deletionRequestedAt",
+                          "createdAt",
+                          "updatedAt"
+                        ],
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "installationId": {
+                            "type": "integer",
+                            "minimum": 1
+                          },
+                          "repositoryId": {
+                            "type": "integer",
+                            "minimum": 1
+                          },
+                          "repository": {
+                            "type": "object",
+                            "required": [
+                              "ownerId",
+                              "ownerLogin",
+                              "name",
+                              "fullName",
+                              "defaultBranch"
+                            ],
+                            "properties": {
+                              "ownerId": {
+                                "type": "integer",
+                                "minimum": 1
+                              },
+                              "ownerLogin": {
+                                "type": "string"
+                              },
+                              "name": {
+                                "type": "string"
+                              },
+                              "fullName": {
+                                "type": "string"
+                              },
+                              "defaultBranch": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              }
+                            },
+                            "additionalProperties": false
+                          },
+                          "sourceBranch": {
+                            "type": "string"
+                          },
+                          "productionBranch": {
+                            "type": "string"
+                          },
+                          "status": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "enum": ["active"]
+                              },
+                              {
+                                "type": "string",
+                                "enum": ["disconnected"]
+                              },
+                              {
+                                "type": "string",
+                                "enum": ["pending_deletion"]
+                              },
+                              {
+                                "type": "string",
+                                "enum": ["deleted"]
+                              }
+                            ]
+                          },
+                          "sourceSha": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "productionSha": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "lastSuccessfulSynchronization": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "configurationVersion": {
+                            "type": "integer",
+                            "minimum": 1
+                          },
+                          "deletionRequestedAt": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "createdAt": {
+                            "type": "string"
+                          },
+                          "updatedAt": {
+                            "type": "string"
+                          }
+                        },
+                        "additionalProperties": false,
+                        "title": "Project"
+                      }
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Common error response returned by the Shipgate API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["code", "message", "requestId"],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "minLength": 1,
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "details": {}
+                  },
+                  "additionalProperties": false,
+                  "title": "ApiError",
+                  "description": "Common error response returned by the Shipgate API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{projectId}": {
+      "get": {
+        "operationId": "getProject",
+        "summary": "Get a Shipgate project",
+        "tags": ["Projects"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "in": "path",
+            "name": "projectId",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "shipgateSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "id",
+                    "installationId",
+                    "repositoryId",
+                    "repository",
+                    "sourceBranch",
+                    "productionBranch",
+                    "status",
+                    "sourceSha",
+                    "productionSha",
+                    "lastSuccessfulSynchronization",
+                    "configurationVersion",
+                    "deletionRequestedAt",
+                    "createdAt",
+                    "updatedAt"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "installationId": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "repositoryId": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "repository": {
+                      "type": "object",
+                      "required": ["ownerId", "ownerLogin", "name", "fullName", "defaultBranch"],
+                      "properties": {
+                        "ownerId": {
+                          "type": "integer",
+                          "minimum": 1
+                        },
+                        "ownerLogin": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "fullName": {
+                          "type": "string"
+                        },
+                        "defaultBranch": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "sourceBranch": {
+                      "type": "string"
+                    },
+                    "productionBranch": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": ["active"]
+                        },
+                        {
+                          "type": "string",
+                          "enum": ["disconnected"]
+                        },
+                        {
+                          "type": "string",
+                          "enum": ["pending_deletion"]
+                        },
+                        {
+                          "type": "string",
+                          "enum": ["deleted"]
+                        }
+                      ]
+                    },
+                    "sourceSha": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "productionSha": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "lastSuccessfulSynchronization": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "configurationVersion": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "deletionRequestedAt": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "createdAt": {
+                      "type": "string"
+                    },
+                    "updatedAt": {
+                      "type": "string"
+                    }
+                  },
+                  "additionalProperties": false,
+                  "title": "Project"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Common error response returned by the Shipgate API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["code", "message", "requestId"],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "minLength": 1,
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "details": {}
+                  },
+                  "additionalProperties": false,
+                  "title": "ApiError",
+                  "description": "Common error response returned by the Shipgate API."
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "operationId": "updateProject",
+        "summary": "Change source or production branch",
+        "tags": ["Projects"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["expectedConfigurationVersion"],
+                "properties": {
+                  "expectedConfigurationVersion": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "sourceBranch": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 255,
+                    "pattern": "^[^\\r\\n\\u0000]+$"
+                  },
+                  "productionBranch": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 255,
+                    "pattern": "^[^\\r\\n\\u0000]+$"
+                  }
+                },
+                "additionalProperties": false,
+                "minProperties": 2
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "in": "path",
+            "name": "projectId",
+            "required": true
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            "in": "header",
+            "name": "x-csrf-token",
+            "required": false
+          }
+        ],
+        "security": [
+          {
+            "shipgateSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["status", "project", "reconciliation"],
+                  "properties": {
+                    "status": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": ["created"]
+                        },
+                        {
+                          "type": "string",
+                          "enum": ["updated"]
+                        },
+                        {
+                          "type": "string",
+                          "enum": ["already_applied"]
+                        }
+                      ]
+                    },
+                    "project": {
+                      "type": "object",
+                      "required": [
+                        "id",
+                        "installationId",
+                        "repositoryId",
+                        "repository",
+                        "sourceBranch",
+                        "productionBranch",
+                        "status",
+                        "sourceSha",
+                        "productionSha",
+                        "lastSuccessfulSynchronization",
+                        "configurationVersion",
+                        "deletionRequestedAt",
+                        "createdAt",
+                        "updatedAt"
+                      ],
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "installationId": {
+                          "type": "integer",
+                          "minimum": 1
+                        },
+                        "repositoryId": {
+                          "type": "integer",
+                          "minimum": 1
+                        },
+                        "repository": {
+                          "type": "object",
+                          "required": [
+                            "ownerId",
+                            "ownerLogin",
+                            "name",
+                            "fullName",
+                            "defaultBranch"
+                          ],
+                          "properties": {
+                            "ownerId": {
+                              "type": "integer",
+                              "minimum": 1
+                            },
+                            "ownerLogin": {
+                              "type": "string"
+                            },
+                            "name": {
+                              "type": "string"
+                            },
+                            "fullName": {
+                              "type": "string"
+                            },
+                            "defaultBranch": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        "sourceBranch": {
+                          "type": "string"
+                        },
+                        "productionBranch": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": ["active"]
+                            },
+                            {
+                              "type": "string",
+                              "enum": ["disconnected"]
+                            },
+                            {
+                              "type": "string",
+                              "enum": ["pending_deletion"]
+                            },
+                            {
+                              "type": "string",
+                              "enum": ["deleted"]
+                            }
+                          ]
+                        },
+                        "sourceSha": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "productionSha": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "lastSuccessfulSynchronization": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "configurationVersion": {
+                          "type": "integer",
+                          "minimum": 1
+                        },
+                        "deletionRequestedAt": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "createdAt": {
+                          "type": "string"
+                        },
+                        "updatedAt": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false,
+                      "title": "Project"
+                    },
+                    "reconciliation": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "required": [
+                            "requestId",
+                            "status",
+                            "configurationVersion",
+                            "reason",
+                            "mode",
+                            "sourceSha",
+                            "productionSha",
+                            "requestedAt"
+                          ],
+                          "properties": {
+                            "requestId": {
+                              "type": "string"
+                            },
+                            "status": {
+                              "type": "string",
+                              "enum": ["queued"]
+                            },
+                            "configurationVersion": {
+                              "type": "integer",
+                              "minimum": 1
+                            },
+                            "reason": {
+                              "type": "string"
+                            },
+                            "mode": {
+                              "type": "string",
+                              "enum": ["full"]
+                            },
+                            "sourceSha": {
+                              "type": "string"
+                            },
+                            "productionSha": {
+                              "type": "string"
+                            },
+                            "requestedAt": {
+                              "type": "string"
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["status", "project", "reconciliation"],
+                  "properties": {
+                    "status": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": ["created"]
+                        },
+                        {
+                          "type": "string",
+                          "enum": ["updated"]
+                        },
+                        {
+                          "type": "string",
+                          "enum": ["already_applied"]
+                        }
+                      ]
+                    },
+                    "project": {
+                      "type": "object",
+                      "required": [
+                        "id",
+                        "installationId",
+                        "repositoryId",
+                        "repository",
+                        "sourceBranch",
+                        "productionBranch",
+                        "status",
+                        "sourceSha",
+                        "productionSha",
+                        "lastSuccessfulSynchronization",
+                        "configurationVersion",
+                        "deletionRequestedAt",
+                        "createdAt",
+                        "updatedAt"
+                      ],
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "installationId": {
+                          "type": "integer",
+                          "minimum": 1
+                        },
+                        "repositoryId": {
+                          "type": "integer",
+                          "minimum": 1
+                        },
+                        "repository": {
+                          "type": "object",
+                          "required": [
+                            "ownerId",
+                            "ownerLogin",
+                            "name",
+                            "fullName",
+                            "defaultBranch"
+                          ],
+                          "properties": {
+                            "ownerId": {
+                              "type": "integer",
+                              "minimum": 1
+                            },
+                            "ownerLogin": {
+                              "type": "string"
+                            },
+                            "name": {
+                              "type": "string"
+                            },
+                            "fullName": {
+                              "type": "string"
+                            },
+                            "defaultBranch": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        "sourceBranch": {
+                          "type": "string"
+                        },
+                        "productionBranch": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": ["active"]
+                            },
+                            {
+                              "type": "string",
+                              "enum": ["disconnected"]
+                            },
+                            {
+                              "type": "string",
+                              "enum": ["pending_deletion"]
+                            },
+                            {
+                              "type": "string",
+                              "enum": ["deleted"]
+                            }
+                          ]
+                        },
+                        "sourceSha": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "productionSha": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "lastSuccessfulSynchronization": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "configurationVersion": {
+                          "type": "integer",
+                          "minimum": 1
+                        },
+                        "deletionRequestedAt": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "createdAt": {
+                          "type": "string"
+                        },
+                        "updatedAt": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false,
+                      "title": "Project"
+                    },
+                    "reconciliation": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "required": [
+                            "requestId",
+                            "status",
+                            "configurationVersion",
+                            "reason",
+                            "mode",
+                            "sourceSha",
+                            "productionSha",
+                            "requestedAt"
+                          ],
+                          "properties": {
+                            "requestId": {
+                              "type": "string"
+                            },
+                            "status": {
+                              "type": "string",
+                              "enum": ["queued"]
+                            },
+                            "configurationVersion": {
+                              "type": "integer",
+                              "minimum": 1
+                            },
+                            "reason": {
+                              "type": "string"
+                            },
+                            "mode": {
+                              "type": "string",
+                              "enum": ["full"]
+                            },
+                            "sourceSha": {
+                              "type": "string"
+                            },
+                            "productionSha": {
+                              "type": "string"
+                            },
+                            "requestedAt": {
+                              "type": "string"
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Common error response returned by the Shipgate API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["code", "message", "requestId"],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "minLength": 1,
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "details": {}
+                  },
+                  "additionalProperties": false,
+                  "title": "ApiError",
+                  "description": "Common error response returned by the Shipgate API."
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteProject",
+        "summary": "Request deletion of a Shipgate project",
+        "tags": ["Projects"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "in": "query",
+            "name": "expectedConfigurationVersion",
+            "required": true
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "in": "path",
+            "name": "projectId",
+            "required": true
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            "in": "header",
+            "name": "x-csrf-token",
+            "required": false
+          }
+        ],
+        "security": [
+          {
+            "shipgateSession": []
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["status", "project"],
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": ["pending_deletion"]
+                    },
+                    "project": {
+                      "type": "object",
+                      "required": [
+                        "id",
+                        "installationId",
+                        "repositoryId",
+                        "repository",
+                        "sourceBranch",
+                        "productionBranch",
+                        "status",
+                        "sourceSha",
+                        "productionSha",
+                        "lastSuccessfulSynchronization",
+                        "configurationVersion",
+                        "deletionRequestedAt",
+                        "createdAt",
+                        "updatedAt"
+                      ],
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "installationId": {
+                          "type": "integer",
+                          "minimum": 1
+                        },
+                        "repositoryId": {
+                          "type": "integer",
+                          "minimum": 1
+                        },
+                        "repository": {
+                          "type": "object",
+                          "required": [
+                            "ownerId",
+                            "ownerLogin",
+                            "name",
+                            "fullName",
+                            "defaultBranch"
+                          ],
+                          "properties": {
+                            "ownerId": {
+                              "type": "integer",
+                              "minimum": 1
+                            },
+                            "ownerLogin": {
+                              "type": "string"
+                            },
+                            "name": {
+                              "type": "string"
+                            },
+                            "fullName": {
+                              "type": "string"
+                            },
+                            "defaultBranch": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        "sourceBranch": {
+                          "type": "string"
+                        },
+                        "productionBranch": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": ["active"]
+                            },
+                            {
+                              "type": "string",
+                              "enum": ["disconnected"]
+                            },
+                            {
+                              "type": "string",
+                              "enum": ["pending_deletion"]
+                            },
+                            {
+                              "type": "string",
+                              "enum": ["deleted"]
+                            }
+                          ]
+                        },
+                        "sourceSha": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "productionSha": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "lastSuccessfulSynchronization": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "configurationVersion": {
+                          "type": "integer",
+                          "minimum": 1
+                        },
+                        "deletionRequestedAt": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "createdAt": {
+                          "type": "string"
+                        },
+                        "updatedAt": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false,
+                      "title": "Project"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Common error response returned by the Shipgate API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["code", "message", "requestId"],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "minLength": 1,
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "details": {}
+                  },
+                  "additionalProperties": false,
+                  "title": "ApiError",
+                  "description": "Common error response returned by the Shipgate API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/_diagnostics/jobs": {
       "post": {
         "operationId": "createDiagnosticJob",
@@ -1570,6 +3078,10 @@
     {
       "name": "Connections",
       "description": "GitHub connection and installation state."
+    },
+    {
+      "name": "Projects",
+      "description": "Shipgate project configuration and repository topology."
     },
     {
       "name": "Operations",

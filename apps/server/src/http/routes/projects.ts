@@ -1,0 +1,339 @@
+import { type FastifyPluginAsyncTypebox, Type } from '@fastify/type-provider-typebox'
+import { DatabaseOperationError } from '@shipgate/database'
+
+import type { ApplicationContext } from '../../application-context.js'
+import type { AuthenticatedSession } from '../../auth/model.js'
+import {
+  type ConfigureProjectResult,
+  ProjectConfigurationValidationError,
+  ProjectNotFoundError,
+  type ProjectRecord,
+  ProjectVersionConflictError,
+  type ReconciliationRequestRecord,
+  RepositoryAlreadyConnectedError,
+} from '../../projects/index.js'
+import { ApiHttpError } from '../api-error.js'
+import { CsrfHeadersSchema } from '../auth-schemas.js'
+import {
+  CreateProjectBodySchema,
+  DeleteProjectQuerySchema,
+  ProjectListSchema,
+  ProjectMutationResponseSchema,
+  ProjectParamsSchema,
+  ProjectSchema,
+  UpdateProjectBodySchema,
+} from '../project-schemas.js'
+import { ApiErrorSchema } from '../schemas.js'
+import { requireAuthenticatedSession, requireCsrfProtection } from '../session-middleware.js'
+
+export const projectRoutes: FastifyPluginAsyncTypebox<{
+  readonly context: ApplicationContext
+}> = async (app, { context }) => {
+  app.post(
+    '/projects',
+    {
+      preHandler: [requireAuthenticatedSession, requireCsrfProtection],
+      schema: {
+        operationId: 'createProject',
+        summary: 'Create a Shipgate project from a GitHub repository',
+        tags: ['Projects'],
+        security: [{ shipgateSession: [] }],
+        headers: CsrfHeadersSchema,
+        body: CreateProjectBodySchema,
+        response: { 201: ProjectMutationResponseSchema, default: ApiErrorSchema },
+      },
+    },
+    async (request, reply) => {
+      const session = requireSession(request.shipgateSession)
+
+      try {
+        const result = await context.projects.create({
+          actorGitHubUserId: session.githubUserId,
+          ...request.body,
+        })
+
+        return reply.code(201).send(mapMutationResult(result))
+      } catch (error) {
+        throw mapProjectError(error)
+      }
+    },
+  )
+
+  app.get(
+    '/projects',
+    {
+      preHandler: [requireAuthenticatedSession],
+      schema: {
+        operationId: 'getProjects',
+        summary: 'List projects visible to the current user',
+        tags: ['Projects'],
+        security: [{ shipgateSession: [] }],
+        response: { 200: ProjectListSchema, default: ApiErrorSchema },
+      },
+    },
+    async (request) => {
+      const session = requireSession(request.shipgateSession)
+
+      try {
+        return {
+          projects: (await context.projects.list(session.githubUserId)).map(mapProject),
+        }
+      } catch (error) {
+        throw mapProjectError(error)
+      }
+    },
+  )
+
+  app.get(
+    '/projects/:projectId',
+    {
+      preHandler: [requireAuthenticatedSession],
+      schema: {
+        operationId: 'getProject',
+        summary: 'Get a Shipgate project',
+        tags: ['Projects'],
+        security: [{ shipgateSession: [] }],
+        params: ProjectParamsSchema,
+        response: { 200: ProjectSchema, default: ApiErrorSchema },
+      },
+    },
+    async (request) => {
+      const session = requireSession(request.shipgateSession)
+
+      try {
+        return mapProject(
+          await context.projects.get(session.githubUserId, request.params.projectId),
+        )
+      } catch (error) {
+        throw mapProjectError(error)
+      }
+    },
+  )
+
+  app.patch(
+    '/projects/:projectId',
+    {
+      preHandler: [requireAuthenticatedSession, requireCsrfProtection],
+      schema: {
+        operationId: 'updateProject',
+        summary: 'Change source or production branch',
+        tags: ['Projects'],
+        security: [{ shipgateSession: [] }],
+        headers: CsrfHeadersSchema,
+        params: ProjectParamsSchema,
+        body: UpdateProjectBodySchema,
+        response: {
+          200: ProjectMutationResponseSchema,
+          202: ProjectMutationResponseSchema,
+          default: ApiErrorSchema,
+        },
+      },
+    },
+    async (request, reply) => {
+      const session = requireSession(request.shipgateSession)
+
+      try {
+        const result = await context.projects.update({
+          actorGitHubUserId: session.githubUserId,
+          projectId: request.params.projectId,
+          expectedConfigurationVersion: request.body.expectedConfigurationVersion,
+          ...(request.body.sourceBranch !== undefined
+            ? { sourceBranch: request.body.sourceBranch }
+            : {}),
+          ...(request.body.productionBranch !== undefined
+            ? { productionBranch: request.body.productionBranch }
+            : {}),
+        })
+        const code = result.status === 'already_applied' ? 200 : 202
+
+        return reply.code(code).send(mapMutationResult(result))
+      } catch (error) {
+        throw mapProjectError(error)
+      }
+    },
+  )
+
+  app.delete(
+    '/projects/:projectId',
+    {
+      preHandler: [requireAuthenticatedSession, requireCsrfProtection],
+      schema: {
+        operationId: 'deleteProject',
+        summary: 'Request deletion of a Shipgate project',
+        tags: ['Projects'],
+        security: [{ shipgateSession: [] }],
+        headers: CsrfHeadersSchema,
+        params: ProjectParamsSchema,
+        querystring: DeleteProjectQuerySchema,
+        response: {
+          202: Type.Object(
+            { status: Type.Literal('pending_deletion'), project: ProjectSchema },
+            { additionalProperties: false },
+          ),
+          default: ApiErrorSchema,
+        },
+      },
+    },
+    async (request, reply) => {
+      const session = requireSession(request.shipgateSession)
+
+      try {
+        const project = await context.projects.delete({
+          actorGitHubUserId: session.githubUserId,
+          projectId: request.params.projectId,
+          expectedConfigurationVersion: request.query.expectedConfigurationVersion,
+        })
+
+        return reply
+          .code(202)
+          .send({ status: 'pending_deletion' as const, project: mapProject(project) })
+      } catch (error) {
+        throw mapProjectError(error)
+      }
+    },
+  )
+}
+
+function mapMutationResult(result: ConfigureProjectResult) {
+  return {
+    status: result.status,
+    project: mapProject(result.project),
+    reconciliation: mapReconciliation(result.reconciliation),
+  }
+}
+
+function mapProject(project: ProjectRecord) {
+  return {
+    id: project.id,
+    installationId: parseSafeId(project.installationId, 'installation ID'),
+    repositoryId: parseSafeId(project.repositoryId, 'repository ID'),
+    repository: {
+      ownerId: parseSafeId(project.ownerId, 'repository owner ID'),
+      ownerLogin: project.ownerLogin,
+      name: project.repositoryName,
+      fullName: project.repositoryFullName,
+      defaultBranch: project.defaultBranch,
+    },
+    sourceBranch: project.sourceBranch,
+    productionBranch: project.productionBranch,
+    status: project.status,
+    sourceSha: project.sourceSha,
+    productionSha: project.productionSha,
+    lastSuccessfulSynchronization: project.lastSuccessfulSyncAt?.toISOString() ?? null,
+    configurationVersion: project.configurationVersion,
+    deletionRequestedAt: project.deletionRequestedAt?.toISOString() ?? null,
+    createdAt: project.createdAt.toISOString(),
+    updatedAt: project.updatedAt.toISOString(),
+  }
+}
+
+function mapReconciliation(reconciliation: ReconciliationRequestRecord | null) {
+  return reconciliation
+    ? {
+        requestId: reconciliation.id,
+        status: 'queued' as const,
+        configurationVersion: reconciliation.configurationVersion,
+        reason: reconciliation.reason,
+        mode: reconciliation.mode,
+        sourceSha: reconciliation.sourceSha,
+        productionSha: reconciliation.productionSha,
+        requestedAt: reconciliation.requestedAt.toISOString(),
+      }
+    : null
+}
+
+function mapProjectError(error: unknown): Error {
+  if (error instanceof ApiHttpError) {
+    return error
+  }
+
+  if (error instanceof ProjectNotFoundError) {
+    return new ApiHttpError({ statusCode: 404, code: 'PROJECT_NOT_FOUND', message: error.message })
+  }
+
+  if (error instanceof RepositoryAlreadyConnectedError) {
+    return new ApiHttpError({
+      statusCode: 409,
+      code: 'REPOSITORY_ALREADY_CONNECTED',
+      message: error.message,
+      details: { projectId: error.projectId, repositoryId: error.repositoryId },
+    })
+  }
+
+  if (error instanceof ProjectVersionConflictError) {
+    return new ApiHttpError({
+      statusCode: 409,
+      code: 'PROJECT_CONFIGURATION_VERSION_CONFLICT',
+      message: error.message,
+      details: { expected: error.expectedVersion, actual: error.actualVersion },
+    })
+  }
+
+  if (error instanceof ProjectConfigurationValidationError) {
+    const statusCode = getValidationStatusCode(error.code)
+
+    return new ApiHttpError({
+      statusCode,
+      code: error.code.toUpperCase(),
+      message: error.message,
+      ...(error.details !== undefined ? { details: error.details } : {}),
+      cause: error,
+    })
+  }
+
+  if (error instanceof DatabaseOperationError && error.kind === 'conflict') {
+    return new ApiHttpError({
+      statusCode: 409,
+      code: 'PROJECT_CONFLICT',
+      message: 'Project configuration conflicts with current repository state',
+      cause: error,
+    })
+  }
+
+  return error instanceof Error ? error : new Error(String(error))
+}
+
+function getValidationStatusCode(code: ProjectConfigurationValidationError['code']): number {
+  switch (code) {
+    case 'permission_missing':
+      return 403
+    case 'external_state_unknown':
+      return 503
+    case 'installation_unavailable':
+    case 'repository_unavailable':
+    case 'app_permissions_missing':
+    case 'repository_state_changed':
+    case 'project_not_active':
+      return 409
+    case 'invalid_branch_name':
+    case 'source_equals_production':
+    case 'source_branch_missing':
+    case 'production_branch_missing':
+    case 'source_ref_not_commit':
+    case 'production_ref_not_commit':
+    case 'production_branch_not_ancestor':
+      return 422
+  }
+}
+
+function parseSafeId(value: string, name: string): number {
+  const parsed = Number(value)
+
+  if (!Number.isSafeInteger(parsed) || parsed <= 0) {
+    throw new Error(`Stored ${name} is invalid: ${value}`)
+  }
+
+  return parsed
+}
+
+function requireSession(value: AuthenticatedSession | undefined): AuthenticatedSession {
+  if (!value) {
+    throw new ApiHttpError({
+      statusCode: 401,
+      code: 'AUTHENTICATION_REQUIRED',
+      message: 'A valid Shipgate session is required',
+    })
+  }
+
+  return value
+}

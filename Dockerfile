@@ -13,6 +13,7 @@ RUN apt-get update \
     --yes \
     --no-install-recommends \
     ca-certificates \
+    git \
   && rm -rf /var/lib/apt/lists/*
 
 RUN corepack enable
@@ -21,13 +22,6 @@ WORKDIR /workspace
 
 
 FROM base AS dependencies
-
-RUN apt-get update \
-  && apt-get install \
-    --yes \
-    --no-install-recommends \
-    git \
-  && rm -rf /var/lib/apt/lists/*
 
 COPY package.json ./
 COPY pnpm-lock.yaml ./

@@ -7,6 +7,7 @@ import { authRoutes } from './auth.js'
 import { connectionRoutes } from './connection.js'
 import { diagnosticJobRoutes } from './diagnostic-jobs.js'
 import { githubWebhookRoutes } from './github-webhooks.js'
+import { projectRoutes } from './projects.js'
 
 interface ApiV1RoutesOptions {
   readonly context: ApplicationContext
@@ -30,6 +31,10 @@ export const apiV1Routes: FastifyPluginAsyncTypebox<ApiV1RoutesOptions> = async 
   })
 
   await app.register(connectionRoutes, {
+    context: options.context,
+  })
+
+  await app.register(projectRoutes, {
     context: options.context,
   })
 

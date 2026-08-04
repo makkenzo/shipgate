@@ -3,8 +3,8 @@
 import { queryOptions, type UseMutationOptions } from '@tanstack/react-query';
 
 import { client } from '../client.gen';
-import { createDiagnosticJob, deleteLocalAccount, disconnectGitHub, getAuthSession, getConnectionConfiguration, getDiagnosticJob, getHealth, getInstallation, getInstallations, getReadiness, logout, type Options } from '../sdk.gen';
-import type { CreateDiagnosticJobData, CreateDiagnosticJobError, CreateDiagnosticJobResponse, DeleteLocalAccountData, DeleteLocalAccountError, DeleteLocalAccountResponse, DisconnectGitHubData, DisconnectGitHubError, DisconnectGitHubResponse, GetAuthSessionData, GetAuthSessionError, GetAuthSessionResponse, GetConnectionConfigurationData, GetConnectionConfigurationError, GetConnectionConfigurationResponse, GetDiagnosticJobData, GetDiagnosticJobError, GetDiagnosticJobResponse, GetHealthData, GetHealthError, GetHealthResponse, GetInstallationData, GetInstallationError, GetInstallationResponse, GetInstallationsData, GetInstallationsError, GetInstallationsResponse, GetReadinessData, GetReadinessError, GetReadinessResponse, LogoutData, LogoutError, LogoutResponse } from '../types.gen';
+import { createDiagnosticJob, createProject, deleteLocalAccount, deleteProject, disconnectGitHub, getAuthSession, getConnectionConfiguration, getDiagnosticJob, getHealth, getInstallation, getInstallations, getProject, getProjects, getReadiness, logout, type Options, updateProject } from '../sdk.gen';
+import type { CreateDiagnosticJobData, CreateDiagnosticJobError, CreateDiagnosticJobResponse, CreateProjectData, CreateProjectError, CreateProjectResponse, DeleteLocalAccountData, DeleteLocalAccountError, DeleteLocalAccountResponse, DeleteProjectData, DeleteProjectError, DeleteProjectResponse, DisconnectGitHubData, DisconnectGitHubError, DisconnectGitHubResponse, GetAuthSessionData, GetAuthSessionError, GetAuthSessionResponse, GetConnectionConfigurationData, GetConnectionConfigurationError, GetConnectionConfigurationResponse, GetDiagnosticJobData, GetDiagnosticJobError, GetDiagnosticJobResponse, GetHealthData, GetHealthError, GetHealthResponse, GetInstallationData, GetInstallationError, GetInstallationResponse, GetInstallationsData, GetInstallationsError, GetInstallationsResponse, GetProjectData, GetProjectError, GetProjectResponse, GetProjectsData, GetProjectsError, GetProjectsResponse, GetReadinessData, GetReadinessError, GetReadinessResponse, LogoutData, LogoutError, LogoutResponse, UpdateProjectData, UpdateProjectError, UpdateProjectResponse } from '../types.gen';
 
 export type QueryKey<TOptions extends Options> = [
     Pick<TOptions, 'baseUrl' | 'body' | 'headers' | 'path' | 'query'> & {
@@ -232,6 +232,102 @@ export const deleteLocalAccountMutation = (options?: Partial<Options<DeleteLocal
             return data;
         },
         mutationKey: deleteLocalAccountMutationKey(options)
+    };
+    return mutationOptions;
+};
+
+export const getProjectsQueryKey = (options?: Options<GetProjectsData>) => createQueryKey('getProjects', options);
+
+/**
+ * List projects visible to the current user
+ */
+export const getProjectsOptions = (options?: Options<GetProjectsData>) => queryOptions<GetProjectsResponse, GetProjectsError, GetProjectsResponse, ReturnType<typeof getProjectsQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await getProjects({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getProjectsQueryKey(options)
+});
+
+export const createProjectMutationKey = (options?: Partial<Options<CreateProjectData>>) => createMutationKey('createProject', options);
+
+/**
+ * Create a Shipgate project from a GitHub repository
+ */
+export const createProjectMutation = (options?: Partial<Options<CreateProjectData>>): UseMutationOptions<CreateProjectResponse, CreateProjectError, Options<CreateProjectData>> => {
+    const mutationOptions: UseMutationOptions<CreateProjectResponse, CreateProjectError, Options<CreateProjectData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await createProject({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        },
+        mutationKey: createProjectMutationKey(options)
+    };
+    return mutationOptions;
+};
+
+export const deleteProjectMutationKey = (options?: Partial<Options<DeleteProjectData>>) => createMutationKey('deleteProject', options);
+
+/**
+ * Request deletion of a Shipgate project
+ */
+export const deleteProjectMutation = (options?: Partial<Options<DeleteProjectData>>): UseMutationOptions<DeleteProjectResponse, DeleteProjectError, Options<DeleteProjectData>> => {
+    const mutationOptions: UseMutationOptions<DeleteProjectResponse, DeleteProjectError, Options<DeleteProjectData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await deleteProject({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        },
+        mutationKey: deleteProjectMutationKey(options)
+    };
+    return mutationOptions;
+};
+
+export const getProjectQueryKey = (options: Options<GetProjectData>) => createQueryKey('getProject', options);
+
+/**
+ * Get a Shipgate project
+ */
+export const getProjectOptions = (options: Options<GetProjectData>) => queryOptions<GetProjectResponse, GetProjectError, GetProjectResponse, ReturnType<typeof getProjectQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await getProject({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getProjectQueryKey(options)
+});
+
+export const updateProjectMutationKey = (options?: Partial<Options<UpdateProjectData>>) => createMutationKey('updateProject', options);
+
+/**
+ * Change source or production branch
+ */
+export const updateProjectMutation = (options?: Partial<Options<UpdateProjectData>>): UseMutationOptions<UpdateProjectResponse, UpdateProjectError, Options<UpdateProjectData>> => {
+    const mutationOptions: UseMutationOptions<UpdateProjectResponse, UpdateProjectError, Options<UpdateProjectData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await updateProject({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        },
+        mutationKey: updateProjectMutationKey(options)
     };
     return mutationOptions;
 };

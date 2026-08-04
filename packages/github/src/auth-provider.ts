@@ -45,6 +45,11 @@ const defaultInstallationPermissions: InstallationPermissions = Object.freeze({
   metadata: 'read',
 })
 
+export interface GitHubInstallationTokenLease {
+  readonly token: string
+  readonly expiresAt: Date
+}
+
 export interface GitHubAuthProvider {
   getAppClient(): Promise<AppGitHubClient>
 
@@ -53,6 +58,15 @@ export interface GitHubAuthProvider {
     repositoryIds?: number[]
     permissions?: InstallationPermissions
   }): Promise<InstallationGitHubClient>
+
+  withInstallationToken?<Result>(
+    input: {
+      readonly installationId: number
+      readonly repositoryIds?: number[]
+      readonly permissions?: InstallationPermissions
+    },
+    callback: (lease: GitHubInstallationTokenLease) => Promise<Result>,
+  ): Promise<Result>
 
   getUserClient(userId: number): Promise<UserGitHubClient>
 }
@@ -259,6 +273,45 @@ class DefaultGitHubAuthenticationService implements GitHubAuthenticationService 
     }
 
     return promise
+  }
+
+  async withInstallationToken<Result>(
+    input: {
+      readonly installationId: number
+      readonly repositoryIds?: number[]
+      readonly permissions?: InstallationPermissions
+    },
+    callback: (lease: GitHubInstallationTokenLease) => Promise<Result>,
+  ): Promise<Result> {
+    assertPositiveSafeInteger('installationId', input.installationId)
+
+    const scope = normalizeInstallationScope(input)
+    const appClient = await this.getAppClient()
+    const response = await appClient.request(
+      'POST /app/installations/{installation_id}/access_tokens',
+      {
+        installation_id: input.installationId,
+        permissions: scope.permissions,
+        ...(scope.repositoryIds !== undefined
+          ? {
+              repository_ids: [...scope.repositoryIds],
+            }
+          : {}),
+      },
+    )
+    const token = getStringProperty(response.data, 'token')
+    const expiresAt = getDateProperty(response.data, 'expires_at')
+
+    if (!token || !expiresAt) {
+      throw new GitHubAuthenticationError(
+        'GitHub installation token response is missing token or expires_at',
+      )
+    }
+
+    return callback({
+      token,
+      expiresAt,
+    })
   }
 
   async getUserClient(userId: number): Promise<UserGitHubClient> {

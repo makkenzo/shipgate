@@ -79,6 +79,12 @@ export async function buildApiApplication(context: ApplicationContext): Promise<
         },
 
         {
+          name: 'Projects',
+
+          description: 'Shipgate project configuration and repository topology.',
+        },
+
+        {
           name: 'Operations',
 
           description: 'Application health and readiness.',

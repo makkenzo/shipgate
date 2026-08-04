@@ -53,6 +53,10 @@ export interface DatabaseSchema {
 
   repository_sync_issues: RepositorySyncIssueTable
 
+  project_audit_events: ProjectAuditEventTable
+
+  repository_reconciliation_requests: RepositoryReconciliationRequestTable
+
   shipgate_job_execution: ShipgateJobExecutionTable
 
   shipgate_worker_heartbeat: ShipgateWorkerHeartbeatTable
@@ -446,6 +450,49 @@ export interface RepositorySyncIssueTable {
   message: string
   details: ColumnType<JsonValue, string, string>
   created_at: Generated<Date>
+}
+
+export type ProjectAuditEventType =
+  | 'project_created'
+  | 'project_configuration_changed'
+  | 'project_deletion_requested'
+
+export type ProjectAuditSource = 'user' | 'system' | 'reconciliation'
+
+export interface ProjectAuditEventTable {
+  id: string
+  project_id: string
+  repository_id: string
+  actor_github_user_id: string | null
+  event_type: ProjectAuditEventType
+  source: ProjectAuditSource
+  configuration_version: number
+  payload: ColumnType<JsonValue, string, string>
+  occurred_at: Date
+  created_at: Generated<Date>
+}
+
+export type RepositoryReconciliationMode = 'full'
+
+export type RepositoryReconciliationRequestStatus = 'queued' | 'claimed' | 'completed' | 'cancelled'
+
+export interface RepositoryReconciliationRequestTable {
+  id: string
+  project_id: string
+  repository_id: string
+  configuration_version: number
+  reason: string
+  mode: Generated<RepositoryReconciliationMode>
+  status: Generated<RepositoryReconciliationRequestStatus>
+  requested_by_github_user_id: string | null
+  source_sha: string
+  production_sha: string
+  idempotency_key: string
+  requested_at: Date
+  claimed_at: Date | null
+  completed_at: Date | null
+  created_at: Generated<Date>
+  updated_at: Generated<Date>
 }
 
 export type JobExecutionStatus = 'queued' | 'running' | 'retrying' | 'succeeded' | 'failed'

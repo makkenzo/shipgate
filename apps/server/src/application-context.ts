@@ -15,6 +15,12 @@ import {
 } from './github-access/index.js'
 import { createApplicationGitHubAuthentication } from './github-auth.js'
 import { createLogger, type ProcessKind } from './logger.js'
+import {
+  createProjectService,
+  createProjectTopologyValidator,
+  createReadOnlyGitWorkspace,
+  type ProjectService,
+} from './projects/index.js'
 import { createShutdownManager, type ShutdownManager } from './shutdown.js'
 
 export interface ApplicationContext {
@@ -26,6 +32,7 @@ export interface ApplicationContext {
   readonly githubSecrets: GitHubSecrets
   readonly githubAuth: GitHubAuthenticationService
   readonly githubRepositoryAccess: GitHubRepositoryAccessService
+  readonly projects: ProjectService
   readonly shutdown: ShutdownManager
 
   createCorrelationId(): string
@@ -134,6 +141,14 @@ export function createApplicationContext(
     githubAuth,
   })
   githubRepositoryAccess = repositoryAccess
+  const projects = createProjectService({
+    database,
+    githubRepositoryAccess: repositoryAccess,
+    topologyValidator: createProjectTopologyValidator({
+      githubAuth,
+      gitWorkspace: createReadOnlyGitWorkspace(),
+    }),
+  })
 
   return {
     processKind: options.processKind,
@@ -144,6 +159,7 @@ export function createApplicationContext(
     githubSecrets,
     githubAuth,
     githubRepositoryAccess: repositoryAccess,
+    projects,
     shutdown,
     createCorrelationId,
 

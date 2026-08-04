@@ -79,3 +79,40 @@ export class RepositoryProjectionIdempotencyConflictError extends Error {
     this.idempotencyKey = idempotencyKey
   }
 }
+
+export type ProjectConfigurationValidationCode =
+  | 'installation_unavailable'
+  | 'repository_unavailable'
+  | 'permission_missing'
+  | 'app_permissions_missing'
+  | 'source_equals_production'
+  | 'invalid_branch_name'
+  | 'source_branch_missing'
+  | 'production_branch_missing'
+  | 'source_ref_not_commit'
+  | 'production_ref_not_commit'
+  | 'production_branch_not_ancestor'
+  | 'repository_state_changed'
+  | 'external_state_unknown'
+  | 'project_not_active'
+
+export class ProjectConfigurationValidationError extends Error {
+  readonly code: ProjectConfigurationValidationCode
+  readonly details: Readonly<Record<string, unknown>> | undefined
+
+  constructor(
+    code: ProjectConfigurationValidationCode,
+    message: string,
+    options: {
+      readonly details?: Readonly<Record<string, unknown>>
+      readonly cause?: unknown
+    } = {},
+  ) {
+    super(message, {
+      ...(options.cause !== undefined ? { cause: options.cause } : {}),
+    })
+    this.name = 'ProjectConfigurationValidationError'
+    this.code = code
+    this.details = options.details
+  }
+}

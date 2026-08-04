@@ -1,0 +1,339 @@
+import type { DatabaseClient } from '@shipgate/database'
+import {
+  GITHUB_APP_REPOSITORY_PERMISSIONS,
+  type InstallationPermissionLevel,
+} from '@shipgate/github'
+
+import {
+  type GitHubRepositoryAccessService,
+  GitHubRepositoryAccessVerificationError,
+  type RepositoryAccessDecision,
+} from '../github-access/index.js'
+import {
+  type ConfigureProjectResult,
+  createConfiguredProject,
+  listStoredProjects,
+  requestProjectDeletion,
+  updateConfiguredProject,
+} from './configuration-store.js'
+import {
+  ProjectConfigurationValidationError,
+  ProjectNotFoundError,
+  ProjectVersionConflictError,
+  RepositoryAlreadyConnectedError,
+} from './errors.js'
+import type { ProjectRecord } from './model.js'
+import { withRepositoryTransaction } from './repository-transaction.js'
+import { getProject } from './store.js'
+import type { ProjectTopologyValidator } from './topology.js'
+
+export interface ProjectService {
+  create(input: {
+    readonly actorGitHubUserId: number
+    readonly installationId: number
+    readonly repositoryId: number
+    readonly sourceBranch: string
+    readonly productionBranch: string
+  }): Promise<ConfigureProjectResult>
+
+  list(actorGitHubUserId: number): Promise<readonly ProjectRecord[]>
+
+  get(actorGitHubUserId: number, projectId: string): Promise<ProjectRecord>
+
+  update(input: {
+    readonly actorGitHubUserId: number
+    readonly projectId: string
+    readonly expectedConfigurationVersion: number
+    readonly sourceBranch?: string
+    readonly productionBranch?: string
+  }): Promise<ConfigureProjectResult>
+
+  delete(input: {
+    readonly actorGitHubUserId: number
+    readonly projectId: string
+    readonly expectedConfigurationVersion: number
+  }): Promise<ProjectRecord>
+}
+
+export function createProjectService(options: {
+  readonly database: DatabaseClient
+  readonly githubRepositoryAccess: GitHubRepositoryAccessService
+  readonly topologyValidator: ProjectTopologyValidator
+}): ProjectService {
+  return {
+    async create(input) {
+      await requireRepositoryPermission(options, {
+        githubUserId: input.actorGitHubUserId,
+        installationId: input.installationId,
+        repositoryId: input.repositoryId,
+        permission: 'maintain',
+      })
+      await assertProjectAppPermissions(options.database, input.installationId)
+      const existing = await options.database.kysely
+        .selectFrom('projects')
+        .select('id')
+        .where('repository_id', '=', String(input.repositoryId))
+        .where('status', '<>', 'deleted')
+        .executeTakeFirst()
+
+      if (existing) {
+        throw new RepositoryAlreadyConnectedError(String(input.repositoryId), existing.id)
+      }
+
+      const topology = await options.topologyValidator.validate(input)
+
+      return withRepositoryTransaction(options.database, input.repositoryId, async (scope) =>
+        createConfiguredProject({
+          scope,
+          topology,
+          actorGitHubUserId: input.actorGitHubUserId,
+        }),
+      )
+    },
+
+    async list(actorGitHubUserId) {
+      const projects = await listStoredProjects(options.database)
+      const visible: ProjectRecord[] = []
+
+      for (const project of projects) {
+        const allowed = await canReadProject(options, actorGitHubUserId, project)
+
+        if (allowed) {
+          visible.push(project)
+        }
+      }
+
+      return visible
+    },
+
+    async get(actorGitHubUserId, projectId) {
+      const project = await requireStoredProject(options.database, projectId)
+
+      if (!(await canReadProject(options, actorGitHubUserId, project))) {
+        throw new ProjectNotFoundError(projectId)
+      }
+
+      return project
+    },
+
+    async update(input) {
+      const project = await requireStoredProject(options.database, input.projectId)
+      const installationId = parseGitHubId(project.installationId, 'installation ID')
+      const repositoryId = parseGitHubId(project.repositoryId, 'repository ID')
+
+      if (project.configurationVersion !== input.expectedConfigurationVersion) {
+        throw new ProjectVersionConflictError(
+          project.id,
+          input.expectedConfigurationVersion,
+          project.configurationVersion,
+        )
+      }
+
+      await requireRepositoryPermission(options, {
+        githubUserId: input.actorGitHubUserId,
+        installationId,
+        repositoryId,
+        permission: 'maintain',
+      })
+
+      if (project.status !== 'active') {
+        throw new ProjectConfigurationValidationError(
+          'project_not_active',
+          `Project ${project.id} is ${project.status} and cannot be reconfigured`,
+        )
+      }
+
+      const sourceBranch = input.sourceBranch ?? project.sourceBranch
+      const productionBranch = input.productionBranch ?? project.productionBranch
+
+      if (sourceBranch === project.sourceBranch && productionBranch === project.productionBranch) {
+        return { status: 'already_applied', project, reconciliation: null }
+      }
+
+      await assertProjectAppPermissions(options.database, installationId)
+
+      const topology = await options.topologyValidator.validate({
+        installationId,
+        repositoryId,
+        sourceBranch,
+        productionBranch,
+      })
+
+      return withRepositoryTransaction(options.database, repositoryId, async (scope) =>
+        updateConfiguredProject({
+          scope,
+          projectId: input.projectId,
+          expectedConfigurationVersion: input.expectedConfigurationVersion,
+          topology,
+          actorGitHubUserId: input.actorGitHubUserId,
+        }),
+      )
+    },
+
+    async delete(input) {
+      const project = await requireStoredProject(options.database, input.projectId)
+      const installationId = parseGitHubId(project.installationId, 'installation ID')
+      const repositoryId = parseGitHubId(project.repositoryId, 'repository ID')
+
+      if (project.configurationVersion !== input.expectedConfigurationVersion) {
+        throw new ProjectVersionConflictError(
+          project.id,
+          input.expectedConfigurationVersion,
+          project.configurationVersion,
+        )
+      }
+
+      await requireRepositoryPermission(options, {
+        githubUserId: input.actorGitHubUserId,
+        installationId,
+        repositoryId,
+        permission: 'maintain',
+      })
+
+      return withRepositoryTransaction(options.database, repositoryId, async (scope) =>
+        requestProjectDeletion({
+          scope,
+          projectId: input.projectId,
+          expectedConfigurationVersion: input.expectedConfigurationVersion,
+          actorGitHubUserId: input.actorGitHubUserId,
+        }),
+      )
+    },
+  }
+}
+
+async function canReadProject(
+  options: {
+    readonly githubRepositoryAccess: GitHubRepositoryAccessService
+  },
+  githubUserId: number,
+  project: ProjectRecord,
+): Promise<boolean> {
+  try {
+    const decision = await options.githubRepositoryAccess.authorizeRepositoryAccess({
+      githubUserId,
+      installationId: parseGitHubId(project.installationId, 'installation ID'),
+      repositoryId: parseGitHubId(project.repositoryId, 'repository ID'),
+      requiredPermission: {
+        repository: 'read',
+        app: { name: 'metadata', level: 'read' },
+      },
+    })
+
+    return decision.allowed
+  } catch (cause) {
+    throw createAccessVerificationError(cause)
+  }
+}
+
+async function requireRepositoryPermission(
+  options: {
+    readonly githubRepositoryAccess: GitHubRepositoryAccessService
+  },
+  input: {
+    readonly githubUserId: number
+    readonly installationId: number
+    readonly repositoryId: number
+    readonly permission: 'read' | 'maintain'
+  },
+): Promise<void> {
+  let decision: RepositoryAccessDecision
+
+  try {
+    decision = await options.githubRepositoryAccess.authorizeRepositoryAccess({
+      githubUserId: input.githubUserId,
+      installationId: input.installationId,
+      repositoryId: input.repositoryId,
+      requiredPermission: {
+        repository: input.permission,
+        app: { name: 'metadata', level: 'read' },
+      },
+    })
+  } catch (cause) {
+    throw createAccessVerificationError(cause)
+  }
+
+  if (decision.allowed) {
+    return
+  }
+
+  const code =
+    decision.reason === 'insufficient_repository_permission'
+      ? 'permission_missing'
+      : decision.reason === 'insufficient_app_permission'
+        ? 'app_permissions_missing'
+        : decision.reason.startsWith('installation_')
+          ? 'installation_unavailable'
+          : 'repository_unavailable'
+
+  throw new ProjectConfigurationValidationError(
+    code,
+    code === 'permission_missing'
+      ? 'GitHub Maintain or Admin repository permission is required'
+      : 'GitHub repository access validation failed',
+    { details: { reason: decision.reason } },
+  )
+}
+
+async function assertProjectAppPermissions(
+  database: DatabaseClient,
+  installationId: number,
+): Promise<void> {
+  const rows = await database.kysely
+    .selectFrom('github_installation_permissions')
+    .select(['permission_name', 'permission_level'])
+    .where('installation_id', '=', String(installationId))
+    .execute()
+  const actual = new Map(rows.map((row) => [row.permission_name, row.permission_level] as const))
+  const missing = Object.entries(GITHUB_APP_REPOSITORY_PERMISSIONS)
+    .filter(([name, required]) => !permissionSatisfies(actual.get(name), required))
+    .map(([name, required]) => ({ name, required, actual: actual.get(name) ?? null }))
+
+  if (missing.length > 0) {
+    throw new ProjectConfigurationValidationError(
+      'app_permissions_missing',
+      'GitHub App installation does not have all permissions required for repository projection',
+      { details: { missing } },
+    )
+  }
+}
+
+function permissionSatisfies(
+  actual: InstallationPermissionLevel | undefined,
+  required: InstallationPermissionLevel,
+): boolean {
+  return actual === 'write' || (actual === 'read' && required === 'read')
+}
+
+async function requireStoredProject(
+  database: DatabaseClient,
+  projectId: string,
+): Promise<ProjectRecord> {
+  const project = await getProject(database, projectId)
+
+  if (!project || project.status === 'deleted') {
+    throw new ProjectNotFoundError(projectId)
+  }
+
+  return project
+}
+
+function parseGitHubId(value: string, name: string): number {
+  const parsed = Number(value)
+
+  if (!Number.isSafeInteger(parsed) || parsed <= 0) {
+    throw new Error(`Stored ${name} is outside JavaScript's safe integer range: ${value}`)
+  }
+
+  return parsed
+}
+
+function createAccessVerificationError(cause: unknown): ProjectConfigurationValidationError {
+  return new ProjectConfigurationValidationError(
+    'external_state_unknown',
+    cause instanceof GitHubRepositoryAccessVerificationError
+      ? 'GitHub repository access could not be verified'
+      : 'Repository access validation failed unexpectedly',
+    { cause },
+  )
+}

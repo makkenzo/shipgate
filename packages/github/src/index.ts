@@ -4,6 +4,7 @@ export {
   type GitHubAuthenticationService,
   type GitHubAuthInvalidator,
   type GitHubAuthProvider,
+  type GitHubInstallationTokenLease,
   type GitHubUserAuthorizationResult,
   type GitHubUserAuthorizationService,
 } from './auth-provider.js'
