@@ -54,6 +54,8 @@ export interface GitHubWebhookMetadata {
   readonly action: string | null
   readonly installationId: string | null
   readonly repositoryId: string | null
+  readonly actionSupported: boolean
+  readonly ignoredReason: string | null
 }
 export function assertGitHubWebhookEventAllowed(
   event: string,
@@ -78,23 +80,32 @@ export function parseGitHubWebhookMetadata(
       message: 'GitHub webhook payload must be a JSON object',
     })
   const allowed = actions[eventValue]
-  const action = payload.action
+  const actionValue = payload.action
+
   if (
-    (allowed === null && action !== undefined) ||
-    (allowed !== null &&
-      (typeof action !== 'string' || !(allowed as readonly string[]).includes(action)))
-  )
+    (allowed !== null && typeof actionValue !== 'string') ||
+    (allowed === null && actionValue !== undefined && typeof actionValue !== 'string')
+  ) {
     throw new ApiHttpError({
-      statusCode: 422,
-      code: 'GITHUB_WEBHOOK_ACTION_NOT_ALLOWED',
-      message: 'GitHub webhook action is not allowed',
-      details: { event: eventValue, action: typeof action === 'string' ? action : null },
+      statusCode: 400,
+      code: 'INVALID_GITHUB_WEBHOOK_PAYLOAD',
+      message: 'GitHub webhook action must be a string when present',
     })
+  }
+
+  const action = typeof actionValue === 'string' ? actionValue : null
+  const actionSupported =
+    allowed === null
+      ? actionValue === undefined
+      : (allowed as readonly string[]).includes(action as string)
+
   return {
     event: eventValue,
-    action: typeof action === 'string' ? action : null,
+    action,
     installationId: readId(payload.installation),
     repositoryId: readId(payload.repository),
+    actionSupported,
+    ignoredReason: actionSupported ? null : 'unsupported_action',
   }
 }
 function readId(value: unknown): string | null {

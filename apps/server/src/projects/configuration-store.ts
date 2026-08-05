@@ -141,6 +141,10 @@ export async function createConfiguredProject(input: {
     idempotencyKey: `project-configuration:${projectId}:1`,
     correlationId: input.correlationId,
     causationId: `project:${projectId}:created`,
+    triggerScope: {
+      reasons: ['project_created'],
+      branchNames: [input.topology.sourceBranch, input.topology.productionBranch],
+    },
     now,
   })
 
@@ -261,6 +265,11 @@ export async function updateConfiguredProject(input: {
     idempotencyKey: `project-configuration:${project.id}:${nextVersion}`,
     correlationId: input.correlationId,
     causationId: `project:${project.id}:configuration:${nextVersion}`,
+    triggerScope: {
+      reasons: ['branch_configuration_changed'],
+      branchNames: [input.topology.sourceBranch, input.topology.productionBranch],
+      requireReconciliation: true,
+    },
     now,
   })
 
@@ -367,6 +376,10 @@ export async function updateProjectRequiredCheckOverrides(input: {
         idempotencyKey: `project-required-check-overrides:${project.id}:${nextVersion}:repository-sync`,
         correlationId: input.correlationId,
         causationId: `project:${project.id}:required-check-overrides:${nextVersion}:repository-sync`,
+        triggerScope: {
+          reasons: ['project_required_check_overrides_changed'],
+          requireReconciliation: true,
+        },
         now,
       })
     : null

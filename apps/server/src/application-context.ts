@@ -9,6 +9,7 @@ import { createDatabase, type DatabaseClient } from '@shipgate/database'
 import type { GitHubAuthenticationService } from '@shipgate/github'
 import type {
   GitHubWebhookProjectionHandler,
+  RepositoryIncrementalSyncHandler,
   RepositoryInitialSyncHandler,
   RepositoryRequiredChecksSyncHandler,
 } from '@shipgate/jobs'
@@ -24,9 +25,10 @@ import {
   createProjectService,
   createProjectTopologyValidator,
   createReadOnlyGitWorkspace,
+  createRepositoryIncrementalSyncHandler,
   createRepositoryInitialSyncHandler,
   createRepositoryRequiredChecksSyncHandler,
-  createRequiredChecksWebhookProjectionHandler,
+  createRepositoryWebhookProjectionHandler,
   type ProjectService,
 } from './projects/index.js'
 import { createShutdownManager, type ShutdownManager } from './shutdown.js'
@@ -42,6 +44,7 @@ export interface ApplicationContext {
   readonly githubRepositoryAccess: GitHubRepositoryAccessService
   readonly projects: ProjectService
   readonly repositoryInitialSync: RepositoryInitialSyncHandler
+  readonly repositoryIncrementalSync: RepositoryIncrementalSyncHandler
   readonly repositoryRequiredChecksSync: RepositoryRequiredChecksSyncHandler
   readonly githubWebhookProjection: GitHubWebhookProjectionHandler
   readonly shutdown: ShutdownManager
@@ -170,7 +173,12 @@ export function createApplicationContext(
     database,
     githubAuth,
   })
-  const githubWebhookProjection = createRequiredChecksWebhookProjectionHandler()
+  const repositoryIncrementalSync = createRepositoryIncrementalSyncHandler({
+    database,
+    githubAuth,
+    repositoryRequiredChecksSync,
+  })
+  const githubWebhookProjection = createRepositoryWebhookProjectionHandler()
 
   return {
     processKind: options.processKind,
@@ -183,6 +191,7 @@ export function createApplicationContext(
     githubRepositoryAccess: repositoryAccess,
     projects,
     repositoryInitialSync,
+    repositoryIncrementalSync,
     repositoryRequiredChecksSync,
     githubWebhookProjection,
     shutdown,

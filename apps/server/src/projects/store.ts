@@ -166,6 +166,151 @@ export async function getProject(
   return row ? mapProject(row) : undefined
 }
 
+export async function archiveRepositoryProjectionInTransaction(
+  scope: RepositoryTransaction,
+  input: {
+    readonly reconciliationRequestId: string
+    readonly syncRunId: string
+    readonly projectId: string
+    readonly repositoryId: string
+    readonly archivedAt: Date
+  },
+): Promise<string> {
+  const repositoryId = assertRepositoryTransaction(scope, input.repositoryId)
+  const transaction = scope.transaction
+  const existing = await transaction
+    .selectFrom('repository_projection_archives')
+    .select('id')
+    .where('reconciliation_request_id', '=', input.reconciliationRequestId)
+    .executeTakeFirst()
+
+  if (existing) {
+    return existing.id
+  }
+
+  const project = await transaction
+    .selectFrom('projects')
+    .selectAll()
+    .where('id', '=', input.projectId)
+    .where('repository_id', '=', repositoryId)
+    .forUpdate()
+    .executeTakeFirstOrThrow()
+  const branches = await transaction
+    .selectFrom('repository_branches')
+    .selectAll()
+    .where('project_id', '=', input.projectId)
+    .orderBy('name')
+    .execute()
+  const commits = await transaction
+    .selectFrom('repository_commits')
+    .selectAll()
+    .where('project_id', '=', input.projectId)
+    .orderBy('source_delta_position')
+    .orderBy('committed_at')
+    .orderBy('sha')
+    .execute()
+  const changes = await transaction
+    .selectFrom('changes')
+    .selectAll()
+    .where('project_id', '=', input.projectId)
+    .orderBy('merged_at')
+    .orderBy('pull_request_number')
+    .execute()
+  const changeCommits = await transaction
+    .selectFrom('change_commits')
+    .selectAll()
+    .where('project_id', '=', input.projectId)
+    .orderBy('change_id')
+    .orderBy('position')
+    .execute()
+  const requiredChecks =
+    project.required_check_policy_version === 0
+      ? []
+      : await transaction
+          .selectFrom('required_checks')
+          .selectAll()
+          .where('project_id', '=', input.projectId)
+          .where('policy_version', '=', project.required_check_policy_version)
+          .orderBy('context')
+          .orderBy('integration_id')
+          .execute()
+  const checkResults = await transaction
+    .selectFrom('commit_check_results')
+    .selectAll()
+    .where('project_id', '=', input.projectId)
+    .orderBy('commit_sha')
+    .orderBy('check_type')
+    .orderBy('context')
+    .orderBy('github_object_id')
+    .execute()
+  const requiredCheckStates = await transaction
+    .selectFrom('change_required_check_states')
+    .selectAll()
+    .where('project_id', '=', input.projectId)
+    .orderBy('change_id')
+    .orderBy('required_check_id')
+    .execute()
+  const previousRun = await transaction
+    .selectFrom('repository_sync_runs')
+    .selectAll()
+    .where('project_id', '=', input.projectId)
+    .where('status', '=', 'succeeded')
+    .where('id', '<>', input.syncRunId)
+    .orderBy('completed_at', 'desc')
+    .executeTakeFirst()
+  const issues = previousRun
+    ? await transaction
+        .selectFrom('repository_sync_issues')
+        .selectAll()
+        .where('sync_run_id', '=', previousRun.id)
+        .orderBy('created_at')
+        .execute()
+    : []
+  const archiveId = randomUUID()
+  const snapshot = toJsonValue({
+    schemaVersion: 1,
+    project,
+    branches,
+    commits,
+    changes,
+    changeCommits,
+    requiredChecks,
+    checkResults,
+    requiredCheckStates,
+    previousRun: previousRun ?? null,
+    issues,
+  })
+  const inserted = await transaction
+    .insertInto('repository_projection_archives')
+    .values({
+      id: archiveId,
+      reconciliation_request_id: input.reconciliationRequestId,
+      sync_run_id: input.syncRunId,
+      project_id: input.projectId,
+      repository_id: repositoryId,
+      source_sha: project.source_sha,
+      production_sha: project.production_sha,
+      classification: 'destructive_history_change',
+      snapshot: JSON.stringify(snapshot),
+      archived_at: input.archivedAt,
+    })
+    .onConflict((conflict) => conflict.column('reconciliation_request_id').doNothing())
+    .returning('id')
+    .executeTakeFirst()
+
+  if (inserted) {
+    return inserted.id
+  }
+
+  const archive = await transaction
+    .selectFrom('repository_projection_archives')
+    .select('id')
+    .where('reconciliation_request_id', '=', input.reconciliationRequestId)
+    .executeTakeFirstOrThrow()
+
+  return archive.id
+}
+
 export async function applyRepositoryProjection(
   database: DatabaseClient,
   input: ApplyRepositoryProjectionInput,
@@ -241,6 +386,8 @@ export async function applyRepositoryProjectionInTransaction(
   )
   const syncRunId = existingRun?.id ?? input.syncRunId ?? randomUUID()
   const observedAt = input.snapshot.observedAt
+  const reconciliationClassification = input.reconciliationClassification ?? 'expected_change'
+  const differenceSummary = input.differenceSummary ?? {}
 
   if (existingRun) {
     const samePendingRun =
@@ -263,6 +410,8 @@ export async function applyRepositoryProjectionInTransaction(
         completed_at: input.completedAt,
         error_code: null,
         error_message: null,
+        reconciliation_classification: reconciliationClassification,
+        difference_summary: JSON.stringify(differenceSummary),
       })
       .where('id', '=', existingRun.id)
       .where('status', 'in', ['queued', 'running'])
@@ -285,6 +434,8 @@ export async function applyRepositoryProjectionInTransaction(
         completed_at: input.completedAt,
         error_code: null,
         error_message: null,
+        reconciliation_classification: reconciliationClassification,
+        difference_summary: JSON.stringify(differenceSummary),
       })
       .execute()
   }
@@ -340,10 +491,12 @@ export async function applyRepositoryProjectionInTransaction(
       .execute()
   }
 
-  await pruneMissingChanges(
+  await reconcileMissingChanges(
     transaction,
     input.projectId,
     storedChanges.map((change) => change.githubPullRequestId),
+    input.preserveMissingChangesAsUnknown === true,
+    observedAt,
   )
 
   for (const stored of storedChanges) {
@@ -444,7 +597,11 @@ export async function applyRepositoryProjectionInTransaction(
       repository_name: input.snapshot.repositoryName,
       repository_full_name: input.snapshot.repositoryFullName,
       default_branch: input.snapshot.defaultBranch,
-      status: 'active',
+      status: ['destructive_history_change', 'unknown_inconsistency'].includes(
+        reconciliationClassification,
+      )
+        ? 'degraded'
+        : 'active',
       source_sha: input.snapshot.sourceSha,
       production_sha: input.snapshot.productionSha,
       merge_base_sha: input.snapshot.mergeBaseSha,
@@ -528,6 +685,10 @@ export async function recordRepositorySyncFailure(
         completed_at: input.completedAt,
         error_code: input.errorCode,
         error_message: input.errorMessage ?? null,
+        reconciliation_classification:
+          input.reconciliationClassification ??
+          (input.disconnectProject === true ? 'permission_problem' : 'unknown_inconsistency'),
+        difference_summary: JSON.stringify(input.differenceSummary ?? {}),
       })
       .execute()
 
@@ -834,12 +995,36 @@ async function prepareStoredChanges(
   })
 }
 
-async function pruneMissingChanges(
+async function reconcileMissingChanges(
   transaction: ProjectWriteTransaction,
   projectId: string,
   githubPullRequestIds: readonly string[],
+  preserveAsUnknown: boolean,
+  observedAt: Date,
 ): Promise<void> {
-  let query = transaction.deleteFrom('changes').where('project_id', '=', projectId)
+  if (preserveAsUnknown) {
+    let query = transaction
+      .updateTable('changes')
+      .set({
+        synchronization_state: 'unknown',
+        production_presence: 'unknown',
+        observed_at: observedAt,
+        updated_at: observedAt,
+      })
+      .where('project_id', '=', projectId)
+
+    if (githubPullRequestIds.length > 0) {
+      query = query.where('github_pull_request_id', 'not in', githubPullRequestIds)
+    }
+
+    await query.execute()
+    return
+  }
+
+  let query = transaction
+    .deleteFrom('changes')
+    .where('project_id', '=', projectId)
+    .where('synchronization_state', '<>', 'unknown')
 
   if (githubPullRequestIds.length > 0) {
     query = query.where('github_pull_request_id', 'not in', githubPullRequestIds)
@@ -885,6 +1070,10 @@ async function insertSynchronizationIssues(
       })),
     )
     .execute()
+}
+
+function toJsonValue(value: unknown): JsonValue {
+  return JSON.parse(JSON.stringify(value)) as JsonValue
 }
 
 function validateApplyInput(input: ApplyRepositoryProjectionInput): void {

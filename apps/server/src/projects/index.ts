@@ -25,6 +25,17 @@ export {
   type GitWorkspaceAncestryInput,
   type ReadOnlyGitWorkspace,
 } from './git-workspace.js'
+export { createRepositoryIncrementalSyncHandler } from './incremental-sync.js'
+export {
+  mergeRepositoryIncrementalSyncScopes,
+  normalizeRepositoryIncrementalSyncScope,
+  parseRepositoryIncrementalSyncScope,
+  queueRepositoryIncrementalSync,
+  type RepositoryIncrementalSyncRequestRecord,
+  type RepositoryIncrementalSyncScope,
+  recoverRepositoryIncrementalSyncJobs,
+} from './incremental-sync-queue.js'
+export { createRepositoryWebhookProjectionHandler } from './incremental-sync-webhooks.js'
 export { createRepositoryInitialSyncHandler } from './initial-sync.js'
 export type {
   ApplyRepositoryProjectionInput,
@@ -60,7 +71,6 @@ export {
 } from './repository-transaction.js'
 export { queueRequiredChecksSync } from './required-checks-queue.js'
 export { createRepositoryRequiredChecksSyncHandler } from './required-checks-sync.js'
-export { createRequiredChecksWebhookProjectionHandler } from './required-checks-webhooks.js'
 export { createProjectService, type ProjectService } from './service.js'
 export {
   applyRepositoryProjection,
@@ -73,7 +83,11 @@ export {
   validateRepositoryProjectionSnapshot,
 } from './store.js'
 export {
+  type QueueDueRepositoryReconciliationsInput,
+  type QueueRepositoryReconciliationForProjectInput,
+  queueDueRepositoryReconciliations,
   queueRepositoryInitialSync,
+  queueRepositoryReconciliationForProject,
   recoverRepositoryInitialSyncJobs,
 } from './sync-queue.js'
 export {

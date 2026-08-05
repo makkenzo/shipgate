@@ -7,6 +7,7 @@ import type {
   CommitCheckStatus,
   JsonValue,
   ProjectStatus,
+  RepositoryReconciliationClassification,
   RepositorySyncIssueScope,
   RepositorySyncIssueSeverity,
   RequiredCheckSource,
@@ -212,6 +213,9 @@ export interface ApplyRepositoryProjectionInput {
   readonly startedAt: Date
   readonly completedAt: Date
   readonly snapshot: RepositoryProjectionSnapshot
+  readonly reconciliationClassification?: RepositoryReconciliationClassification
+  readonly differenceSummary?: JsonValue
+  readonly preserveMissingChangesAsUnknown?: boolean
 }
 
 export type ApplyRepositoryProjectionResult =
@@ -240,6 +244,8 @@ export interface RecordRepositorySyncFailureInput {
   readonly productionSha?: string
   readonly issues: readonly RepositorySyncIssueProjection[]
   readonly disconnectProject?: boolean
+  readonly reconciliationClassification?: RepositoryReconciliationClassification
+  readonly differenceSummary?: JsonValue
 }
 
 export type RecordRepositorySyncFailureResult =

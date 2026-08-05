@@ -23,6 +23,7 @@
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "test:e2e": "playwright test",
     "check:boundaries": "node scripts/check-boundaries.mjs",
+    "repository:reconcile": "pnpm --filter @shipgate/server repository:reconcile",
     "clean": "pnpm --recursive --if-present run clean",
     "api:generate": "pnpm --filter @shipgate/server... build && pnpm --filter @shipgate/server openapi:generate:compiled && pnpm --filter @shipgate/web api:generate && biome format --write apps/web/openapi apps/web/src/api/generated",
     "api:generate:compiled": "pnpm --filter @shipgate/server openapi:generate:compiled && pnpm --filter @shipgate/web api:generate && biome format --write apps/web/openapi apps/web/src/api/generated",

@@ -172,6 +172,7 @@ async function executeJobAttempt(options: ExecuteJobAttemptOptions): Promise<Job
       signal: options.signal,
       repositoryInitialSync: dependencies.repositoryInitialSync,
       repositoryRequiredChecksSync: dependencies.repositoryRequiredChecksSync,
+      repositoryIncrementalSync: dependencies.repositoryIncrementalSync,
       githubWebhookProjection: dependencies.githubWebhookProjection,
     })
 

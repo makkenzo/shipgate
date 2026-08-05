@@ -12,14 +12,22 @@ import type { Selectable, Transaction } from 'kysely'
 import { ProjectConfigurationValidationError } from './errors.js'
 import type { ReadOnlyGitWorkspace } from './git-workspace.js'
 import {
+  parseRepositoryIncrementalSyncScope,
+  type RepositoryIncrementalSyncScope,
+} from './incremental-sync-queue.js'
+import {
   buildRepositoryProjectionSnapshot,
+  compareRepositoryHistory,
   createProjectionFingerprint,
   loadRepositoryMetadata,
   type RepositoryHeadState,
+  type RepositoryHistoryRelation,
   type RepositoryInitialSyncTarget,
   repositoryInitialSyncPermissions,
   resolveRepositoryHeads,
 } from './initial-sync-github.js'
+import { loadStoredRepositoryProjectionState } from './projection-fingerprint.js'
+import { classifyRepositoryDifference } from './reconciliation.js'
 import {
   type RepositoryLock,
   withRepositoryLock,
@@ -28,6 +36,7 @@ import {
 import { parseRequiredCheckOverrides } from './required-checks.js'
 import {
   applyRepositoryProjectionInTransaction,
+  archiveRepositoryProjectionInTransaction,
   validateRepositoryProjectionSnapshot,
 } from './store.js'
 import { queueRepositoryInitialSync } from './sync-queue.js'
@@ -45,6 +54,11 @@ interface ClaimedSynchronization {
   readonly productionBranch: string
   readonly requestedSourceSha: string
   readonly requestedProductionSha: string
+  readonly previousSourceSha: string | null
+  readonly previousProductionSha: string | null
+  readonly triggerScope: RepositoryIncrementalSyncScope
+  readonly forcePush: boolean
+  readonly coalescedCount: number
   readonly requiredCheckOverrides: ReturnType<typeof parseRequiredCheckOverrides>
 }
 
@@ -169,6 +183,41 @@ async function executeSynchronization(
     })
   }
 
+  const [storedProjection, sourceHistory, productionHistory] = await Promise.all([
+    loadStoredRepositoryProjectionState(lock.connection, claimed.projectId),
+    comparePreviousHistory(client, metadata, claimed.previousSourceSha, observedHeads.sourceSha),
+    comparePreviousHistory(
+      client,
+      metadata,
+      claimed.previousProductionSha,
+      observedHeads.productionSha,
+    ),
+  ])
+  const destructiveHistoryDetected =
+    claimed.forcePush || sourceHistory === 'rewritten' || productionHistory === 'rewritten'
+  const earlyProjectionArchiveId = destructiveHistoryDetected
+    ? await withRepositoryTransactionInLock(lock, async (scope) => {
+        const detectedAt = new Date()
+        const archiveId = await archiveRepositoryProjectionInTransaction(scope, {
+          reconciliationRequestId: claimed.requestId,
+          syncRunId: claimed.syncRunId,
+          projectId: claimed.projectId,
+          repositoryId: claimed.repositoryId,
+          archivedAt: detectedAt,
+        })
+
+        await scope.transaction
+          .updateTable('projects')
+          .set({ status: 'degraded', updated_at: detectedAt })
+          .where('id', '=', claimed.projectId)
+          .where('configuration_version', '=', claimed.configurationVersion)
+          .where('status', 'in', ['initializing', 'active', 'degraded', 'disconnected'])
+          .execute()
+
+        return archiveId
+      })
+    : null
+
   if (!options.githubAuth.withInstallationToken) {
     throw new Error('GitHub authentication provider cannot lease an installation token')
   }
@@ -222,6 +271,26 @@ async function executeSynchronization(
 
   const completedAt = new Date()
   const fingerprint = createProjectionFingerprint(snapshot)
+  const projectedPullRequestIds = new Set(
+    snapshot.changes.map((change) => String(change.githubPullRequestId)),
+  )
+  const unresolvedUnknownChangeCount = storedProjection.unknownChangeGitHubPullRequestIds.filter(
+    (githubPullRequestId) => !projectedPullRequestIds.has(githubPullRequestId),
+  ).length
+  const difference = classifyRepositoryDifference({
+    previousSourceSha: claimed.previousSourceSha,
+    previousProductionSha: claimed.previousProductionSha,
+    currentSourceSha: observedHeads.sourceSha,
+    currentProductionSha: observedHeads.productionSha,
+    previousProjectionFingerprint: storedProjection.fingerprint,
+    currentProjectionFingerprint: fingerprint,
+    sourceHistory,
+    productionHistory,
+    forcePush: claimed.forcePush,
+    triggerScope: claimed.triggerScope,
+    coalescedCount: claimed.coalescedCount,
+    unresolvedUnknownChangeCount,
+  })
 
   return withRepositoryTransactionInLock(lock, async (scope) => {
     const current = await scope.transaction
@@ -253,6 +322,17 @@ async function executeSynchronization(
       return { status: 'superseded', requestId: claimed.requestId }
     }
 
+    const archiveId =
+      difference.classification === 'destructive_history_change'
+        ? (earlyProjectionArchiveId ??
+          (await archiveRepositoryProjectionInTransaction(scope, {
+            reconciliationRequestId: claimed.requestId,
+            syncRunId: claimed.syncRunId,
+            projectId: claimed.projectId,
+            repositoryId: claimed.repositoryId,
+            archivedAt: completedAt,
+          })))
+        : null
     const applied = await applyRepositoryProjectionInTransaction(scope, {
       projectId: claimed.projectId,
       syncRunId: claimed.syncRunId,
@@ -264,6 +344,9 @@ async function executeSynchronization(
       startedAt: observedAt,
       completedAt,
       snapshot,
+      reconciliationClassification: difference.classification,
+      differenceSummary: difference.summary,
+      preserveMissingChangesAsUnknown: difference.classification === 'destructive_history_change',
     })
 
     await scope.transaction
@@ -289,6 +372,8 @@ async function executeSynchronization(
       sourceSha: observedHeads.sourceSha,
       productionSha: observedHeads.productionSha,
       configurationVersion: claimed.configurationVersion,
+      reconciliationClassification: difference.classification,
+      projectionArchiveId: archiveId,
     }
   })
 }
@@ -310,12 +395,17 @@ async function claimSynchronization(
         'request.configuration_version',
         'request.reason',
         'request.idempotency_key',
-        'request.source_sha',
-        'request.production_sha',
+        'request.source_sha as requested_source_sha',
+        'request.production_sha as requested_production_sha',
+        'request.trigger_scope',
+        'request.force_push',
+        'request.coalesced_count',
         'request.status',
         'project.installation_id',
         'project.source_branch',
         'project.production_branch',
+        'project.source_sha as previous_source_sha',
+        'project.production_sha as previous_production_sha',
         'project.required_check_overrides',
         'project.configuration_version as project_configuration_version',
         'project.status as project_status',
@@ -426,6 +516,8 @@ async function supersedeSynchronization(input: {
       ].join(':'),
       correlationId: input.correlationId,
       causationId: `repository-sync:${input.claimed.requestId}:superseded`,
+      triggerScope: input.claimed.triggerScope,
+      forcePush: input.claimed.forcePush,
       now: input.now,
     })
 
@@ -450,6 +542,18 @@ async function supersedeSynchronization(input: {
         completed_at: input.now,
         error_code: 'synchronization_superseded',
         error_message: 'Branch heads changed while the snapshot was being built',
+        reconciliation_classification: 'expected_change',
+        difference_summary: JSON.stringify({
+          previousRequestedHeads: {
+            sourceSha: input.claimed.requestedSourceSha,
+            productionSha: input.claimed.requestedProductionSha,
+          },
+          currentHeads: {
+            sourceSha: input.finalHeads.sourceSha,
+            productionSha: input.finalHeads.productionSha,
+          },
+          triggerScope: input.claimed.triggerScope,
+        }),
       })
       .where('id', '=', input.claimed.syncRunId)
       .where('status', 'in', ['queued', 'running'])
@@ -506,6 +610,22 @@ async function markSynchronizationFailed(
         completed_at: now,
         error_code: code,
         error_message: message,
+        reconciliation_classification: disconnected
+          ? 'permission_problem'
+          : 'unknown_inconsistency',
+        difference_summary: JSON.stringify({
+          previous: {
+            sourceSha: claimed.previousSourceSha,
+            productionSha: claimed.previousProductionSha,
+          },
+          requested: {
+            sourceSha: claimed.requestedSourceSha,
+            productionSha: claimed.requestedProductionSha,
+          },
+          forcePush: claimed.forcePush,
+          triggerScope: claimed.triggerScope,
+          error: { code, message },
+        }),
       })
       .where('id', '=', claimed.syncRunId)
       .where('status', 'in', ['queued', 'running'])
@@ -586,11 +706,16 @@ function mapClaimed(row: {
   readonly configuration_version: number
   readonly reason: string
   readonly idempotency_key: string
-  readonly source_sha: string
-  readonly production_sha: string
+  readonly requested_source_sha: string
+  readonly requested_production_sha: string
+  readonly trigger_scope: JsonValue
+  readonly force_push: boolean
+  readonly coalesced_count: number
   readonly installation_id: string
   readonly source_branch: string
   readonly production_branch: string
+  readonly previous_source_sha: string | null
+  readonly previous_production_sha: string | null
   readonly required_check_overrides: unknown
 }): ClaimedSynchronization {
   return {
@@ -604,8 +729,13 @@ function mapClaimed(row: {
     idempotencyKey: row.idempotency_key,
     sourceBranch: row.source_branch,
     productionBranch: row.production_branch,
-    requestedSourceSha: row.source_sha,
-    requestedProductionSha: row.production_sha,
+    requestedSourceSha: row.requested_source_sha,
+    requestedProductionSha: row.requested_production_sha,
+    previousSourceSha: row.previous_source_sha,
+    previousProductionSha: row.previous_production_sha,
+    triggerScope: parseRepositoryIncrementalSyncScope(row.trigger_scope),
+    forcePush: row.force_push,
+    coalescedCount: row.coalesced_count,
     requiredCheckOverrides: parseRequiredCheckOverrides(row.required_check_overrides),
   }
 }
@@ -618,6 +748,17 @@ function toTarget(claimed: ClaimedSynchronization): RepositoryInitialSyncTarget 
     sourceBranch: claimed.sourceBranch,
     productionBranch: claimed.productionBranch,
   }
+}
+
+function comparePreviousHistory(
+  client: Parameters<typeof compareRepositoryHistory>[0],
+  metadata: Parameters<typeof compareRepositoryHistory>[1],
+  previousSha: string | null,
+  currentSha: string,
+): Promise<RepositoryHistoryRelation | null> {
+  return previousSha === null
+    ? Promise.resolve(null)
+    : compareRepositoryHistory(client, metadata, previousSha, currentSha)
 }
 
 function sameHeads(left: RepositoryHeadState, right: RepositoryHeadState): boolean {

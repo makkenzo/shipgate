@@ -102,9 +102,9 @@ describe.sequential('Repository initial synchronization', () => {
     const queuedJob = await sql<{ readonly task_identifier: string }>`
       select task_identifier
       from graphile_worker.jobs
-      where key = ${`repository.initial-sync:${requestId}`}
+      where key = ${`repository.reconcile:${requestId}`}
     `.execute(database.kysely)
-    expect(queuedJob.rows).toEqual([{ task_identifier: 'repository.initial-sync' }])
+    expect(queuedJob.rows).toEqual([{ task_identifier: 'repository.reconcile' }])
 
     await expect(
       handler({

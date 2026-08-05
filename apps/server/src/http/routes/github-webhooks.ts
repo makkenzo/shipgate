@@ -12,7 +12,11 @@ import { ApiErrorSchema } from '../schemas.js'
 const Response = Type.Object(
   {
     deliveryId: Type.String(),
-    status: Type.Union([Type.Literal('queued'), Type.Literal('duplicate')]),
+    status: Type.Union([
+      Type.Literal('queued'),
+      Type.Literal('duplicate'),
+      Type.Literal('ignored'),
+    ]),
   },
   { additionalProperties: false },
 )

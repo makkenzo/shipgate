@@ -1,4 +1,9 @@
-import type { DatabaseClient, DatabaseSchema, JsonValue } from '@shipgate/database'
+import type {
+  DatabaseClient,
+  RepositoryIncrementalSyncType as DatabaseRepositoryIncrementalSyncType,
+  DatabaseSchema,
+  JsonValue,
+} from '@shipgate/database'
 import type { Transaction } from 'kysely'
 import type { z } from 'zod'
 
@@ -47,6 +52,24 @@ export type RepositoryInitialSyncHandler = (
   execution: RepositoryInitialSyncExecution,
 ) => Promise<JsonValue | undefined>
 
+export type RepositoryIncrementalSyncType = DatabaseRepositoryIncrementalSyncType
+
+export interface RepositoryIncrementalSyncExecution {
+  readonly requestId: string
+  readonly syncType: RepositoryIncrementalSyncType
+  readonly jobId: string
+  readonly attempt: number
+  readonly maxAttempts: number
+  readonly correlationId: string
+  readonly causationId: string | undefined
+  readonly signal: AbortSignal
+  readonly logger: StructuredLogger
+}
+
+export type RepositoryIncrementalSyncHandler = (
+  execution: RepositoryIncrementalSyncExecution,
+) => Promise<JsonValue | undefined>
+
 export interface RepositoryRequiredChecksSyncExecution {
   readonly projectId: string
   readonly repositoryId: string
@@ -93,6 +116,7 @@ export interface JobTaskContext {
   readonly signal: AbortSignal
   readonly repositoryInitialSync: RepositoryInitialSyncHandler | undefined
   readonly repositoryRequiredChecksSync: RepositoryRequiredChecksSyncHandler | undefined
+  readonly repositoryIncrementalSync: RepositoryIncrementalSyncHandler | undefined
   readonly githubWebhookProjection: GitHubWebhookProjectionHandler | undefined
 }
 
@@ -101,6 +125,7 @@ export interface JobTaskDependencies {
   readonly logger: StructuredLogger
   readonly repositoryInitialSync?: RepositoryInitialSyncHandler
   readonly repositoryRequiredChecksSync?: RepositoryRequiredChecksSyncHandler
+  readonly repositoryIncrementalSync?: RepositoryIncrementalSyncHandler
   readonly githubWebhookProjection?: GitHubWebhookProjectionHandler
 }
 

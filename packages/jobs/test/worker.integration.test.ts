@@ -23,6 +23,11 @@ describe.sequential('Graphile Worker', () => {
 
   const requiredCheckSyncExecutions: string[] = []
 
+  const incrementalSyncExecutions: Array<{
+    readonly requestId: string
+    readonly syncType: string
+  }> = []
+
   beforeAll(async () => {
     postgres = await startPostgresTestDatabase()
 
@@ -64,6 +69,18 @@ describe.sequential('Graphile Worker', () => {
         async repositoryRequiredChecksSync(execution) {
           requiredCheckSyncExecutions.push(execution.projectId)
           return { projectId: execution.projectId, status: 'applied' }
+        },
+
+        async repositoryIncrementalSync(execution) {
+          incrementalSyncExecutions.push({
+            requestId: execution.requestId,
+            syncType: execution.syncType,
+          })
+          return {
+            requestId: execution.requestId,
+            syncType: execution.syncType,
+            status: 'applied',
+          }
         },
       },
 
@@ -125,6 +142,55 @@ describe.sequential('Graphile Worker', () => {
       attempts: 1,
     })
     expect(repositorySyncExecutions).toContain(requestId)
+  })
+
+  it('dispatches the durable repository.reconcile task', async () => {
+    const requestId = randomUUID()
+    const queued = await enqueueJob(
+      database,
+      'repository.reconcile',
+      { requestId },
+      {
+        correlationId: `worker-test-repository-reconcile-${requestId}`,
+        jobKey: `repository.reconcile:${requestId}`,
+      },
+    )
+    const execution = await waitForJobExecution(database, queued.jobId, {
+      timeoutMs: 20_000,
+    })
+
+    expect(execution).toMatchObject({
+      taskIdentifier: 'repository.reconcile',
+      status: 'succeeded',
+      attempts: 1,
+    })
+    expect(repositorySyncExecutions).toContain(requestId)
+  })
+
+  it('dispatches a targeted repository refresh task with its sync type', async () => {
+    const requestId = randomUUID()
+    const queued = await enqueueJob(
+      database,
+      'repository.refresh-checks',
+      { requestId },
+      {
+        correlationId: `worker-test-repository-refresh-${requestId}`,
+        jobKey: `repository.incremental:${requestId}`,
+      },
+    )
+    const execution = await waitForJobExecution(database, queued.jobId, {
+      timeoutMs: 20_000,
+    })
+
+    expect(execution).toMatchObject({
+      taskIdentifier: 'repository.refresh-checks',
+      status: 'succeeded',
+      attempts: 1,
+    })
+    expect(incrementalSyncExecutions).toContainEqual({
+      requestId,
+      syncType: 'refresh_checks',
+    })
   })
 
   it('dispatches the durable repository.required-checks-sync task', async () => {

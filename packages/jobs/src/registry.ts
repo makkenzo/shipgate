@@ -1,5 +1,6 @@
 import { setTimeout as delay } from 'node:timers/promises'
 
+import type { JsonValue } from '@shipgate/database'
 import { z } from 'zod'
 
 import { PermanentJobError, RetryableJobError } from './errors.js'
@@ -44,6 +45,13 @@ export const repositoryInitialSyncPayloadSchema = z
   .strict()
 export type RepositoryInitialSyncJobPayload = z.output<typeof repositoryInitialSyncPayloadSchema>
 
+export const repositoryIncrementalSyncPayloadSchema = z
+  .object({ requestId: z.string().uuid() })
+  .strict()
+export type RepositoryIncrementalSyncJobPayload = z.output<
+  typeof repositoryIncrementalSyncPayloadSchema
+>
+
 export const repositoryRequiredChecksSyncPayloadSchema = z
   .object({
     projectId: z.string().trim().min(1).max(128),
@@ -72,7 +80,55 @@ function defineTask<Schema extends z.ZodTypeAny>(
   return definition
 }
 
+function createIncrementalSyncTask(
+  syncType: 'refresh_branches' | 'refresh_change' | 'refresh_checks' | 'refresh_rules',
+) {
+  return async (
+    payload: RepositoryIncrementalSyncJobPayload,
+    context: JobTaskContext,
+  ): Promise<JsonValue | undefined> => {
+    if (!context.repositoryIncrementalSync) {
+      throw new PermanentJobError(
+        'Repository incremental synchronization handler is not configured',
+        { code: 'REPOSITORY_INCREMENTAL_SYNC_HANDLER_MISSING' },
+      )
+    }
+
+    return context.repositoryIncrementalSync({
+      requestId: payload.requestId,
+      syncType,
+      jobId: context.job.id,
+      attempt: context.job.attempt,
+      maxAttempts: context.job.maxAttempts,
+      correlationId: context.correlationId,
+      causationId: context.causationId,
+      signal: context.signal,
+      logger: context.logger,
+    })
+  }
+}
+
 export const taskDefinitions = {
+  'repository.refresh-branches': defineTask({
+    dataSchema: repositoryIncrementalSyncPayloadSchema,
+    retry: { maxAttempts: 10 },
+    execute: createIncrementalSyncTask('refresh_branches'),
+  }),
+  'repository.refresh-change': defineTask({
+    dataSchema: repositoryIncrementalSyncPayloadSchema,
+    retry: { maxAttempts: 10 },
+    execute: createIncrementalSyncTask('refresh_change'),
+  }),
+  'repository.refresh-checks': defineTask({
+    dataSchema: repositoryIncrementalSyncPayloadSchema,
+    retry: { maxAttempts: 10 },
+    execute: createIncrementalSyncTask('refresh_checks'),
+  }),
+  'repository.refresh-rules': defineTask({
+    dataSchema: repositoryIncrementalSyncPayloadSchema,
+    retry: { maxAttempts: 10 },
+    execute: createIncrementalSyncTask('refresh_rules'),
+  }),
   'repository.required-checks-sync': defineTask({
     dataSchema: repositoryRequiredChecksSyncPayloadSchema,
     retry: { maxAttempts: 10 },
@@ -92,6 +148,27 @@ export const taskDefinitions = {
         reason: payload.reason,
         deliveryId: payload.deliveryId,
         actorGitHubUserId: payload.actorGitHubUserId,
+        attempt: context.job.attempt,
+        maxAttempts: context.job.maxAttempts,
+        correlationId: context.correlationId,
+        causationId: context.causationId,
+        signal: context.signal,
+        logger: context.logger,
+      })
+    },
+  }),
+  'repository.reconcile': defineTask({
+    dataSchema: repositoryInitialSyncPayloadSchema,
+    retry: { maxAttempts: 10 },
+    async execute(payload, context) {
+      if (!context.repositoryInitialSync) {
+        throw new PermanentJobError('Repository reconciliation handler is not configured', {
+          code: 'REPOSITORY_RECONCILIATION_HANDLER_MISSING',
+        })
+      }
+
+      return context.repositoryInitialSync({
+        requestId: payload.requestId,
         attempt: context.job.attempt,
         maxAttempts: context.job.maxAttempts,
         correlationId: context.correlationId,

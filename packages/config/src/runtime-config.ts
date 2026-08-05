@@ -181,6 +181,12 @@ const runtimeEnvironmentSchema = z
 
     JOB_WORKER_HEARTBEAT_STALE_AFTER_MS: z.coerce.number().int().min(5_000).default(60_000),
 
+    REPOSITORY_RECONCILIATION_INTERVAL_MS: z.coerce
+      .number()
+      .int()
+      .min(60_000)
+      .default(6 * 60 * 60_000),
+
     API_BODY_LIMIT_BYTES: z.coerce
       .number()
       .int()
@@ -321,6 +327,7 @@ export interface RuntimeConfig {
     readonly pollIntervalMs: number
     readonly heartbeatIntervalMs: number
     readonly heartbeatStaleAfterMs: number
+    readonly reconciliationIntervalMs: number
   }
 }
 
@@ -422,6 +429,7 @@ export function loadRuntimeConfig(environment: NodeJS.ProcessEnv = process.env):
       pollIntervalMs: result.data.JOB_WORKER_POLL_INTERVAL_MS,
       heartbeatIntervalMs: result.data.JOB_WORKER_HEARTBEAT_INTERVAL_MS,
       heartbeatStaleAfterMs: result.data.JOB_WORKER_HEARTBEAT_STALE_AFTER_MS,
+      reconciliationIntervalMs: result.data.REPOSITORY_RECONCILIATION_INTERVAL_MS,
     },
   }
 }

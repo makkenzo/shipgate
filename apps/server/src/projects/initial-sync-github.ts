@@ -1,5 +1,3 @@
-import { createHash } from 'node:crypto'
-
 import type { InstallationGitHubClient, InstallationPermissions } from '@shipgate/github'
 import { ProjectConfigurationValidationError } from './errors.js'
 import type { GitRepositorySnapshot } from './git-workspace.js'
@@ -9,6 +7,7 @@ import type {
   RepositoryProjectionSnapshot,
 } from './model.js'
 import { attributePullRequestChanges } from './pr-attribution.js'
+import { createProjectionFingerprint } from './projection-fingerprint.js'
 import {
   loadCheckResultsForCommit,
   loadEffectiveRequiredChecks,
@@ -95,6 +94,49 @@ export async function loadRepositoryMetadata(
     fullName: requireString(value.full_name, 'repository full name'),
     cloneUrl: requireString(value.clone_url, 'repository clone URL'),
     defaultBranch: nullableString(value.default_branch),
+  }
+}
+
+export type RepositoryHistoryRelation = 'identical' | 'fast_forward' | 'rewritten'
+
+export async function compareRepositoryHistory(
+  client: InstallationGitHubClient,
+  metadata: RepositoryMetadata,
+  previousSha: string,
+  currentSha: string,
+): Promise<RepositoryHistoryRelation> {
+  if (previousSha === currentSha) {
+    return 'identical'
+  }
+
+  try {
+    const response = await client.request('GET /repos/{owner}/{repo}/compare/{basehead}', {
+      owner: metadata.ownerLogin,
+      repo: metadata.name,
+      basehead: `${previousSha}...${currentSha}`,
+    })
+    const comparison = requireRecord(response.data, 'repository history comparison')
+
+    switch (comparison.status) {
+      case 'ahead':
+        return 'fast_forward'
+      case 'identical':
+        return 'identical'
+      case 'behind':
+      case 'diverged':
+        return 'rewritten'
+      default:
+        throw new ProjectConfigurationValidationError(
+          'external_state_unknown',
+          `GitHub returned unsupported comparison status: ${String(comparison.status)}`,
+        )
+    }
+  } catch (error) {
+    if (getStatus(error) === 404) {
+      return 'rewritten'
+    }
+
+    throw error
   }
 }
 
@@ -201,17 +243,7 @@ export async function buildRepositoryProjectionSnapshot(input: {
   }
 }
 
-export function createProjectionFingerprint(snapshot: RepositoryProjectionSnapshot): string {
-  return createHash('sha256')
-    .update(
-      JSON.stringify(snapshot, (_key, value) =>
-        value instanceof Date ? value.toISOString() : value,
-      ),
-    )
-    .digest('hex')
-}
-
-export { syncPermissions as repositoryInitialSyncPermissions }
+export { createProjectionFingerprint, syncPermissions as repositoryInitialSyncPermissions }
 
 function createBranchProjection(input: {
   readonly target: RepositoryInitialSyncTarget

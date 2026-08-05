@@ -59,6 +59,10 @@ export interface DatabaseSchema {
 
   repository_reconciliation_requests: RepositoryReconciliationRequestTable
 
+  repository_incremental_sync_requests: RepositoryIncrementalSyncRequestTable
+
+  repository_projection_archives: RepositoryProjectionArchiveTable
+
   shipgate_job_execution: ShipgateJobExecutionTable
 
   shipgate_worker_heartbeat: ShipgateWorkerHeartbeatTable
@@ -223,7 +227,12 @@ export interface GitHubUserInstallationRepositoryTable {
   updated_at: Generated<Date>
 }
 
-export type GitHubWebhookProcessingState = 'queued' | 'processing' | 'succeeded' | 'failed'
+export type GitHubWebhookProcessingState =
+  | 'queued'
+  | 'processing'
+  | 'succeeded'
+  | 'ignored'
+  | 'failed'
 
 export interface GitHubWebhookDeliveryTable {
   delivery_id: string
@@ -236,6 +245,7 @@ export interface GitHubWebhookDeliveryTable {
   processing_state: GitHubWebhookProcessingState
   attempt_count: number
   error_code: string | null
+  ignored_reason: Generated<string | null>
   received_at: Generated<Date>
   processing_started_at: Date | null
   processed_at: Date | null
@@ -451,6 +461,13 @@ export interface ChangeRequiredCheckStateTable {
 
 export type RepositorySyncRunStatus = 'queued' | 'running' | 'succeeded' | 'superseded' | 'failed'
 
+export type RepositoryReconciliationClassification =
+  | 'expected_change'
+  | 'recoverable_drift'
+  | 'destructive_history_change'
+  | 'permission_problem'
+  | 'unknown_inconsistency'
+
 export interface RepositorySyncRunTable {
   id: string
   project_id: string
@@ -466,6 +483,8 @@ export interface RepositorySyncRunTable {
   completed_at: Date | null
   error_code: string | null
   error_message: string | null
+  reconciliation_classification: Generated<RepositoryReconciliationClassification | null>
+  difference_summary: ColumnType<JsonValue | null, string | null | undefined, string | null>
   created_at: Generated<Date>
 }
 
@@ -541,7 +560,55 @@ export interface RepositoryReconciliationRequestTable {
   claimed_at: Date | null
   completed_at: Date | null
   created_at: Generated<Date>
+  trigger_scope: ColumnType<JsonValue, string, string>
+  force_push: Generated<boolean>
+  coalesced_count: Generated<number>
   updated_at: Generated<Date>
+}
+
+export type RepositoryIncrementalSyncType =
+  | 'refresh_branches'
+  | 'refresh_change'
+  | 'refresh_checks'
+  | 'refresh_rules'
+
+export type RepositoryIncrementalSyncRequestStatus =
+  | 'queued'
+  | 'running'
+  | 'succeeded'
+  | 'superseded'
+  | 'failed'
+
+export interface RepositoryIncrementalSyncRequestTable {
+  id: string
+  project_id: string
+  repository_id: string
+  configuration_version: number
+  sync_type: RepositoryIncrementalSyncType
+  status: Generated<RepositoryIncrementalSyncRequestStatus>
+  scope: ColumnType<JsonValue, string, string>
+  attempt_count: Generated<number>
+  last_error_code: string | null
+  last_error_message: string | null
+  requested_at: Date
+  claimed_at: Date | null
+  completed_at: Date | null
+  created_at: Generated<Date>
+  updated_at: Generated<Date>
+}
+
+export interface RepositoryProjectionArchiveTable {
+  id: string
+  reconciliation_request_id: string
+  sync_run_id: string
+  project_id: string
+  repository_id: string
+  source_sha: string | null
+  production_sha: string | null
+  classification: Extract<RepositoryReconciliationClassification, 'destructive_history_change'>
+  snapshot: ColumnType<JsonValue, string, string>
+  archived_at: Date
+  created_at: Generated<Date>
 }
 
 export type JobExecutionStatus = 'queued' | 'running' | 'retrying' | 'succeeded' | 'failed'

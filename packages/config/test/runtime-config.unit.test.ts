@@ -18,6 +18,7 @@ describe('loadRuntimeConfig', () => {
     expect(config.api.metricsEnabled).toBe(true)
     expect(config.database.poolMax).toBe(10)
     expect(config.jobs.concurrency).toBe(4)
+    expect(config.jobs.reconciliationIntervalMs).toBe(21_600_000)
     expect(config.auth.sessionTtlSeconds).toBe(604_800)
     expect(config.auth.oauthAttemptTtlSeconds).toBe(600)
   })

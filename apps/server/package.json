@@ -22,6 +22,7 @@
     "database:status": "node --env-file-if-exists=../../.env --enable-source-maps dist/database-cli.js status",
     "healthcheck:worker": "node --enable-source-maps dist/worker-healthcheck.js",
     "jobs:diagnostic": "node --env-file-if-exists=../../.env --enable-source-maps dist/diagnostic-cli.js",
+    "repository:reconcile": "node --env-file-if-exists=../../.env --enable-source-maps dist/reconcile-cli.js",
     "github:doctor": "node --env-file-if-exists=../../.env --enable-source-maps dist/github-doctor.js",
     "github:manifest": "node --env-file-if-exists=../../.env --enable-source-maps dist/github-manifest.js"
   },

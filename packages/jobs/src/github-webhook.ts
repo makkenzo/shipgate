@@ -255,6 +255,7 @@ export async function processGitHubWebhookDelivery(input: {
           processing_state: 'succeeded',
           processed_at: now,
           error_code: null,
+          ignored_reason: null,
           updated_at: now,
         })
         .where('delivery_id', '=', delivery.deliveryId)
@@ -269,6 +270,7 @@ export async function processGitHubWebhookDelivery(input: {
         processing_state: 'failed',
         error_code:
           error instanceof PermanentJobError ? error.code : 'GITHUB_WEBHOOK_PROCESSING_FAILED',
+        ignored_reason: null,
         updated_at: new Date(),
       })
       .where('delivery_id', '=', input.deliveryId)
@@ -320,7 +322,7 @@ async function loadDelivery(
       updated_at: now,
     })
     .where('delivery_id', '=', deliveryId)
-    .where('processing_state', '!=', 'succeeded')
+    .where('processing_state', 'not in', ['succeeded', 'ignored'])
     .where('attempt_count', '<', attempt)
     .returning([
       'delivery_id',
