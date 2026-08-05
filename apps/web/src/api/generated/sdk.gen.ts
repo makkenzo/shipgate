@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { CreateDiagnosticJobData, CreateDiagnosticJobErrors, CreateDiagnosticJobResponses, CreateProjectData, CreateProjectErrors, CreateProjectResponses, DeleteLocalAccountData, DeleteLocalAccountErrors, DeleteLocalAccountResponses, DeleteProjectData, DeleteProjectErrors, DeleteProjectResponses, DisconnectGitHubData, DisconnectGitHubErrors, DisconnectGitHubResponses, GetAuthSessionData, GetAuthSessionErrors, GetAuthSessionResponses, GetConnectionConfigurationData, GetConnectionConfigurationErrors, GetConnectionConfigurationResponses, GetDiagnosticJobData, GetDiagnosticJobErrors, GetDiagnosticJobResponses, GetHealthData, GetHealthErrors, GetHealthResponses, GetInstallationData, GetInstallationErrors, GetInstallationResponses, GetInstallationsData, GetInstallationsErrors, GetInstallationsResponses, GetProjectData, GetProjectErrors, GetProjectResponses, GetProjectsData, GetProjectsErrors, GetProjectsResponses, GetReadinessData, GetReadinessErrors, GetReadinessResponses, LogoutData, LogoutErrors, LogoutResponses, UpdateProjectData, UpdateProjectErrors, UpdateProjectResponses } from './types.gen';
+import type { CreateDiagnosticJobData, CreateDiagnosticJobErrors, CreateDiagnosticJobResponses, CreateProjectData, CreateProjectErrors, CreateProjectResponses, DeleteLocalAccountData, DeleteLocalAccountErrors, DeleteLocalAccountResponses, DeleteProjectData, DeleteProjectErrors, DeleteProjectResponses, DisconnectGitHubData, DisconnectGitHubErrors, DisconnectGitHubResponses, GetAuthSessionData, GetAuthSessionErrors, GetAuthSessionResponses, GetConnectionConfigurationData, GetConnectionConfigurationErrors, GetConnectionConfigurationResponses, GetDiagnosticJobData, GetDiagnosticJobErrors, GetDiagnosticJobResponses, GetHealthData, GetHealthErrors, GetHealthResponses, GetInstallationData, GetInstallationErrors, GetInstallationResponses, GetInstallationsData, GetInstallationsErrors, GetInstallationsResponses, GetProjectChangesData, GetProjectChangesErrors, GetProjectChangesResponses, GetProjectData, GetProjectErrors, GetProjectResponses, GetProjectsData, GetProjectsErrors, GetProjectsResponses, GetReadinessData, GetReadinessErrors, GetReadinessResponses, LogoutData, LogoutErrors, LogoutResponses, UpdateProjectData, UpdateProjectErrors, UpdateProjectResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -168,7 +168,7 @@ export const getProject = <ThrowOnError extends boolean = false>(options: Option
 });
 
 /**
- * Change source or production branch
+ * Change project branches or required-check overrides
  */
 export const updateProject = <ThrowOnError extends boolean = false>(options: Options<UpdateProjectData, ThrowOnError>): RequestResult<UpdateProjectResponses, UpdateProjectErrors, ThrowOnError> => (options.client ?? client).patch<UpdateProjectResponses, UpdateProjectErrors, ThrowOnError>({
     security: [{
@@ -182,6 +182,19 @@ export const updateProject = <ThrowOnError extends boolean = false>(options: Opt
         'Content-Type': 'application/json',
         ...options.headers
     }
+});
+
+/**
+ * List unreleased changes with required-check states
+ */
+export const getProjectChanges = <ThrowOnError extends boolean = false>(options: Options<GetProjectChangesData, ThrowOnError>): RequestResult<GetProjectChangesResponses, GetProjectChangesErrors, ThrowOnError> => (options.client ?? client).get<GetProjectChangesResponses, GetProjectChangesErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: '__Host-shipgate_session',
+            type: 'apiKey'
+        }],
+    url: '/api/v1/projects/{projectId}/changes',
+    ...options
 });
 
 /**

@@ -7,7 +7,11 @@ import {
 } from '@shipgate/config'
 import { createDatabase, type DatabaseClient } from '@shipgate/database'
 import type { GitHubAuthenticationService } from '@shipgate/github'
-import type { RepositoryInitialSyncHandler } from '@shipgate/jobs'
+import type {
+  GitHubWebhookProjectionHandler,
+  RepositoryInitialSyncHandler,
+  RepositoryRequiredChecksSyncHandler,
+} from '@shipgate/jobs'
 import type { Logger } from 'pino'
 import { createCorrelationId, withCorrelationId } from './correlation-id.js'
 import {
@@ -21,6 +25,8 @@ import {
   createProjectTopologyValidator,
   createReadOnlyGitWorkspace,
   createRepositoryInitialSyncHandler,
+  createRepositoryRequiredChecksSyncHandler,
+  createRequiredChecksWebhookProjectionHandler,
   type ProjectService,
 } from './projects/index.js'
 import { createShutdownManager, type ShutdownManager } from './shutdown.js'
@@ -36,6 +42,8 @@ export interface ApplicationContext {
   readonly githubRepositoryAccess: GitHubRepositoryAccessService
   readonly projects: ProjectService
   readonly repositoryInitialSync: RepositoryInitialSyncHandler
+  readonly repositoryRequiredChecksSync: RepositoryRequiredChecksSyncHandler
+  readonly githubWebhookProjection: GitHubWebhookProjectionHandler
   readonly shutdown: ShutdownManager
 
   createCorrelationId(): string
@@ -158,6 +166,11 @@ export function createApplicationContext(
     githubAuth,
     gitWorkspace,
   })
+  const repositoryRequiredChecksSync = createRepositoryRequiredChecksSyncHandler({
+    database,
+    githubAuth,
+  })
+  const githubWebhookProjection = createRequiredChecksWebhookProjectionHandler()
 
   return {
     processKind: options.processKind,
@@ -170,6 +183,8 @@ export function createApplicationContext(
     githubRepositoryAccess: repositoryAccess,
     projects,
     repositoryInitialSync,
+    repositoryRequiredChecksSync,
+    githubWebhookProjection,
     shutdown,
     createCorrelationId,
 

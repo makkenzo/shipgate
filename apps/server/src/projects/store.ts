@@ -36,6 +36,11 @@ import {
   serializeGitHubNumericId,
   withRepositoryTransaction,
 } from './repository-transaction.js'
+import { normalizeRequiredCheckOverrides, parseRequiredCheckOverrides } from './required-checks.js'
+import {
+  applyRequiredCheckProjectionInTransaction,
+  loadRequiredCheckStatesForChanges,
+} from './required-checks-store.js'
 
 export async function createProject(
   database: DatabaseClient,
@@ -130,6 +135,10 @@ export async function createProject(
         production_sha: null,
         last_successful_sync_at: null,
         configuration_version: 1,
+        required_check_policy_version: 0,
+        required_check_overrides: JSON.stringify(
+          normalizeRequiredCheckOverrides(input.requiredCheckOverrides ?? []),
+        ),
         deletion_requested_at: null,
         deleted_at: null,
         created_at: now,
@@ -394,60 +403,29 @@ export async function applyRepositoryProjectionInTransaction(
     await transaction.insertInto('change_commits').values(changeCommitRows).execute()
   }
 
-  if (input.snapshot.requiredChecks.length > 0) {
-    await transaction
-      .insertInto('required_checks')
-      .values(
-        input.snapshot.requiredChecks.map((check) => ({
-          id: check.id ?? randomUUID(),
-          project_id: input.projectId,
-          repository_id: repositoryId,
-          policy_version: check.policyVersion,
-          check_type: check.type,
-          context: check.context,
-          integration_id: serializeNullableGitHubNumericId(
-            check.integrationId,
-            'required check integration ID',
-          ),
-          source: check.source,
-          source_reference: check.sourceReference,
-          observed_at: observedAt,
-          updated_at: observedAt,
-        })),
-      )
-      .execute()
-  }
+  const requiredCheckTargetShas = [
+    ...new Set(
+      input.snapshot.changes
+        .filter((change) => change.productionPresence !== 'released')
+        .map((change) => change.finalHeadSha),
+    ),
+  ]
 
-  if (input.snapshot.checkResults.length > 0) {
-    await transaction
-      .insertInto('commit_check_results')
-      .values(
-        input.snapshot.checkResults.map((result) => ({
-          id: result.id ?? randomUUID(),
-          project_id: input.projectId,
-          repository_id: repositoryId,
-          commit_sha: result.commitSha,
-          check_type: result.type,
-          context: result.context,
-          integration_id: serializeNullableGitHubNumericId(
-            result.integrationId,
-            'check result integration ID',
-          ),
-          github_object_id: serializeGitHubNumericId(
-            result.githubObjectId,
-            'check result GitHub object ID',
-          ),
-          attempt: result.attempt,
-          status: result.status,
-          conclusion: result.conclusion,
-          details_url: result.detailsUrl,
-          started_at: result.startedAt,
-          completed_at: result.completedAt,
-          observed_at: result.observedAt,
-        })),
-      )
-      .execute()
-  }
+  await applyRequiredCheckProjectionInTransaction(scope, {
+    projectId: input.projectId,
+    repositoryId,
+    expectedConfigurationVersion: input.expectedConfigurationVersion,
+    requiredChecks: input.snapshot.requiredChecks,
+    checkResults: input.snapshot.checkResults,
+    targetCommitShas: requiredCheckTargetShas,
+    recomputeAllChanges: true,
+    observedAt,
+    trigger: {
+      reason: input.reason,
+      auditSource: 'reconciliation',
+      actorGitHubUserId: null,
+    },
+  })
 
   await insertSynchronizationIssues(
     transaction,
@@ -599,6 +577,7 @@ export async function listChangesAheadOfProduction(
       'merge_method',
       'commit_set_fingerprint',
       'production_presence',
+      'final_head_sha',
     ])
     .where('project_id', '=', projectId)
     .where('synchronization_state', '=', 'known')
@@ -630,6 +609,11 @@ export async function listChangesAheadOfProduction(
     commitsByChange.set(commit.change_id, commits)
   }
 
+  const requiredChecksByChange = await loadRequiredCheckStatesForChanges(
+    database,
+    rows.map((row) => row.id),
+  )
+
   return rows.map((row) => {
     const mergeMethod = row.merge_method
     const fingerprint = row.commit_set_fingerprint
@@ -650,7 +634,9 @@ export async function listChangesAheadOfProduction(
       mergeMethod,
       commitSetFingerprint: fingerprint,
       productionPresence,
+      finalHeadSha: row.final_head_sha,
       commitShas: commitsByChange.get(row.id) ?? [],
+      requiredChecks: requiredChecksByChange.get(row.id) ?? [],
     }
   })
 }
@@ -866,8 +852,6 @@ async function clearCurrentProjection(
   transaction: ProjectWriteTransaction,
   projectId: string,
 ): Promise<void> {
-  await transaction.deleteFrom('commit_check_results').where('project_id', '=', projectId).execute()
-  await transaction.deleteFrom('required_checks').where('project_id', '=', projectId).execute()
   await transaction.deleteFrom('change_commits').where('project_id', '=', projectId).execute()
   await transaction.deleteFrom('repository_commits').where('project_id', '=', projectId).execute()
   await transaction.deleteFrom('repository_branches').where('project_id', '=', projectId).execute()
@@ -1160,28 +1144,24 @@ export function validateRepositoryProjectionSnapshot(snapshot: RepositoryProject
   }
 
   const requiredChecks = new Set<string>()
-  const requiredCheckPolicyVersions = new Set<number>()
 
   for (const check of snapshot.requiredChecks) {
     if (check.id !== undefined) {
       assertLocalId(check.id, 'required check ID')
     }
 
-    assertPositiveInteger(check.policyVersion, 'required check policy version')
-    requiredCheckPolicyVersions.add(check.policyVersion)
     assertNonEmpty(check.context, 'required check context')
     const integrationId = serializeNullableGitHubNumericId(
       check.integrationId,
       'required check integration ID',
     )
-    const identity = [check.policyVersion, check.type, check.context, integrationId ?? ''].join(':')
+    const identity = [
+      check.context,
+      integrationId ?? '',
+      check.source,
+      check.sourceReference ?? '',
+    ].join(':')
     assertUnique(requiredChecks, identity, `Duplicate required check ${identity}`)
-  }
-
-  if (requiredCheckPolicyVersions.size > 1) {
-    throw new RepositoryProjectionInvariantError(
-      'A repository projection must contain exactly one required-check policy version',
-    )
   }
 
   const checkResults = new Set<string>()
@@ -1192,13 +1172,6 @@ export function validateRepositoryProjectionSnapshot(snapshot: RepositoryProject
     }
 
     assertCommitSha(result.commitSha, 'check result commit SHA')
-
-    if (!commits.has(result.commitSha)) {
-      throw new RepositoryProjectionInvariantError(
-        `Check result ${result.context} references unknown commit ${result.commitSha}`,
-      )
-    }
-
     assertNonEmpty(result.context, 'check result context')
     serializeNullableGitHubNumericId(result.integrationId, 'check result integration ID')
     const githubObjectId = serializeGitHubNumericId(
@@ -1516,6 +1489,8 @@ function mapProject(row: ProjectRow): ProjectRecord {
     mergeBaseSha: row.merge_base_sha,
     lastSuccessfulSyncAt: row.last_successful_sync_at,
     configurationVersion: row.configuration_version,
+    requiredCheckPolicyVersion: row.required_check_policy_version,
+    requiredCheckOverrides: parseRequiredCheckOverrides(row.required_check_overrides),
     deletionRequestedAt: row.deletion_requested_at,
     deletedAt: row.deleted_at,
     createdAt: row.created_at,

@@ -476,6 +476,11 @@ export type GetProjectsResponses = {
             productionSha: string | null;
             lastSuccessfulSynchronization: string | null;
             configurationVersion: number;
+            requiredCheckPolicyVersion: number;
+            requiredCheckOverrides: Array<{
+                context: string;
+                integrationId: number | null;
+            }>;
             deletionRequestedAt: string | null;
             createdAt: string;
             updatedAt: string;
@@ -491,6 +496,10 @@ export type CreateProjectData = {
         repositoryId: number;
         sourceBranch: string;
         productionBranch: string;
+        requiredCheckOverrides?: Array<{
+            context: string;
+            integrationId: number | null;
+        }>;
     };
     headers?: {
         'x-csrf-token'?: string;
@@ -543,6 +552,11 @@ export type CreateProjectResponses = {
             productionSha: string | null;
             lastSuccessfulSynchronization: string | null;
             configurationVersion: number;
+            requiredCheckPolicyVersion: number;
+            requiredCheckOverrides: Array<{
+                context: string;
+                integrationId: number | null;
+            }>;
             deletionRequestedAt: string | null;
             createdAt: string;
             updatedAt: string;
@@ -619,6 +633,11 @@ export type DeleteProjectResponses = {
             productionSha: string | null;
             lastSuccessfulSynchronization: string | null;
             configurationVersion: number;
+            requiredCheckPolicyVersion: number;
+            requiredCheckOverrides: Array<{
+                context: string;
+                integrationId: number | null;
+            }>;
             deletionRequestedAt: string | null;
             createdAt: string;
             updatedAt: string;
@@ -677,6 +696,11 @@ export type GetProjectResponses = {
         productionSha: string | null;
         lastSuccessfulSynchronization: string | null;
         configurationVersion: number;
+        requiredCheckPolicyVersion: number;
+        requiredCheckOverrides: Array<{
+            context: string;
+            integrationId: number | null;
+        }>;
         deletionRequestedAt: string | null;
         createdAt: string;
         updatedAt: string;
@@ -690,6 +714,10 @@ export type UpdateProjectData = {
         expectedConfigurationVersion: number;
         sourceBranch?: string;
         productionBranch?: string;
+        requiredCheckOverrides?: Array<{
+            context: string;
+            integrationId: number | null;
+        }>;
     };
     headers?: {
         'x-csrf-token'?: string;
@@ -744,6 +772,11 @@ export type UpdateProjectResponses = {
             productionSha: string | null;
             lastSuccessfulSynchronization: string | null;
             configurationVersion: number;
+            requiredCheckPolicyVersion: number;
+            requiredCheckOverrides: Array<{
+                context: string;
+                integrationId: number | null;
+            }>;
             deletionRequestedAt: string | null;
             createdAt: string;
             updatedAt: string;
@@ -785,6 +818,11 @@ export type UpdateProjectResponses = {
             productionSha: string | null;
             lastSuccessfulSynchronization: string | null;
             configurationVersion: number;
+            requiredCheckPolicyVersion: number;
+            requiredCheckOverrides: Array<{
+                context: string;
+                integrationId: number | null;
+            }>;
             deletionRequestedAt: string | null;
             createdAt: string;
             updatedAt: string;
@@ -803,6 +841,79 @@ export type UpdateProjectResponses = {
 };
 
 export type UpdateProjectResponse = UpdateProjectResponses[keyof UpdateProjectResponses];
+
+export type GetProjectChangesData = {
+    body?: never;
+    path: {
+        projectId: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{projectId}/changes';
+};
+
+export type GetProjectChangesErrors = {
+    /**
+     * ApiError
+     *
+     * Common error response returned by the Shipgate API.
+     */
+    default: {
+        code: string;
+        message: string;
+        requestId: string;
+        details?: unknown;
+    };
+};
+
+export type GetProjectChangesError = GetProjectChangesErrors[keyof GetProjectChangesErrors];
+
+export type GetProjectChangesResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        changes: Array<{
+            id: string;
+            githubPullRequestId: number;
+            pullRequestNumber: number;
+            title: string;
+            authorId: number | null;
+            authorLogin: string | null;
+            mergedAt: string;
+            mergeMethod: 'merge' | 'squash' | 'rebase' | 'unknown';
+            commitSetFingerprint: string;
+            productionPresence: 'unreleased' | 'partially_present';
+            finalHeadSha: string;
+            commitShas: Array<string>;
+            requiredChecks: Array<{
+                requiredCheckId: string;
+                policyVersion: number;
+                context: string;
+                integrationId: number | null;
+                source: 'branch_protection' | 'repository_ruleset' | 'project_override';
+                sourceReference: string | null;
+                commitSha: string;
+                state: 'pending' | 'successful' | 'failed' | 'missing' | 'stale';
+                observations: Array<{
+                    id: string | null;
+                    type: 'check_run' | 'commit_status';
+                    integrationId: number | null;
+                    githubObjectId: string;
+                    attempt: number | null;
+                    status: 'queued' | 'in_progress' | 'pending' | 'completed';
+                    conclusion: 'success' | 'failure' | 'neutral' | 'cancelled' | 'skipped' | 'timed_out' | 'action_required' | 'stale' | 'startup_failure' | 'error' | null;
+                    detailsUrl: string | null;
+                    startedAt: string | null;
+                    completedAt: string | null;
+                    observedAt: string;
+                }>;
+                observedAt: string;
+            }>;
+        }>;
+    };
+};
+
+export type GetProjectChangesResponse = GetProjectChangesResponses[keyof GetProjectChangesResponses];
 
 export type CreateDiagnosticJobData = {
     /**

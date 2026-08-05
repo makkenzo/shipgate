@@ -24,7 +24,7 @@
     "test:e2e": "playwright test",
     "check:boundaries": "node scripts/check-boundaries.mjs",
     "clean": "pnpm --recursive --if-present run clean",
-    "api:generate": "pnpm --filter @shipgate/server openapi:generate && pnpm --filter @shipgate/web api:generate && biome format --write apps/web/openapi apps/web/src/api/generated",
+    "api:generate": "pnpm --filter @shipgate/server... build && pnpm --filter @shipgate/server openapi:generate:compiled && pnpm --filter @shipgate/web api:generate && biome format --write apps/web/openapi apps/web/src/api/generated",
     "api:generate:compiled": "pnpm --filter @shipgate/server openapi:generate:compiled && pnpm --filter @shipgate/web api:generate && biome format --write apps/web/openapi apps/web/src/api/generated",
     "api:check": "pnpm --filter @shipgate/web api:check",
     "routes:check": "pnpm --filter @shipgate/web routes:check",

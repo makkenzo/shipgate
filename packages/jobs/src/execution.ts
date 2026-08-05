@@ -171,6 +171,8 @@ async function executeJobAttempt(options: ExecuteJobAttemptOptions): Promise<Job
       causationId,
       signal: options.signal,
       repositoryInitialSync: dependencies.repositoryInitialSync,
+      repositoryRequiredChecksSync: dependencies.repositoryRequiredChecksSync,
+      githubWebhookProjection: dependencies.githubWebhookProjection,
     })
 
     if (persist) {

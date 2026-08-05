@@ -49,6 +49,8 @@ export interface DatabaseSchema {
 
   commit_check_results: CommitCheckResultTable
 
+  change_required_check_states: ChangeRequiredCheckStateTable
+
   repository_sync_runs: RepositorySyncRunTable
 
   repository_sync_issues: RepositorySyncIssueTable
@@ -291,6 +293,8 @@ export interface ProjectTable {
   last_successful_sync_at: Date | null
   merge_base_sha: Generated<string | null>
   configuration_version: Generated<number>
+  required_check_policy_version: Generated<number>
+  required_check_overrides: ColumnType<JsonValue, string, string>
   deletion_requested_at: Date | null
   deleted_at: Date | null
   created_at: Generated<Date>
@@ -379,14 +383,13 @@ export interface ChangeCommitTable {
 
 export type RequiredCheckType = 'check_run' | 'commit_status'
 
-export type RequiredCheckSource = 'branch_protection' | 'repository_ruleset'
+export type RequiredCheckSource = 'branch_protection' | 'repository_ruleset' | 'project_override'
 
 export interface RequiredCheckTable {
   id: string
   project_id: string
   repository_id: string
   policy_version: number
-  check_type: RequiredCheckType
   context: string
   integration_id: string | null
   source: RequiredCheckSource
@@ -427,6 +430,23 @@ export interface CommitCheckResultTable {
   completed_at: Date | null
   observed_at: Date
   created_at: Generated<Date>
+  updated_at: Generated<Date>
+}
+
+export type RequiredCheckState = 'pending' | 'successful' | 'failed' | 'missing' | 'stale'
+
+export interface ChangeRequiredCheckStateTable {
+  project_id: string
+  repository_id: string
+  change_id: string
+  required_check_id: string
+  policy_version: number
+  commit_sha: string
+  state: RequiredCheckState
+  evidence_ids: ColumnType<JsonValue, string, string>
+  observed_at: Date
+  created_at: Generated<Date>
+  updated_at: Generated<Date>
 }
 
 export type RepositorySyncRunStatus = 'queued' | 'running' | 'succeeded' | 'superseded' | 'failed'
@@ -470,6 +490,9 @@ export interface RepositorySyncIssueTable {
 export type ProjectAuditEventType =
   | 'project_created'
   | 'project_configuration_changed'
+  | 'project_required_check_overrides_changed'
+  | 'required_check_policy_changed'
+  | 'required_check_policy_refreshed'
   | 'project_deletion_requested'
 
 export type ProjectAuditSource = 'user' | 'system' | 'reconciliation'

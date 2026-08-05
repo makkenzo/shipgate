@@ -8,6 +8,7 @@ import type {
 } from '@shipgate/database'
 import type { Transaction } from 'kysely'
 import { PermanentJobError } from './errors.js'
+import type { GitHubWebhookProjectionHandler } from './types.js'
 
 interface WebhookDelivery {
   readonly deliveryId: string
@@ -25,6 +26,9 @@ export async function processGitHubWebhookDelivery(input: {
   readonly database: DatabaseClient
   readonly deliveryId: string
   readonly attempt: number
+  readonly correlationId: string
+  readonly causationId: string | undefined
+  readonly projection: GitHubWebhookProjectionHandler | undefined
 }): Promise<Readonly<Record<string, JsonValue>>> {
   let completedDelivery: WebhookDelivery | undefined
 
@@ -229,6 +233,20 @@ export async function processGitHubWebhookDelivery(input: {
 
         default:
           break
+      }
+
+      if (input.projection) {
+        await input.projection({
+          transaction,
+          deliveryId: delivery.deliveryId,
+          event: delivery.event,
+          action: delivery.action,
+          installationId: delivery.installationId,
+          repositoryId: delivery.repositoryId,
+          payload: payload as unknown as JsonValue,
+          correlationId: input.correlationId,
+          causationId: input.causationId,
+        })
       }
 
       await transaction

@@ -26,8 +26,12 @@ export {
   waitForJobExecution,
 } from './store.js'
 export type {
+  GitHubWebhookProjectionExecution,
+  GitHubWebhookProjectionHandler,
   RepositoryInitialSyncExecution,
   RepositoryInitialSyncHandler,
+  RepositoryRequiredChecksSyncExecution,
+  RepositoryRequiredChecksSyncHandler,
   StructuredLogger,
 } from './types.js'
 export {

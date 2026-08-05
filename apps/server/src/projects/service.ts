@@ -15,6 +15,7 @@ import {
   listStoredProjects,
   requestProjectDeletion,
   updateConfiguredProject,
+  updateProjectRequiredCheckOverrides,
 } from './configuration-store.js'
 import {
   ProjectConfigurationValidationError,
@@ -22,9 +23,10 @@ import {
   ProjectVersionConflictError,
   RepositoryAlreadyConnectedError,
 } from './errors.js'
-import type { ProjectRecord } from './model.js'
+import type { ChangeAheadOfProduction, ProjectRecord, RequiredCheckOverride } from './model.js'
 import { withRepositoryTransaction } from './repository-transaction.js'
-import { getProject } from './store.js'
+import { normalizeRequiredCheckOverrides } from './required-checks.js'
+import { getProject, listChangesAheadOfProduction } from './store.js'
 import type { ProjectTopologyValidator } from './topology.js'
 
 export interface ProjectService {
@@ -34,6 +36,7 @@ export interface ProjectService {
     readonly repositoryId: number
     readonly sourceBranch: string
     readonly productionBranch: string
+    readonly requiredCheckOverrides?: readonly RequiredCheckOverride[]
     readonly correlationId: string
   }): Promise<ConfigureProjectResult>
 
@@ -41,12 +44,18 @@ export interface ProjectService {
 
   get(actorGitHubUserId: number, projectId: string): Promise<ProjectRecord>
 
+  listChanges(
+    actorGitHubUserId: number,
+    projectId: string,
+  ): Promise<readonly ChangeAheadOfProduction[]>
+
   update(input: {
     readonly actorGitHubUserId: number
     readonly projectId: string
     readonly expectedConfigurationVersion: number
     readonly sourceBranch?: string
     readonly productionBranch?: string
+    readonly requiredCheckOverrides?: readonly RequiredCheckOverride[]
     readonly correlationId: string
   }): Promise<ConfigureProjectResult>
 
@@ -90,6 +99,9 @@ export function createProjectService(options: {
           topology,
           actorGitHubUserId: input.actorGitHubUserId,
           correlationId: input.correlationId,
+          ...(input.requiredCheckOverrides !== undefined
+            ? { requiredCheckOverrides: input.requiredCheckOverrides }
+            : {}),
         }),
       )
     },
@@ -117,6 +129,16 @@ export function createProjectService(options: {
       }
 
       return project
+    },
+
+    async listChanges(actorGitHubUserId, projectId) {
+      const project = await requireStoredProject(options.database, projectId)
+
+      if (!(await canReadProject(options, actorGitHubUserId, project))) {
+        throw new ProjectNotFoundError(projectId)
+      }
+
+      return listChangesAheadOfProduction(options.database, project.id)
     },
 
     async update(input) {
@@ -148,12 +170,32 @@ export function createProjectService(options: {
 
       const sourceBranch = input.sourceBranch ?? project.sourceBranch
       const productionBranch = input.productionBranch ?? project.productionBranch
+      const requiredCheckOverrides = normalizeRequiredCheckOverrides(
+        input.requiredCheckOverrides ?? project.requiredCheckOverrides,
+      )
+      const branchesChanged =
+        sourceBranch !== project.sourceBranch || productionBranch !== project.productionBranch
+      const overridesChanged =
+        JSON.stringify(requiredCheckOverrides) !== JSON.stringify(project.requiredCheckOverrides)
 
-      if (sourceBranch === project.sourceBranch && productionBranch === project.productionBranch) {
+      if (!branchesChanged && !overridesChanged) {
         return { status: 'already_applied', project, reconciliation: null }
       }
 
       await assertProjectAppPermissions(options.database, installationId)
+
+      if (!branchesChanged) {
+        return withRepositoryTransaction(options.database, repositoryId, async (scope) =>
+          updateProjectRequiredCheckOverrides({
+            scope,
+            projectId: input.projectId,
+            expectedConfigurationVersion: input.expectedConfigurationVersion,
+            requiredCheckOverrides,
+            actorGitHubUserId: input.actorGitHubUserId,
+            correlationId: input.correlationId,
+          }),
+        )
+      }
 
       const topology = await options.topologyValidator.validate({
         installationId,
@@ -168,6 +210,7 @@ export function createProjectService(options: {
           projectId: input.projectId,
           expectedConfigurationVersion: input.expectedConfigurationVersion,
           topology,
+          requiredCheckOverrides,
           actorGitHubUserId: input.actorGitHubUserId,
           correlationId: input.correlationId,
         }),

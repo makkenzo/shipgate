@@ -1309,6 +1309,34 @@
                     "minLength": 1,
                     "maxLength": 255,
                     "pattern": "^[^\\r\\n\\u0000]+$"
+                  },
+                  "requiredCheckOverrides": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": ["context", "integrationId"],
+                      "properties": {
+                        "context": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 255,
+                          "pattern": "^[^\\r\\n\\u0000]+$"
+                        },
+                        "integrationId": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "minimum": 1
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "maxItems": 100
                   }
                 },
                 "additionalProperties": false
@@ -1372,6 +1400,8 @@
                         "productionSha",
                         "lastSuccessfulSynchronization",
                         "configurationVersion",
+                        "requiredCheckPolicyVersion",
+                        "requiredCheckOverrides",
                         "deletionRequestedAt",
                         "createdAt",
                         "updatedAt"
@@ -1491,6 +1521,37 @@
                         "configurationVersion": {
                           "type": "integer",
                           "minimum": 1
+                        },
+                        "requiredCheckPolicyVersion": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "requiredCheckOverrides": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": ["context", "integrationId"],
+                            "properties": {
+                              "context": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 255,
+                                "pattern": "^[^\\r\\n\\u0000]+$"
+                              },
+                              "integrationId": {
+                                "anyOf": [
+                                  {
+                                    "type": "integer",
+                                    "minimum": 1
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              }
+                            },
+                            "additionalProperties": false
+                          }
                         },
                         "deletionRequestedAt": {
                           "anyOf": [
@@ -1634,6 +1695,8 @@
                           "productionSha",
                           "lastSuccessfulSynchronization",
                           "configurationVersion",
+                          "requiredCheckPolicyVersion",
+                          "requiredCheckOverrides",
                           "deletionRequestedAt",
                           "createdAt",
                           "updatedAt"
@@ -1754,6 +1817,37 @@
                             "type": "integer",
                             "minimum": 1
                           },
+                          "requiredCheckPolicyVersion": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
+                          "requiredCheckOverrides": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "required": ["context", "integrationId"],
+                              "properties": {
+                                "context": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 255,
+                                  "pattern": "^[^\\r\\n\\u0000]+$"
+                                },
+                                "integrationId": {
+                                  "anyOf": [
+                                    {
+                                      "type": "integer",
+                                      "minimum": 1
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                }
+                              },
+                              "additionalProperties": false
+                            }
+                          },
                           "deletionRequestedAt": {
                             "anyOf": [
                               {
@@ -1855,6 +1949,8 @@
                     "productionSha",
                     "lastSuccessfulSynchronization",
                     "configurationVersion",
+                    "requiredCheckPolicyVersion",
+                    "requiredCheckOverrides",
                     "deletionRequestedAt",
                     "createdAt",
                     "updatedAt"
@@ -1969,6 +2065,37 @@
                       "type": "integer",
                       "minimum": 1
                     },
+                    "requiredCheckPolicyVersion": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "requiredCheckOverrides": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": ["context", "integrationId"],
+                        "properties": {
+                          "context": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 255,
+                            "pattern": "^[^\\r\\n\\u0000]+$"
+                          },
+                          "integrationId": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": 1
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          }
+                        },
+                        "additionalProperties": false
+                      }
+                    },
                     "deletionRequestedAt": {
                       "anyOf": [
                         {
@@ -2026,7 +2153,7 @@
       },
       "patch": {
         "operationId": "updateProject",
-        "summary": "Change source or production branch",
+        "summary": "Change project branches or required-check overrides",
         "tags": ["Projects"],
         "requestBody": {
           "required": true,
@@ -2051,6 +2178,34 @@
                     "minLength": 1,
                     "maxLength": 255,
                     "pattern": "^[^\\r\\n\\u0000]+$"
+                  },
+                  "requiredCheckOverrides": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": ["context", "integrationId"],
+                      "properties": {
+                        "context": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 255,
+                          "pattern": "^[^\\r\\n\\u0000]+$"
+                        },
+                        "integrationId": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "minimum": 1
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "maxItems": 100
                   }
                 },
                 "additionalProperties": false,
@@ -2125,6 +2280,8 @@
                         "productionSha",
                         "lastSuccessfulSynchronization",
                         "configurationVersion",
+                        "requiredCheckPolicyVersion",
+                        "requiredCheckOverrides",
                         "deletionRequestedAt",
                         "createdAt",
                         "updatedAt"
@@ -2244,6 +2401,37 @@
                         "configurationVersion": {
                           "type": "integer",
                           "minimum": 1
+                        },
+                        "requiredCheckPolicyVersion": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "requiredCheckOverrides": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": ["context", "integrationId"],
+                            "properties": {
+                              "context": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 255,
+                                "pattern": "^[^\\r\\n\\u0000]+$"
+                              },
+                              "integrationId": {
+                                "anyOf": [
+                                  {
+                                    "type": "integer",
+                                    "minimum": 1
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              }
+                            },
+                            "additionalProperties": false
+                          }
                         },
                         "deletionRequestedAt": {
                           "anyOf": [
@@ -2359,6 +2547,8 @@
                         "productionSha",
                         "lastSuccessfulSynchronization",
                         "configurationVersion",
+                        "requiredCheckPolicyVersion",
+                        "requiredCheckOverrides",
                         "deletionRequestedAt",
                         "createdAt",
                         "updatedAt"
@@ -2478,6 +2668,37 @@
                         "configurationVersion": {
                           "type": "integer",
                           "minimum": 1
+                        },
+                        "requiredCheckPolicyVersion": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "requiredCheckOverrides": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": ["context", "integrationId"],
+                            "properties": {
+                              "context": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 255,
+                                "pattern": "^[^\\r\\n\\u0000]+$"
+                              },
+                              "integrationId": {
+                                "anyOf": [
+                                  {
+                                    "type": "integer",
+                                    "minimum": 1
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              }
+                            },
+                            "additionalProperties": false
+                          }
                         },
                         "deletionRequestedAt": {
                           "anyOf": [
@@ -2654,6 +2875,8 @@
                         "productionSha",
                         "lastSuccessfulSynchronization",
                         "configurationVersion",
+                        "requiredCheckPolicyVersion",
+                        "requiredCheckOverrides",
                         "deletionRequestedAt",
                         "createdAt",
                         "updatedAt"
@@ -2774,6 +2997,37 @@
                           "type": "integer",
                           "minimum": 1
                         },
+                        "requiredCheckPolicyVersion": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "requiredCheckOverrides": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": ["context", "integrationId"],
+                            "properties": {
+                              "context": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 255,
+                                "pattern": "^[^\\r\\n\\u0000]+$"
+                              },
+                              "integrationId": {
+                                "anyOf": [
+                                  {
+                                    "type": "integer",
+                                    "minimum": 1
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              }
+                            },
+                            "additionalProperties": false
+                          }
+                        },
                         "deletionRequestedAt": {
                           "anyOf": [
                             {
@@ -2793,6 +3047,449 @@
                       },
                       "additionalProperties": false,
                       "title": "Project"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Common error response returned by the Shipgate API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["code", "message", "requestId"],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "minLength": 1,
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "details": {}
+                  },
+                  "additionalProperties": false,
+                  "title": "ApiError",
+                  "description": "Common error response returned by the Shipgate API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{projectId}/changes": {
+      "get": {
+        "operationId": "getProjectChanges",
+        "summary": "List unreleased changes with required-check states",
+        "tags": ["Projects"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "in": "path",
+            "name": "projectId",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "shipgateSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["changes"],
+                  "properties": {
+                    "changes": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "id",
+                          "githubPullRequestId",
+                          "pullRequestNumber",
+                          "title",
+                          "authorId",
+                          "authorLogin",
+                          "mergedAt",
+                          "mergeMethod",
+                          "commitSetFingerprint",
+                          "productionPresence",
+                          "finalHeadSha",
+                          "commitShas",
+                          "requiredChecks"
+                        ],
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "githubPullRequestId": {
+                            "type": "integer",
+                            "minimum": 1
+                          },
+                          "pullRequestNumber": {
+                            "type": "integer",
+                            "minimum": 1
+                          },
+                          "title": {
+                            "type": "string"
+                          },
+                          "authorId": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": 1
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "authorLogin": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "mergedAt": {
+                            "type": "string"
+                          },
+                          "mergeMethod": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "enum": ["merge"]
+                              },
+                              {
+                                "type": "string",
+                                "enum": ["squash"]
+                              },
+                              {
+                                "type": "string",
+                                "enum": ["rebase"]
+                              },
+                              {
+                                "type": "string",
+                                "enum": ["unknown"]
+                              }
+                            ]
+                          },
+                          "commitSetFingerprint": {
+                            "type": "string"
+                          },
+                          "productionPresence": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "enum": ["unreleased"]
+                              },
+                              {
+                                "type": "string",
+                                "enum": ["partially_present"]
+                              }
+                            ]
+                          },
+                          "finalHeadSha": {
+                            "type": "string"
+                          },
+                          "commitShas": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "requiredChecks": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "required": [
+                                "requiredCheckId",
+                                "policyVersion",
+                                "context",
+                                "integrationId",
+                                "source",
+                                "sourceReference",
+                                "commitSha",
+                                "state",
+                                "observations",
+                                "observedAt"
+                              ],
+                              "properties": {
+                                "requiredCheckId": {
+                                  "type": "string"
+                                },
+                                "policyVersion": {
+                                  "type": "integer",
+                                  "minimum": 1
+                                },
+                                "context": {
+                                  "type": "string"
+                                },
+                                "integrationId": {
+                                  "anyOf": [
+                                    {
+                                      "type": "integer",
+                                      "minimum": 1
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "source": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "enum": ["branch_protection"]
+                                    },
+                                    {
+                                      "type": "string",
+                                      "enum": ["repository_ruleset"]
+                                    },
+                                    {
+                                      "type": "string",
+                                      "enum": ["project_override"]
+                                    }
+                                  ]
+                                },
+                                "sourceReference": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "commitSha": {
+                                  "type": "string"
+                                },
+                                "state": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "enum": ["pending"]
+                                    },
+                                    {
+                                      "type": "string",
+                                      "enum": ["successful"]
+                                    },
+                                    {
+                                      "type": "string",
+                                      "enum": ["failed"]
+                                    },
+                                    {
+                                      "type": "string",
+                                      "enum": ["missing"]
+                                    },
+                                    {
+                                      "type": "string",
+                                      "enum": ["stale"]
+                                    }
+                                  ]
+                                },
+                                "observations": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "required": [
+                                      "id",
+                                      "type",
+                                      "integrationId",
+                                      "githubObjectId",
+                                      "attempt",
+                                      "status",
+                                      "conclusion",
+                                      "detailsUrl",
+                                      "startedAt",
+                                      "completedAt",
+                                      "observedAt"
+                                    ],
+                                    "properties": {
+                                      "id": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "type": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string",
+                                            "enum": ["check_run"]
+                                          },
+                                          {
+                                            "type": "string",
+                                            "enum": ["commit_status"]
+                                          }
+                                        ]
+                                      },
+                                      "integrationId": {
+                                        "anyOf": [
+                                          {
+                                            "type": "integer",
+                                            "minimum": 1
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "githubObjectId": {
+                                        "type": "string"
+                                      },
+                                      "attempt": {
+                                        "anyOf": [
+                                          {
+                                            "type": "integer",
+                                            "minimum": 1
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "status": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string",
+                                            "enum": ["queued"]
+                                          },
+                                          {
+                                            "type": "string",
+                                            "enum": ["in_progress"]
+                                          },
+                                          {
+                                            "type": "string",
+                                            "enum": ["pending"]
+                                          },
+                                          {
+                                            "type": "string",
+                                            "enum": ["completed"]
+                                          }
+                                        ]
+                                      },
+                                      "conclusion": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string",
+                                            "enum": ["success"]
+                                          },
+                                          {
+                                            "type": "string",
+                                            "enum": ["failure"]
+                                          },
+                                          {
+                                            "type": "string",
+                                            "enum": ["neutral"]
+                                          },
+                                          {
+                                            "type": "string",
+                                            "enum": ["cancelled"]
+                                          },
+                                          {
+                                            "type": "string",
+                                            "enum": ["skipped"]
+                                          },
+                                          {
+                                            "type": "string",
+                                            "enum": ["timed_out"]
+                                          },
+                                          {
+                                            "type": "string",
+                                            "enum": ["action_required"]
+                                          },
+                                          {
+                                            "type": "string",
+                                            "enum": ["stale"]
+                                          },
+                                          {
+                                            "type": "string",
+                                            "enum": ["startup_failure"]
+                                          },
+                                          {
+                                            "type": "string",
+                                            "enum": ["error"]
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "detailsUrl": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "startedAt": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "completedAt": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "observedAt": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "additionalProperties": false
+                                  }
+                                },
+                                "observedAt": {
+                                  "type": "string"
+                                }
+                              },
+                              "additionalProperties": false
+                            }
+                          }
+                        },
+                        "additionalProperties": false
+                      }
                     }
                   },
                   "additionalProperties": false

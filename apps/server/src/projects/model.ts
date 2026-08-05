@@ -10,6 +10,7 @@ import type {
   RepositorySyncIssueScope,
   RepositorySyncIssueSeverity,
   RequiredCheckSource,
+  RequiredCheckState,
   RequiredCheckType,
 } from '@shipgate/database'
 
@@ -32,6 +33,8 @@ export interface ProjectRecord {
   readonly lastSuccessfulSyncAt: Date | null
   readonly mergeBaseSha: string | null
   readonly configurationVersion: number
+  readonly requiredCheckPolicyVersion: number
+  readonly requiredCheckOverrides: readonly RequiredCheckOverride[]
   readonly deletionRequestedAt: Date | null
   readonly deletedAt: Date | null
   readonly createdAt: Date
@@ -52,12 +55,18 @@ export interface ReconciliationRequestRecord {
   readonly requestedAt: Date
 }
 
+export type RequiredCheckOverride = {
+  readonly context: string
+  readonly integrationId: number | null
+}
+
 export interface CreateProjectInput {
   readonly projectId?: string
   readonly installationId: GitHubNumericId
   readonly repositoryId: GitHubNumericId
   readonly sourceBranch: string
   readonly productionBranch: string
+  readonly requiredCheckOverrides?: readonly RequiredCheckOverride[]
   readonly now?: Date
 }
 
@@ -112,12 +121,37 @@ export interface ChangeProjection {
 
 export interface RequiredCheckProjection {
   readonly id?: string
-  readonly policyVersion: number
-  readonly type: RequiredCheckType
   readonly context: string
-  readonly integrationId: GitHubNumericId | null
+  readonly integrationId: number | null
   readonly source: RequiredCheckSource
   readonly sourceReference: string | null
+}
+
+export interface RequiredCheckObservation {
+  readonly id: string | null
+  readonly type: RequiredCheckType
+  readonly integrationId: number | null
+  readonly githubObjectId: string
+  readonly attempt: number | null
+  readonly status: CommitCheckStatus
+  readonly conclusion: CommitCheckConclusion | null
+  readonly detailsUrl: string | null
+  readonly startedAt: Date | null
+  readonly completedAt: Date | null
+  readonly observedAt: Date
+}
+
+export interface ChangeRequiredCheckState {
+  readonly requiredCheckId: string
+  readonly policyVersion: number
+  readonly context: string
+  readonly integrationId: number | null
+  readonly source: RequiredCheckSource
+  readonly sourceReference: string | null
+  readonly commitSha: string
+  readonly state: RequiredCheckState
+  readonly observations: readonly RequiredCheckObservation[]
+  readonly observedAt: Date
 }
 
 export interface CommitCheckResultProjection {
@@ -135,6 +169,8 @@ export interface CommitCheckResultProjection {
   readonly completedAt: Date | null
   readonly observedAt: Date
 }
+
+export type { RequiredCheckState }
 
 export interface RepositorySyncIssueProjection {
   readonly id?: string
@@ -227,7 +263,9 @@ export interface ChangeAheadOfProduction {
   readonly mergeMethod: ChangeMergeMethod
   readonly commitSetFingerprint: string
   readonly productionPresence: Extract<ChangeProductionPresence, 'unreleased' | 'partially_present'>
+  readonly finalHeadSha: string
   readonly commitShas: readonly string[]
+  readonly requiredChecks: readonly ChangeRequiredCheckState[]
 }
 
 export interface UnmanagedCommitRecord {

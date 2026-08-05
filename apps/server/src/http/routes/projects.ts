@@ -17,6 +17,7 @@ import { CsrfHeadersSchema } from '../auth-schemas.js'
 import {
   CreateProjectBodySchema,
   DeleteProjectQuerySchema,
+  ProjectChangesSchema,
   ProjectListSchema,
   ProjectMutationResponseSchema,
   ProjectParamsSchema,
@@ -111,13 +112,42 @@ export const projectRoutes: FastifyPluginAsyncTypebox<{
     },
   )
 
+  app.get(
+    '/projects/:projectId/changes',
+    {
+      preHandler: [requireAuthenticatedSession],
+      schema: {
+        operationId: 'getProjectChanges',
+        summary: 'List unreleased changes with required-check states',
+        tags: ['Projects'],
+        security: [{ shipgateSession: [] }],
+        params: ProjectParamsSchema,
+        response: { 200: ProjectChangesSchema, default: ApiErrorSchema },
+      },
+    },
+    async (request) => {
+      const session = requireSession(request.shipgateSession)
+
+      try {
+        const changes = await context.projects.listChanges(
+          session.githubUserId,
+          request.params.projectId,
+        )
+
+        return { changes: changes.map(mapChange) }
+      } catch (error) {
+        throw mapProjectError(error)
+      }
+    },
+  )
+
   app.patch(
     '/projects/:projectId',
     {
       preHandler: [requireAuthenticatedSession, requireCsrfProtection],
       schema: {
         operationId: 'updateProject',
-        summary: 'Change source or production branch',
+        summary: 'Change project branches or required-check overrides',
         tags: ['Projects'],
         security: [{ shipgateSession: [] }],
         headers: CsrfHeadersSchema,
@@ -144,6 +174,9 @@ export const projectRoutes: FastifyPluginAsyncTypebox<{
             : {}),
           ...(request.body.productionBranch !== undefined
             ? { productionBranch: request.body.productionBranch }
+            : {}),
+          ...(request.body.requiredCheckOverrides !== undefined
+            ? { requiredCheckOverrides: request.body.requiredCheckOverrides }
             : {}),
         })
         const code = result.status === 'already_applied' ? 200 : 202
@@ -223,9 +256,36 @@ function mapProject(project: ProjectRecord) {
     productionSha: project.productionSha,
     lastSuccessfulSynchronization: project.lastSuccessfulSyncAt?.toISOString() ?? null,
     configurationVersion: project.configurationVersion,
+    requiredCheckPolicyVersion: project.requiredCheckPolicyVersion,
+    requiredCheckOverrides: project.requiredCheckOverrides.map((override) => ({
+      context: override.context,
+      integrationId: override.integrationId,
+    })),
     deletionRequestedAt: project.deletionRequestedAt?.toISOString() ?? null,
     createdAt: project.createdAt.toISOString(),
     updatedAt: project.updatedAt.toISOString(),
+  }
+}
+
+function mapChange(
+  change: Awaited<ReturnType<ApplicationContext['projects']['listChanges']>>[number],
+) {
+  return {
+    ...change,
+    githubPullRequestId: parseSafeId(change.githubPullRequestId, 'pull request ID'),
+    authorId: change.authorId === null ? null : parseSafeId(change.authorId, 'author ID'),
+    mergedAt: change.mergedAt.toISOString(),
+    commitShas: [...change.commitShas],
+    requiredChecks: change.requiredChecks.map((required) => ({
+      ...required,
+      observedAt: required.observedAt.toISOString(),
+      observations: required.observations.map((observation) => ({
+        ...observation,
+        startedAt: observation.startedAt?.toISOString() ?? null,
+        completedAt: observation.completedAt?.toISOString() ?? null,
+        observedAt: observation.observedAt.toISOString(),
+      })),
+    })),
   }
 }
 

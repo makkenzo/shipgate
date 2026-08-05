@@ -424,7 +424,7 @@ function createGitHubAuth(input: {
         return response<Data>({ contexts: ['ci/test'], checks: [] })
       }
 
-      if (route === 'GET /repos/{owner}/{repo}/rulesets') {
+      if (route === 'GET /repos/{owner}/{repo}/rules/branches/{branch}') {
         return response<Data>([])
       }
 

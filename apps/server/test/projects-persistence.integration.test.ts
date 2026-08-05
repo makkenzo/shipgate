@@ -470,8 +470,6 @@ function createSnapshot() {
     requiredChecks: [
       {
         id: 'required-check-ci',
-        policyVersion: 1,
-        type: 'check_run' as const,
         context: 'ci',
         integrationId: 9001,
         source: 'repository_ruleset' as const,

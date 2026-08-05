@@ -1,6 +1,7 @@
 import { type DatabaseClient, withTransaction } from '@shipgate/database'
 import { enqueueJobInTransaction } from '@shipgate/jobs'
 import type { GitHubWebhookMetadata } from './policy.js'
+
 const retentionMs = 30 * 24 * 60 * 60 * 1_000
 export type GitHubWebhookAcceptance =
   | { readonly status: 'queued'; readonly jobId: string }

@@ -3,8 +3,8 @@
 import { queryOptions, type UseMutationOptions } from '@tanstack/react-query';
 
 import { client } from '../client.gen';
-import { createDiagnosticJob, createProject, deleteLocalAccount, deleteProject, disconnectGitHub, getAuthSession, getConnectionConfiguration, getDiagnosticJob, getHealth, getInstallation, getInstallations, getProject, getProjects, getReadiness, logout, type Options, updateProject } from '../sdk.gen';
-import type { CreateDiagnosticJobData, CreateDiagnosticJobError, CreateDiagnosticJobResponse, CreateProjectData, CreateProjectError, CreateProjectResponse, DeleteLocalAccountData, DeleteLocalAccountError, DeleteLocalAccountResponse, DeleteProjectData, DeleteProjectError, DeleteProjectResponse, DisconnectGitHubData, DisconnectGitHubError, DisconnectGitHubResponse, GetAuthSessionData, GetAuthSessionError, GetAuthSessionResponse, GetConnectionConfigurationData, GetConnectionConfigurationError, GetConnectionConfigurationResponse, GetDiagnosticJobData, GetDiagnosticJobError, GetDiagnosticJobResponse, GetHealthData, GetHealthError, GetHealthResponse, GetInstallationData, GetInstallationError, GetInstallationResponse, GetInstallationsData, GetInstallationsError, GetInstallationsResponse, GetProjectData, GetProjectError, GetProjectResponse, GetProjectsData, GetProjectsError, GetProjectsResponse, GetReadinessData, GetReadinessError, GetReadinessResponse, LogoutData, LogoutError, LogoutResponse, UpdateProjectData, UpdateProjectError, UpdateProjectResponse } from '../types.gen';
+import { createDiagnosticJob, createProject, deleteLocalAccount, deleteProject, disconnectGitHub, getAuthSession, getConnectionConfiguration, getDiagnosticJob, getHealth, getInstallation, getInstallations, getProject, getProjectChanges, getProjects, getReadiness, logout, type Options, updateProject } from '../sdk.gen';
+import type { CreateDiagnosticJobData, CreateDiagnosticJobError, CreateDiagnosticJobResponse, CreateProjectData, CreateProjectError, CreateProjectResponse, DeleteLocalAccountData, DeleteLocalAccountError, DeleteLocalAccountResponse, DeleteProjectData, DeleteProjectError, DeleteProjectResponse, DisconnectGitHubData, DisconnectGitHubError, DisconnectGitHubResponse, GetAuthSessionData, GetAuthSessionError, GetAuthSessionResponse, GetConnectionConfigurationData, GetConnectionConfigurationError, GetConnectionConfigurationResponse, GetDiagnosticJobData, GetDiagnosticJobError, GetDiagnosticJobResponse, GetHealthData, GetHealthError, GetHealthResponse, GetInstallationData, GetInstallationError, GetInstallationResponse, GetInstallationsData, GetInstallationsError, GetInstallationsResponse, GetProjectChangesData, GetProjectChangesError, GetProjectChangesResponse, GetProjectData, GetProjectError, GetProjectResponse, GetProjectsData, GetProjectsError, GetProjectsResponse, GetReadinessData, GetReadinessError, GetReadinessResponse, LogoutData, LogoutError, LogoutResponse, UpdateProjectData, UpdateProjectError, UpdateProjectResponse } from '../types.gen';
 
 export type QueryKey<TOptions extends Options> = [
     Pick<TOptions, 'baseUrl' | 'body' | 'headers' | 'path' | 'query'> & {
@@ -315,7 +315,7 @@ export const getProjectOptions = (options: Options<GetProjectData>) => queryOpti
 export const updateProjectMutationKey = (options?: Partial<Options<UpdateProjectData>>) => createMutationKey('updateProject', options);
 
 /**
- * Change source or production branch
+ * Change project branches or required-check overrides
  */
 export const updateProjectMutation = (options?: Partial<Options<UpdateProjectData>>): UseMutationOptions<UpdateProjectResponse, UpdateProjectError, Options<UpdateProjectData>> => {
     const mutationOptions: UseMutationOptions<UpdateProjectResponse, UpdateProjectError, Options<UpdateProjectData>> = {
@@ -331,6 +331,24 @@ export const updateProjectMutation = (options?: Partial<Options<UpdateProjectDat
     };
     return mutationOptions;
 };
+
+export const getProjectChangesQueryKey = (options: Options<GetProjectChangesData>) => createQueryKey('getProjectChanges', options);
+
+/**
+ * List unreleased changes with required-check states
+ */
+export const getProjectChangesOptions = (options: Options<GetProjectChangesData>) => queryOptions<GetProjectChangesResponse, GetProjectChangesError, GetProjectChangesResponse, ReturnType<typeof getProjectChangesQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await getProjectChanges({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getProjectChangesQueryKey(options)
+});
 
 export const createDiagnosticJobMutationKey = (options?: Partial<Options<CreateDiagnosticJobData>>) => createMutationKey('createDiagnosticJob', options);
 

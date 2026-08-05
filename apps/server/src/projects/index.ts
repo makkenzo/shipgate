@@ -4,6 +4,7 @@ export {
   listStoredProjects,
   requestProjectDeletion,
   updateConfiguredProject,
+  updateProjectRequiredCheckOverrides,
 } from './configuration-store.js'
 export {
   type ProjectConfigurationValidationCode,
@@ -30,6 +31,7 @@ export type {
   ApplyRepositoryProjectionResult,
   ChangeAheadOfProduction,
   ChangeProjection,
+  ChangeRequiredCheckState,
   CommitCheckResultProjection,
   CreateProjectInput,
   GitHubNumericId,
@@ -41,7 +43,9 @@ export type {
   RepositoryCommitProjection,
   RepositoryProjectionSnapshot,
   RepositorySyncIssueProjection,
+  RequiredCheckOverride,
   RequiredCheckProjection,
+  RequiredCheckState,
   UnmanagedCommitRecord,
 } from './model.js'
 export {
@@ -54,6 +58,9 @@ export {
   withRepositoryTransaction,
   withRepositoryTransactionInLock,
 } from './repository-transaction.js'
+export { queueRequiredChecksSync } from './required-checks-queue.js'
+export { createRepositoryRequiredChecksSyncHandler } from './required-checks-sync.js'
+export { createRequiredChecksWebhookProjectionHandler } from './required-checks-webhooks.js'
 export { createProjectService, type ProjectService } from './service.js'
 export {
   applyRepositoryProjection,

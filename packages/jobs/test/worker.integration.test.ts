@@ -21,6 +21,8 @@ describe.sequential('Graphile Worker', () => {
 
   const repositorySyncExecutions: string[] = []
 
+  const requiredCheckSyncExecutions: string[] = []
+
   beforeAll(async () => {
     postgres = await startPostgresTestDatabase()
 
@@ -57,6 +59,11 @@ describe.sequential('Graphile Worker', () => {
         async repositoryInitialSync(execution) {
           repositorySyncExecutions.push(execution.requestId)
           return { requestId: execution.requestId, status: 'succeeded' }
+        },
+
+        async repositoryRequiredChecksSync(execution) {
+          requiredCheckSyncExecutions.push(execution.projectId)
+          return { projectId: execution.projectId, status: 'applied' }
         },
       },
 
@@ -118,6 +125,35 @@ describe.sequential('Graphile Worker', () => {
       attempts: 1,
     })
     expect(repositorySyncExecutions).toContain(requestId)
+  })
+
+  it('dispatches the durable repository.required-checks-sync task', async () => {
+    const projectId = randomUUID()
+    const queued = await enqueueJob(
+      database,
+      'repository.required-checks-sync',
+      {
+        projectId,
+        repositoryId: '456',
+        configurationVersion: 3,
+        refreshPolicy: true,
+        reason: 'worker_integration_test',
+      },
+      {
+        correlationId: `worker-test-required-checks-${projectId}`,
+        jobKey: `repository.required-checks-sync:${projectId}:3:policy:test`,
+      },
+    )
+    const execution = await waitForJobExecution(database, queued.jobId, {
+      timeoutMs: 20_000,
+    })
+
+    expect(execution).toMatchObject({
+      taskIdentifier: 'repository.required-checks-sync',
+      status: 'succeeded',
+      attempts: 1,
+    })
+    expect(requiredCheckSyncExecutions).toContain(projectId)
   })
 
   it('retries a failed attempt', async () => {

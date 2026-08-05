@@ -101,17 +101,42 @@ describe.sequential('Project configuration persistence', () => {
     expect(same).toMatchObject({ status: 'already_applied', reconciliation: null })
     await seedProjection(database, created.project.id)
 
-    const updated = await service.update({
+    const overrideUpdated = await service.update({
       actorGitHubUserId,
       projectId: created.project.id,
       expectedConfigurationVersion: 1,
+      requiredCheckOverrides: [{ context: 'shipgate/manual', integrationId: null }],
+      correlationId: 'test:required-check-override',
+    })
+    expect(overrideUpdated).toMatchObject({
+      status: 'updated',
+      reconciliation: null,
+      project: {
+        configurationVersion: 2,
+        requiredCheckOverrides: [{ context: 'shipgate/manual', integrationId: null }],
+      },
+    })
+    expect(await count(database, 'repository_branches')).toBe(1)
+    expect(await count(database, 'repository_commits')).toBe(1)
+    expect(await count(database, 'change_commits')).toBe(1)
+    const requiredChecksJobs = await database.kysely
+      .selectFrom('shipgate_job_execution')
+      .select('task_identifier')
+      .where('task_identifier', '=', 'repository.required-checks-sync')
+      .execute()
+    expect(requiredChecksJobs).toHaveLength(1)
+
+    const updated = await service.update({
+      actorGitHubUserId,
+      projectId: created.project.id,
+      expectedConfigurationVersion: 2,
       sourceBranch: 'release',
       correlationId: 'test:update',
     })
     expect(updated).toMatchObject({
       status: 'updated',
       project: {
-        configurationVersion: 2,
+        configurationVersion: 3,
         sourceBranch: 'release',
         sourceSha: changedSourceSha,
         lastSuccessfulSyncAt: null,
@@ -136,16 +161,16 @@ describe.sequential('Project configuration persistence', () => {
       production_presence: 'unknown',
       commit_set_fingerprint: null,
     })
-    expect(await count(database, 'project_audit_events')).toBe(2)
+    expect(await count(database, 'project_audit_events')).toBe(3)
     expect(await count(database, 'repository_reconciliation_requests')).toBe(2)
 
     const deleted = await service.delete({
       actorGitHubUserId,
       projectId: created.project.id,
-      expectedConfigurationVersion: 2,
+      expectedConfigurationVersion: 3,
     })
-    expect(deleted).toMatchObject({ status: 'pending_deletion', configurationVersion: 3 })
-    expect(await count(database, 'project_audit_events')).toBe(3)
+    expect(deleted).toMatchObject({ status: 'pending_deletion', configurationVersion: 4 })
+    expect(await count(database, 'project_audit_events')).toBe(4)
     const activeRequests = await database.kysely
       .selectFrom('repository_reconciliation_requests')
       .select('id')
@@ -350,6 +375,42 @@ async function seedProjection(database: DatabaseClient, projectId: string): Prom
         commit_sha: sourceSha,
         position: 0,
       })
+      .execute()
+
+    const request = await transaction
+      .selectFrom('repository_reconciliation_requests')
+      .select(['id', 'sync_run_id'])
+      .where('project_id', '=', projectId)
+      .where('status', '=', 'queued')
+      .executeTakeFirstOrThrow()
+
+    await transaction
+      .updateTable('repository_sync_runs')
+      .set({
+        status: 'succeeded',
+        projection_fingerprint: '5'.repeat(64),
+        source_sha: sourceSha,
+        production_sha: productionSha,
+        completed_at: now,
+      })
+      .where('id', '=', request.sync_run_id)
+      .execute()
+
+    await transaction
+      .updateTable('repository_reconciliation_requests')
+      .set({ status: 'succeeded', completed_at: now, updated_at: now })
+      .where('id', '=', request.id)
+      .execute()
+
+    await transaction
+      .updateTable('projects')
+      .set({
+        status: 'active',
+        merge_base_sha: productionSha,
+        last_successful_sync_at: now,
+        updated_at: now,
+      })
+      .where('id', '=', projectId)
       .execute()
   })
 }

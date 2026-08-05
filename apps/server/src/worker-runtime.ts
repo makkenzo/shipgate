@@ -29,6 +29,8 @@ export async function startWorker(context: ApplicationContext): Promise<StartedA
 
       logger: context.logger,
       repositoryInitialSync: context.repositoryInitialSync,
+      repositoryRequiredChecksSync: context.repositoryRequiredChecksSync,
+      githubWebhookProjection: context.githubWebhookProjection,
     },
 
     appVersion: context.runtimeConfig.appVersion,

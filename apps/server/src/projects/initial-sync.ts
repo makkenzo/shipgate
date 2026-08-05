@@ -25,6 +25,7 @@ import {
   withRepositoryLock,
   withRepositoryTransactionInLock,
 } from './repository-transaction.js'
+import { parseRequiredCheckOverrides } from './required-checks.js'
 import {
   applyRepositoryProjectionInTransaction,
   validateRepositoryProjectionSnapshot,
@@ -44,6 +45,7 @@ interface ClaimedSynchronization {
   readonly productionBranch: string
   readonly requestedSourceSha: string
   readonly requestedProductionSha: string
+  readonly requiredCheckOverrides: ReturnType<typeof parseRequiredCheckOverrides>
 }
 
 export function createRepositoryInitialSyncHandler(options: {
@@ -196,6 +198,7 @@ async function executeSynchronization(
     heads: observedHeads,
     git,
     observedAt,
+    requiredCheckOverrides: claimed.requiredCheckOverrides,
   })
 
   validateRepositoryProjectionSnapshot(snapshot)
@@ -313,6 +316,7 @@ async function claimSynchronization(
         'project.installation_id',
         'project.source_branch',
         'project.production_branch',
+        'project.required_check_overrides',
         'project.configuration_version as project_configuration_version',
         'project.status as project_status',
       ])
@@ -587,6 +591,7 @@ function mapClaimed(row: {
   readonly installation_id: string
   readonly source_branch: string
   readonly production_branch: string
+  readonly required_check_overrides: unknown
 }): ClaimedSynchronization {
   return {
     requestId: row.id,
@@ -601,6 +606,7 @@ function mapClaimed(row: {
     productionBranch: row.production_branch,
     requestedSourceSha: row.source_sha,
     requestedProductionSha: row.production_sha,
+    requiredCheckOverrides: parseRequiredCheckOverrides(row.required_check_overrides),
   }
 }
 
