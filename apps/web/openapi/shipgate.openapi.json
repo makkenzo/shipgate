@@ -1592,8 +1592,32 @@
                               "type": "string"
                             },
                             "status": {
-                              "type": "string",
-                              "enum": ["queued"]
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "enum": ["queued"]
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": ["running"]
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": ["succeeded"]
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": ["superseded"]
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": ["failed"]
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": ["cancelled"]
+                                }
+                              ]
                             },
                             "configurationVersion": {
                               "type": "integer",
@@ -2472,8 +2496,32 @@
                               "type": "string"
                             },
                             "status": {
-                              "type": "string",
-                              "enum": ["queued"]
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "enum": ["queued"]
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": ["running"]
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": ["succeeded"]
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": ["superseded"]
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": ["failed"]
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": ["cancelled"]
+                                }
+                              ]
                             },
                             "configurationVersion": {
                               "type": "integer",
@@ -2739,8 +2787,32 @@
                               "type": "string"
                             },
                             "status": {
-                              "type": "string",
-                              "enum": ["queued"]
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "enum": ["queued"]
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": ["running"]
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": ["succeeded"]
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": ["superseded"]
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": ["failed"]
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": ["cancelled"]
+                                }
+                              ]
                             },
                             "configurationVersion": {
                               "type": "integer",
@@ -3087,6 +3159,1572 @@
         }
       }
     },
+    "/api/v1/projects/{projectId}/overview": {
+      "get": {
+        "operationId": "getProjectOverview",
+        "summary": "Get the repository dashboard projection for a project",
+        "tags": ["Projects"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "in": "path",
+            "name": "projectId",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "shipgateSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "project",
+                    "branches",
+                    "counts",
+                    "requiredChecks",
+                    "lastSynchronization",
+                    "health"
+                  ],
+                  "properties": {
+                    "project": {
+                      "type": "object",
+                      "required": [
+                        "id",
+                        "installationId",
+                        "repositoryId",
+                        "repository",
+                        "sourceBranch",
+                        "productionBranch",
+                        "status",
+                        "sourceSha",
+                        "productionSha",
+                        "lastSuccessfulSynchronization",
+                        "configurationVersion",
+                        "requiredCheckPolicyVersion",
+                        "requiredCheckOverrides",
+                        "deletionRequestedAt",
+                        "createdAt",
+                        "updatedAt"
+                      ],
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "installationId": {
+                          "type": "integer",
+                          "minimum": 1
+                        },
+                        "repositoryId": {
+                          "type": "integer",
+                          "minimum": 1
+                        },
+                        "repository": {
+                          "type": "object",
+                          "required": [
+                            "ownerId",
+                            "ownerLogin",
+                            "name",
+                            "fullName",
+                            "defaultBranch"
+                          ],
+                          "properties": {
+                            "ownerId": {
+                              "type": "integer",
+                              "minimum": 1
+                            },
+                            "ownerLogin": {
+                              "type": "string"
+                            },
+                            "name": {
+                              "type": "string"
+                            },
+                            "fullName": {
+                              "type": "string"
+                            },
+                            "defaultBranch": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        "sourceBranch": {
+                          "type": "string"
+                        },
+                        "productionBranch": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": ["initializing"]
+                            },
+                            {
+                              "type": "string",
+                              "enum": ["active"]
+                            },
+                            {
+                              "type": "string",
+                              "enum": ["degraded"]
+                            },
+                            {
+                              "type": "string",
+                              "enum": ["disconnected"]
+                            },
+                            {
+                              "type": "string",
+                              "enum": ["pending_deletion"]
+                            },
+                            {
+                              "type": "string",
+                              "enum": ["deleted"]
+                            }
+                          ]
+                        },
+                        "sourceSha": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "productionSha": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "lastSuccessfulSynchronization": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "configurationVersion": {
+                          "type": "integer",
+                          "minimum": 1
+                        },
+                        "requiredCheckPolicyVersion": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "requiredCheckOverrides": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": ["context", "integrationId"],
+                            "properties": {
+                              "context": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 255,
+                                "pattern": "^[^\\r\\n\\u0000]+$"
+                              },
+                              "integrationId": {
+                                "anyOf": [
+                                  {
+                                    "type": "integer",
+                                    "minimum": 1
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              }
+                            },
+                            "additionalProperties": false
+                          }
+                        },
+                        "deletionRequestedAt": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "createdAt": {
+                          "type": "string"
+                        },
+                        "updatedAt": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false,
+                      "title": "Project"
+                    },
+                    "branches": {
+                      "type": "object",
+                      "required": ["source", "production"],
+                      "properties": {
+                        "source": {
+                          "type": "object",
+                          "required": ["name", "sha", "protected", "defaultBranch", "observedAt"],
+                          "properties": {
+                            "name": {
+                              "type": "string"
+                            },
+                            "sha": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "protected": {
+                              "anyOf": [
+                                {
+                                  "type": "boolean"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "defaultBranch": {
+                              "anyOf": [
+                                {
+                                  "type": "boolean"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "observedAt": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        "production": {
+                          "type": "object",
+                          "required": ["name", "sha", "protected", "defaultBranch", "observedAt"],
+                          "properties": {
+                            "name": {
+                              "type": "string"
+                            },
+                            "sha": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "protected": {
+                              "anyOf": [
+                                {
+                                  "type": "boolean"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "defaultBranch": {
+                              "anyOf": [
+                                {
+                                  "type": "boolean"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "observedAt": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            }
+                          },
+                          "additionalProperties": false
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "counts": {
+                      "type": "object",
+                      "required": [
+                        "unreleasedChanges",
+                        "partiallyPresentChanges",
+                        "unknownChanges",
+                        "unmanagedCommits",
+                        "ambiguousCommits"
+                      ],
+                      "properties": {
+                        "unreleasedChanges": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "partiallyPresentChanges": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "unknownChanges": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "unmanagedCommits": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "ambiguousCommits": {
+                          "type": "integer",
+                          "minimum": 0
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requiredChecks": {
+                      "type": "object",
+                      "required": ["policyVersion", "state", "checks"],
+                      "properties": {
+                        "policyVersion": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "state": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": ["not_configured"]
+                            },
+                            {
+                              "type": "string",
+                              "enum": ["not_applicable"]
+                            },
+                            {
+                              "type": "string",
+                              "enum": ["successful"]
+                            },
+                            {
+                              "type": "string",
+                              "enum": ["pending"]
+                            },
+                            {
+                              "type": "string",
+                              "enum": ["failed"]
+                            },
+                            {
+                              "type": "string",
+                              "enum": ["missing"]
+                            },
+                            {
+                              "type": "string",
+                              "enum": ["stale"]
+                            },
+                            {
+                              "type": "string",
+                              "enum": ["unknown"]
+                            }
+                          ]
+                        },
+                        "checks": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "id",
+                              "context",
+                              "integrationId",
+                              "source",
+                              "sourceReference",
+                              "state",
+                              "stateCounts"
+                            ],
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "context": {
+                                "type": "string"
+                              },
+                              "integrationId": {
+                                "anyOf": [
+                                  {
+                                    "type": "integer",
+                                    "minimum": 1
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "source": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "enum": ["branch_protection"]
+                                  },
+                                  {
+                                    "type": "string",
+                                    "enum": ["repository_ruleset"]
+                                  },
+                                  {
+                                    "type": "string",
+                                    "enum": ["project_override"]
+                                  }
+                                ]
+                              },
+                              "sourceReference": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "state": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "enum": ["not_configured"]
+                                  },
+                                  {
+                                    "type": "string",
+                                    "enum": ["not_applicable"]
+                                  },
+                                  {
+                                    "type": "string",
+                                    "enum": ["successful"]
+                                  },
+                                  {
+                                    "type": "string",
+                                    "enum": ["pending"]
+                                  },
+                                  {
+                                    "type": "string",
+                                    "enum": ["failed"]
+                                  },
+                                  {
+                                    "type": "string",
+                                    "enum": ["missing"]
+                                  },
+                                  {
+                                    "type": "string",
+                                    "enum": ["stale"]
+                                  },
+                                  {
+                                    "type": "string",
+                                    "enum": ["unknown"]
+                                  }
+                                ]
+                              },
+                              "stateCounts": {
+                                "type": "object",
+                                "required": ["pending", "successful", "failed", "missing", "stale"],
+                                "properties": {
+                                  "pending": {
+                                    "type": "integer",
+                                    "minimum": 0
+                                  },
+                                  "successful": {
+                                    "type": "integer",
+                                    "minimum": 0
+                                  },
+                                  "failed": {
+                                    "type": "integer",
+                                    "minimum": 0
+                                  },
+                                  "missing": {
+                                    "type": "integer",
+                                    "minimum": 0
+                                  },
+                                  "stale": {
+                                    "type": "integer",
+                                    "minimum": 0
+                                  }
+                                },
+                                "additionalProperties": false
+                              }
+                            },
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "lastSynchronization": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "required": [
+                            "id",
+                            "status",
+                            "reason",
+                            "configurationVersion",
+                            "classification",
+                            "sourceSha",
+                            "productionSha",
+                            "startedAt",
+                            "completedAt",
+                            "durationMs",
+                            "errorCode",
+                            "errorMessage",
+                            "differenceSummary",
+                            "issueCount"
+                          ],
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "status": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "enum": ["queued"]
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": ["running"]
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": ["succeeded"]
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": ["superseded"]
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": ["failed"]
+                                }
+                              ]
+                            },
+                            "reason": {
+                              "type": "string"
+                            },
+                            "configurationVersion": {
+                              "type": "integer",
+                              "minimum": 1
+                            },
+                            "classification": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "enum": ["expected_change"]
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": ["recoverable_drift"]
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": ["destructive_history_change"]
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": ["permission_problem"]
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": ["unknown_inconsistency"]
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "sourceSha": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "productionSha": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "startedAt": {
+                              "type": "string"
+                            },
+                            "completedAt": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "durationMs": {
+                              "anyOf": [
+                                {
+                                  "type": "integer",
+                                  "minimum": 0
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "errorCode": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "errorMessage": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "differenceSummary": {},
+                            "issueCount": {
+                              "type": "integer",
+                              "minimum": 0
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "health": {
+                      "type": "object",
+                      "required": ["state", "summary", "reasons"],
+                      "properties": {
+                        "state": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": ["healthy"]
+                            },
+                            {
+                              "type": "string",
+                              "enum": ["attention"]
+                            },
+                            {
+                              "type": "string",
+                              "enum": ["initializing"]
+                            },
+                            {
+                              "type": "string",
+                              "enum": ["synchronizing"]
+                            },
+                            {
+                              "type": "string",
+                              "enum": ["degraded"]
+                            },
+                            {
+                              "type": "string",
+                              "enum": ["disconnected"]
+                            },
+                            {
+                              "type": "string",
+                              "enum": ["deleting"]
+                            }
+                          ]
+                        },
+                        "summary": {
+                          "type": "string"
+                        },
+                        "reasons": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": ["severity", "code", "message"],
+                            "properties": {
+                              "severity": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "enum": ["info"]
+                                  },
+                                  {
+                                    "type": "string",
+                                    "enum": ["warning"]
+                                  },
+                                  {
+                                    "type": "string",
+                                    "enum": ["error"]
+                                  }
+                                ]
+                              },
+                              "code": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "type": "string"
+                              }
+                            },
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  },
+                  "additionalProperties": false,
+                  "title": "ProjectOverview"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Common error response returned by the Shipgate API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["code", "message", "requestId"],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "minLength": 1,
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "details": {}
+                  },
+                  "additionalProperties": false,
+                  "title": "ApiError",
+                  "description": "Common error response returned by the Shipgate API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{projectId}/synchronization": {
+      "get": {
+        "operationId": "getProjectSynchronization",
+        "summary": "Get repository synchronization history and detected issues",
+        "tags": ["Projects"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 30
+            },
+            "in": "query",
+            "name": "limit",
+            "required": false
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "in": "path",
+            "name": "projectId",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "shipgateSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["project", "health", "runs"],
+                  "properties": {
+                    "project": {
+                      "type": "object",
+                      "required": [
+                        "id",
+                        "installationId",
+                        "repositoryId",
+                        "repository",
+                        "sourceBranch",
+                        "productionBranch",
+                        "status",
+                        "sourceSha",
+                        "productionSha",
+                        "lastSuccessfulSynchronization",
+                        "configurationVersion",
+                        "requiredCheckPolicyVersion",
+                        "requiredCheckOverrides",
+                        "deletionRequestedAt",
+                        "createdAt",
+                        "updatedAt"
+                      ],
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "installationId": {
+                          "type": "integer",
+                          "minimum": 1
+                        },
+                        "repositoryId": {
+                          "type": "integer",
+                          "minimum": 1
+                        },
+                        "repository": {
+                          "type": "object",
+                          "required": [
+                            "ownerId",
+                            "ownerLogin",
+                            "name",
+                            "fullName",
+                            "defaultBranch"
+                          ],
+                          "properties": {
+                            "ownerId": {
+                              "type": "integer",
+                              "minimum": 1
+                            },
+                            "ownerLogin": {
+                              "type": "string"
+                            },
+                            "name": {
+                              "type": "string"
+                            },
+                            "fullName": {
+                              "type": "string"
+                            },
+                            "defaultBranch": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        "sourceBranch": {
+                          "type": "string"
+                        },
+                        "productionBranch": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": ["initializing"]
+                            },
+                            {
+                              "type": "string",
+                              "enum": ["active"]
+                            },
+                            {
+                              "type": "string",
+                              "enum": ["degraded"]
+                            },
+                            {
+                              "type": "string",
+                              "enum": ["disconnected"]
+                            },
+                            {
+                              "type": "string",
+                              "enum": ["pending_deletion"]
+                            },
+                            {
+                              "type": "string",
+                              "enum": ["deleted"]
+                            }
+                          ]
+                        },
+                        "sourceSha": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "productionSha": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "lastSuccessfulSynchronization": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "configurationVersion": {
+                          "type": "integer",
+                          "minimum": 1
+                        },
+                        "requiredCheckPolicyVersion": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "requiredCheckOverrides": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": ["context", "integrationId"],
+                            "properties": {
+                              "context": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 255,
+                                "pattern": "^[^\\r\\n\\u0000]+$"
+                              },
+                              "integrationId": {
+                                "anyOf": [
+                                  {
+                                    "type": "integer",
+                                    "minimum": 1
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              }
+                            },
+                            "additionalProperties": false
+                          }
+                        },
+                        "deletionRequestedAt": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "createdAt": {
+                          "type": "string"
+                        },
+                        "updatedAt": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false,
+                      "title": "Project"
+                    },
+                    "health": {
+                      "type": "object",
+                      "required": ["state", "summary", "reasons"],
+                      "properties": {
+                        "state": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": ["healthy"]
+                            },
+                            {
+                              "type": "string",
+                              "enum": ["attention"]
+                            },
+                            {
+                              "type": "string",
+                              "enum": ["initializing"]
+                            },
+                            {
+                              "type": "string",
+                              "enum": ["synchronizing"]
+                            },
+                            {
+                              "type": "string",
+                              "enum": ["degraded"]
+                            },
+                            {
+                              "type": "string",
+                              "enum": ["disconnected"]
+                            },
+                            {
+                              "type": "string",
+                              "enum": ["deleting"]
+                            }
+                          ]
+                        },
+                        "summary": {
+                          "type": "string"
+                        },
+                        "reasons": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": ["severity", "code", "message"],
+                            "properties": {
+                              "severity": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "enum": ["info"]
+                                  },
+                                  {
+                                    "type": "string",
+                                    "enum": ["warning"]
+                                  },
+                                  {
+                                    "type": "string",
+                                    "enum": ["error"]
+                                  }
+                                ]
+                              },
+                              "code": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "type": "string"
+                              }
+                            },
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "runs": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "id",
+                          "status",
+                          "reason",
+                          "configurationVersion",
+                          "classification",
+                          "sourceSha",
+                          "productionSha",
+                          "startedAt",
+                          "completedAt",
+                          "durationMs",
+                          "errorCode",
+                          "errorMessage",
+                          "differenceSummary",
+                          "issueCount",
+                          "requestedAt",
+                          "coalescedCount",
+                          "forcePush",
+                          "triggerScope",
+                          "issues"
+                        ],
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "status": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "enum": ["queued"]
+                              },
+                              {
+                                "type": "string",
+                                "enum": ["running"]
+                              },
+                              {
+                                "type": "string",
+                                "enum": ["succeeded"]
+                              },
+                              {
+                                "type": "string",
+                                "enum": ["superseded"]
+                              },
+                              {
+                                "type": "string",
+                                "enum": ["failed"]
+                              }
+                            ]
+                          },
+                          "reason": {
+                            "type": "string"
+                          },
+                          "configurationVersion": {
+                            "type": "integer",
+                            "minimum": 1
+                          },
+                          "classification": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "enum": ["expected_change"]
+                              },
+                              {
+                                "type": "string",
+                                "enum": ["recoverable_drift"]
+                              },
+                              {
+                                "type": "string",
+                                "enum": ["destructive_history_change"]
+                              },
+                              {
+                                "type": "string",
+                                "enum": ["permission_problem"]
+                              },
+                              {
+                                "type": "string",
+                                "enum": ["unknown_inconsistency"]
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "sourceSha": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "productionSha": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "startedAt": {
+                            "type": "string"
+                          },
+                          "completedAt": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "durationMs": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": 0
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "errorCode": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "errorMessage": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "differenceSummary": {},
+                          "issueCount": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
+                          "requestedAt": {
+                            "type": "string"
+                          },
+                          "coalescedCount": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
+                          "forcePush": {
+                            "type": "boolean"
+                          },
+                          "triggerScope": {},
+                          "issues": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "required": [
+                                "id",
+                                "severity",
+                                "code",
+                                "scope",
+                                "subjectId",
+                                "message",
+                                "details",
+                                "createdAt"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "type": "string"
+                                },
+                                "severity": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "enum": ["warning"]
+                                    },
+                                    {
+                                      "type": "string",
+                                      "enum": ["error"]
+                                    }
+                                  ]
+                                },
+                                "code": {
+                                  "type": "string"
+                                },
+                                "scope": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "enum": ["repository"]
+                                    },
+                                    {
+                                      "type": "string",
+                                      "enum": ["branch"]
+                                    },
+                                    {
+                                      "type": "string",
+                                      "enum": ["change"]
+                                    },
+                                    {
+                                      "type": "string",
+                                      "enum": ["commit"]
+                                    },
+                                    {
+                                      "type": "string",
+                                      "enum": ["check"]
+                                    }
+                                  ]
+                                },
+                                "subjectId": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "message": {
+                                  "type": "string"
+                                },
+                                "details": {},
+                                "createdAt": {
+                                  "type": "string"
+                                }
+                              },
+                              "additionalProperties": false
+                            }
+                          }
+                        },
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "additionalProperties": false,
+                  "title": "ProjectSynchronization"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Common error response returned by the Shipgate API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["code", "message", "requestId"],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "minLength": 1,
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "details": {}
+                  },
+                  "additionalProperties": false,
+                  "title": "ApiError",
+                  "description": "Common error response returned by the Shipgate API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{projectId}/reconciliation": {
+      "post": {
+        "operationId": "reconcileProject",
+        "summary": "Queue an authoritative repository reconciliation",
+        "tags": ["Projects"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["expectedConfigurationVersion"],
+                "properties": {
+                  "expectedConfigurationVersion": {
+                    "type": "integer",
+                    "minimum": 1
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "in": "path",
+            "name": "projectId",
+            "required": true
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            "in": "header",
+            "name": "x-csrf-token",
+            "required": false
+          }
+        ],
+        "security": [
+          {
+            "shipgateSession": []
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["reconciliation"],
+                  "properties": {
+                    "reconciliation": {
+                      "type": "object",
+                      "required": [
+                        "requestId",
+                        "status",
+                        "configurationVersion",
+                        "reason",
+                        "mode",
+                        "sourceSha",
+                        "productionSha",
+                        "requestedAt"
+                      ],
+                      "properties": {
+                        "requestId": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": ["queued"]
+                            },
+                            {
+                              "type": "string",
+                              "enum": ["running"]
+                            },
+                            {
+                              "type": "string",
+                              "enum": ["succeeded"]
+                            },
+                            {
+                              "type": "string",
+                              "enum": ["superseded"]
+                            },
+                            {
+                              "type": "string",
+                              "enum": ["failed"]
+                            },
+                            {
+                              "type": "string",
+                              "enum": ["cancelled"]
+                            }
+                          ]
+                        },
+                        "configurationVersion": {
+                          "type": "integer",
+                          "minimum": 1
+                        },
+                        "reason": {
+                          "type": "string"
+                        },
+                        "mode": {
+                          "type": "string",
+                          "enum": ["full"]
+                        },
+                        "sourceSha": {
+                          "type": "string"
+                        },
+                        "productionSha": {
+                          "type": "string"
+                        },
+                        "requestedAt": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Common error response returned by the Shipgate API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["code", "message", "requestId"],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "minLength": 1,
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "details": {}
+                  },
+                  "additionalProperties": false,
+                  "title": "ApiError",
+                  "description": "Common error response returned by the Shipgate API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/projects/{projectId}/changes": {
       "get": {
         "operationId": "getProjectChanges",
@@ -3127,12 +4765,16 @@
                           "githubPullRequestId",
                           "pullRequestNumber",
                           "title",
+                          "url",
                           "authorId",
                           "authorLogin",
                           "mergedAt",
                           "mergeMethod",
+                          "commitCount",
                           "commitSetFingerprint",
+                          "synchronizationState",
                           "productionPresence",
+                          "checkState",
                           "finalHeadSha",
                           "commitShas",
                           "requiredChecks"
@@ -3151,6 +4793,16 @@
                           },
                           "title": {
                             "type": "string"
+                          },
+                          "url": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
                           },
                           "authorId": {
                             "anyOf": [
@@ -3196,8 +4848,31 @@
                               }
                             ]
                           },
+                          "commitCount": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
                           "commitSetFingerprint": {
-                            "type": "string"
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "synchronizationState": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "enum": ["known"]
+                              },
+                              {
+                                "type": "string",
+                                "enum": ["unknown"]
+                              }
+                            ]
                           },
                           "productionPresence": {
                             "anyOf": [
@@ -3208,6 +4883,46 @@
                               {
                                 "type": "string",
                                 "enum": ["partially_present"]
+                              },
+                              {
+                                "type": "string",
+                                "enum": ["unknown"]
+                              }
+                            ]
+                          },
+                          "checkState": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "enum": ["not_configured"]
+                              },
+                              {
+                                "type": "string",
+                                "enum": ["not_applicable"]
+                              },
+                              {
+                                "type": "string",
+                                "enum": ["successful"]
+                              },
+                              {
+                                "type": "string",
+                                "enum": ["pending"]
+                              },
+                              {
+                                "type": "string",
+                                "enum": ["failed"]
+                              },
+                              {
+                                "type": "string",
+                                "enum": ["missing"]
+                              },
+                              {
+                                "type": "string",
+                                "enum": ["stale"]
+                              },
+                              {
+                                "type": "string",
+                                "enum": ["unknown"]
                               }
                             ]
                           },

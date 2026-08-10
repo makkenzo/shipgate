@@ -6,14 +6,23 @@ import type { AuthenticatedSession } from '../../auth/model.js'
 import {
   type ConfigureProjectResult,
   ProjectConfigurationValidationError,
+  type ProjectHealth,
   ProjectNotFoundError,
   type ProjectRecord,
+  type ProjectSynchronizationSummary,
   ProjectVersionConflictError,
   type ReconciliationRequestRecord,
   RepositoryAlreadyConnectedError,
 } from '../../projects/index.js'
 import { ApiHttpError } from '../api-error.js'
 import { CsrfHeadersSchema } from '../auth-schemas.js'
+import {
+  ProjectOverviewSchema,
+  ProjectReconcileBodySchema,
+  ProjectReconcileResponseSchema,
+  ProjectSynchronizationQuerySchema,
+  ProjectSynchronizationSchema,
+} from '../project-dashboard-schemas.js'
 import {
   CreateProjectBodySchema,
   DeleteProjectQuerySchema,
@@ -106,6 +115,96 @@ export const projectRoutes: FastifyPluginAsyncTypebox<{
         return mapProject(
           await context.projects.get(session.githubUserId, request.params.projectId),
         )
+      } catch (error) {
+        throw mapProjectError(error)
+      }
+    },
+  )
+
+  app.get(
+    '/projects/:projectId/overview',
+    {
+      preHandler: [requireAuthenticatedSession],
+      schema: {
+        operationId: 'getProjectOverview',
+        summary: 'Get the repository dashboard projection for a project',
+        tags: ['Projects'],
+        security: [{ shipgateSession: [] }],
+        params: ProjectParamsSchema,
+        response: { 200: ProjectOverviewSchema, default: ApiErrorSchema },
+      },
+    },
+    async (request) => {
+      const session = requireSession(request.shipgateSession)
+
+      try {
+        return mapOverview(
+          await context.projects.getOverview(session.githubUserId, request.params.projectId),
+        )
+      } catch (error) {
+        throw mapProjectError(error)
+      }
+    },
+  )
+
+  app.get(
+    '/projects/:projectId/synchronization',
+    {
+      preHandler: [requireAuthenticatedSession],
+      schema: {
+        operationId: 'getProjectSynchronization',
+        summary: 'Get repository synchronization history and detected issues',
+        tags: ['Projects'],
+        security: [{ shipgateSession: [] }],
+        params: ProjectParamsSchema,
+        querystring: ProjectSynchronizationQuerySchema,
+        response: { 200: ProjectSynchronizationSchema, default: ApiErrorSchema },
+      },
+    },
+    async (request) => {
+      const session = requireSession(request.shipgateSession)
+
+      try {
+        return mapSynchronizationHistory(
+          await context.projects.getSynchronization(
+            session.githubUserId,
+            request.params.projectId,
+            request.query.limit,
+          ),
+        )
+      } catch (error) {
+        throw mapProjectError(error)
+      }
+    },
+  )
+
+  app.post(
+    '/projects/:projectId/reconciliation',
+    {
+      preHandler: [requireAuthenticatedSession, requireCsrfProtection],
+      schema: {
+        operationId: 'reconcileProject',
+        summary: 'Queue an authoritative repository reconciliation',
+        tags: ['Projects'],
+        security: [{ shipgateSession: [] }],
+        headers: CsrfHeadersSchema,
+        params: ProjectParamsSchema,
+        body: ProjectReconcileBodySchema,
+        response: { 202: ProjectReconcileResponseSchema, default: ApiErrorSchema },
+      },
+    },
+    async (request, reply) => {
+      const session = requireSession(request.shipgateSession)
+
+      try {
+        const reconciliation = await context.projects.reconcile({
+          actorGitHubUserId: session.githubUserId,
+          projectId: request.params.projectId,
+          expectedConfigurationVersion: request.body.expectedConfigurationVersion,
+          correlationId: request.id,
+        })
+
+        return reply.code(202).send({ reconciliation: mapReconciliation(reconciliation) })
       } catch (error) {
         throw mapProjectError(error)
       }
@@ -275,6 +374,7 @@ function mapChange(
     githubPullRequestId: parseSafeId(change.githubPullRequestId, 'pull request ID'),
     authorId: change.authorId === null ? null : parseSafeId(change.authorId, 'author ID'),
     mergedAt: change.mergedAt.toISOString(),
+    commitCount: change.commitShas.length,
     commitShas: [...change.commitShas],
     requiredChecks: change.requiredChecks.map((required) => ({
       ...required,
@@ -289,19 +389,108 @@ function mapChange(
   }
 }
 
+function mapOverview(overview: Awaited<ReturnType<ApplicationContext['projects']['getOverview']>>) {
+  return {
+    project: mapProject(overview.project),
+    branches: {
+      source: mapOverviewBranch(overview.branches.source),
+      production: mapOverviewBranch(overview.branches.production),
+    },
+    counts: overview.counts,
+    requiredChecks: {
+      policyVersion: overview.requiredChecks.policyVersion,
+      state: overview.requiredChecks.state,
+      checks: overview.requiredChecks.checks.map((check) => ({
+        ...check,
+        stateCounts: { ...check.stateCounts },
+      })),
+    },
+    lastSynchronization:
+      overview.lastSynchronization === null
+        ? null
+        : mapSynchronizationSummary(overview.lastSynchronization),
+    health: mapProjectHealth(overview.health),
+  }
+}
+
+function mapOverviewBranch(
+  branch: Awaited<ReturnType<ApplicationContext['projects']['getOverview']>>['branches']['source'],
+) {
+  return {
+    ...branch,
+    observedAt: branch.observedAt?.toISOString() ?? null,
+  }
+}
+
+function mapProjectHealth(health: ProjectHealth) {
+  return {
+    state: health.state,
+    summary: health.summary,
+    reasons: health.reasons.map((reason) => ({
+      severity: reason.severity,
+      code: reason.code,
+      message: reason.message,
+    })),
+  }
+}
+
+function mapSynchronizationHistory(
+  history: Awaited<ReturnType<ApplicationContext['projects']['getSynchronization']>>,
+) {
+  return {
+    project: mapProject(history.project),
+    health: mapProjectHealth(history.health),
+    runs: history.runs.map((run) => ({
+      ...mapSynchronizationSummary(run),
+      requestedAt: run.requestedAt.toISOString(),
+      coalescedCount: run.coalescedCount,
+      forcePush: run.forcePush,
+      triggerScope: run.triggerScope,
+      issues: run.issues.map((issue) => ({
+        ...issue,
+        createdAt: issue.createdAt.toISOString(),
+      })),
+    })),
+  }
+}
+
+function mapSynchronizationSummary(synchronization: ProjectSynchronizationSummary) {
+  return {
+    ...synchronization,
+    startedAt: synchronization.startedAt.toISOString(),
+    completedAt: synchronization.completedAt?.toISOString() ?? null,
+  }
+}
+
+function mapReconciliation(reconciliation: ReconciliationRequestRecord): {
+  readonly requestId: string
+  readonly status: ReconciliationRequestRecord['status']
+  readonly configurationVersion: number
+  readonly reason: string
+  readonly mode: 'full'
+  readonly sourceSha: string
+  readonly productionSha: string
+  readonly requestedAt: string
+}
+function mapReconciliation(reconciliation: null): null
+function mapReconciliation(
+  reconciliation: ReconciliationRequestRecord | null,
+): ReturnType<typeof mapReconciliationRecord> | null
 function mapReconciliation(reconciliation: ReconciliationRequestRecord | null) {
-  return reconciliation
-    ? {
-        requestId: reconciliation.id,
-        status: 'queued' as const,
-        configurationVersion: reconciliation.configurationVersion,
-        reason: reconciliation.reason,
-        mode: reconciliation.mode,
-        sourceSha: reconciliation.sourceSha,
-        productionSha: reconciliation.productionSha,
-        requestedAt: reconciliation.requestedAt.toISOString(),
-      }
-    : null
+  return reconciliation ? mapReconciliationRecord(reconciliation) : null
+}
+
+function mapReconciliationRecord(reconciliation: ReconciliationRequestRecord) {
+  return {
+    requestId: reconciliation.id,
+    status: reconciliation.status,
+    configurationVersion: reconciliation.configurationVersion,
+    reason: reconciliation.reason,
+    mode: reconciliation.mode,
+    sourceSha: reconciliation.sourceSha,
+    productionSha: reconciliation.productionSha,
+    requestedAt: reconciliation.requestedAt.toISOString(),
+  }
 }
 
 function mapProjectError(error: unknown): Error {

@@ -42,6 +42,50 @@ describe('project topology validator', () => {
     )
   })
 
+  it('rejects identical source and production branches before contacting GitHub', async () => {
+    const getInstallationClient = vi.fn(async () => {
+      throw new Error('GitHub must not be contacted')
+    })
+    const validator = createProjectTopologyValidator({
+      githubAuth: {
+        ...createGitHubAuth('ahead'),
+        getInstallationClient,
+      },
+      gitWorkspace: { assertProductionAncestor: vi.fn(async () => undefined) },
+    })
+
+    await expect(
+      validator.validate({
+        installationId: 123,
+        repositoryId: 456,
+        sourceBranch: 'main',
+        productionBranch: 'main',
+      }),
+    ).rejects.toMatchObject({ code: 'source_equals_production' })
+    expect(getInstallationClient).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ['source', 'source_branch_missing'],
+    ['production', 'production_branch_missing'],
+  ] as const)('reports a missing %s branch precisely', async (missingBranch, expectedCode) => {
+    const assertProductionAncestor = vi.fn(async () => undefined)
+    const validator = createProjectTopologyValidator({
+      githubAuth: createGitHubAuth('ahead', 'commit', missingBranch),
+      gitWorkspace: { assertProductionAncestor } satisfies GitAncestryWorkspace,
+    })
+
+    await expect(
+      validator.validate({
+        installationId: 123,
+        repositoryId: 456,
+        sourceBranch: 'develop',
+        productionBranch: 'main',
+      }),
+    ).rejects.toMatchObject({ code: expectedCode })
+    expect(assertProductionAncestor).not.toHaveBeenCalled()
+  })
+
   it('rejects a diverged Compare result before creating a Git workspace', async () => {
     const assertProductionAncestor = vi.fn(async () => undefined)
     const validator = createProjectTopologyValidator({
@@ -80,6 +124,7 @@ describe('project topology validator', () => {
 function createGitHubAuth(
   compareStatus: 'ahead' | 'diverged',
   sourceObjectType: 'commit' | 'tag' = 'commit',
+  missingBranch?: 'source' | 'production',
 ): GitHubAuthenticationService {
   const client: InstallationGitHubClient = {
     authentication: {
@@ -108,6 +153,10 @@ function createGitHubAuth(
       if (route === 'GET /repos/{owner}/{repo}/git/ref/{ref}') {
         const ref = parameters?.ref
         const source = ref === 'heads/develop'
+
+        if ((missingBranch === 'source' && source) || (missingBranch === 'production' && !source)) {
+          throw Object.assign(new Error('branch not found'), { status: 404 })
+        }
 
         return response<Data>({
           ref: source ? 'refs/heads/develop' : 'refs/heads/main',

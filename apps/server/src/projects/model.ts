@@ -17,6 +17,16 @@ import type {
 
 export type GitHubNumericId = number | string
 
+export type ProjectCheckState =
+  | 'not_configured'
+  | 'not_applicable'
+  | 'successful'
+  | 'pending'
+  | 'failed'
+  | 'missing'
+  | 'stale'
+  | 'unknown'
+
 export interface ProjectRecord {
   readonly id: string
   readonly installationId: string
@@ -263,12 +273,18 @@ export interface ChangeAheadOfProduction {
   readonly githubPullRequestId: string
   readonly pullRequestNumber: number
   readonly title: string
+  readonly url: string | null
   readonly authorId: string | null
   readonly authorLogin: string | null
   readonly mergedAt: Date
   readonly mergeMethod: ChangeMergeMethod
-  readonly commitSetFingerprint: string
-  readonly productionPresence: Extract<ChangeProductionPresence, 'unreleased' | 'partially_present'>
+  readonly commitSetFingerprint: string | null
+  readonly synchronizationState: ChangeSynchronizationState
+  readonly productionPresence: Extract<
+    ChangeProductionPresence,
+    'unreleased' | 'partially_present' | 'unknown'
+  >
+  readonly checkState: ProjectCheckState
   readonly finalHeadSha: string
   readonly commitShas: readonly string[]
   readonly requiredChecks: readonly ChangeRequiredCheckState[]

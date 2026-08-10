@@ -106,6 +106,10 @@ function createUnavailableGitHubAuthenticationService(
       throw createError()
     },
 
+    async withInstallationToken() {
+      throw createError()
+    },
+
     async getUserClient() {
       throw createError()
     },
@@ -130,6 +134,17 @@ function createLazyGitHubAuthenticationService(
   return {
     getAppClient: () => getService().getAppClient(),
     getInstallationClient: (input) => getService().getInstallationClient(input),
+    withInstallationToken: async (input, callback) => {
+      const authentication = getService()
+
+      if (!authentication.withInstallationToken) {
+        throw new GitHubAuthenticationError(
+          'GitHub authentication provider cannot lease an installation token',
+        )
+      }
+
+      return authentication.withInstallationToken(input, callback)
+    },
     getUserClient: (userId) => getService().getUserClient(userId),
     authorizeUser: (input) => getService().authorizeUser(input),
     invalidateInstallation: (installationId) => getService().invalidateInstallation(installationId),

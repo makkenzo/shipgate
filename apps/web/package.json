@@ -6,13 +6,13 @@
   "scripts": {
     "dev": "vite",
     "routes:generate": "tsr generate",
-    "routes:check": "git diff --exit-code -- src/routeTree.gen.ts",
+    "routes:check": "node ../../scripts/check-generated.mjs routes",
     "typecheck": "pnpm routes:generate && tsc -p tsconfig.json && tsc -p tsconfig.node.json",
     "build": "pnpm typecheck && vite build",
     "preview": "vite preview",
     "test": "vitest run --passWithNoTests",
     "api:generate": "openapi-ts",
-    "api:check": "git diff --exit-code -- openapi src/api/generated",
+    "api:check": "node ../../scripts/check-generated.mjs api",
     "clean": "node -e \"import('node:fs').then(({ rmSync }) => { rmSync('dist', { recursive: true, force: true }) })\""
   },
   "dependencies": {

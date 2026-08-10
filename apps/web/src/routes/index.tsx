@@ -7,7 +7,7 @@ export const Route = createFileRoute('/')({
     const session = await context.queryClient.ensureQueryData(authSessionOptions())
 
     throw redirect({
-      to: session.authenticated ? '/installations' : '/login',
+      to: session.authenticated ? '/projects' : '/login',
     })
   },
 })

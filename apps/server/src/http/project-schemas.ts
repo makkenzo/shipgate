@@ -91,10 +91,17 @@ export const ProjectSchema = Type.Object(
   { additionalProperties: false, title: 'Project' },
 )
 
-const ReconciliationSchema = Type.Object(
+export const ProjectReconciliationSchema = Type.Object(
   {
     requestId: Type.String(),
-    status: Type.Literal('queued'),
+    status: Type.Union([
+      Type.Literal('queued'),
+      Type.Literal('running'),
+      Type.Literal('succeeded'),
+      Type.Literal('superseded'),
+      Type.Literal('failed'),
+      Type.Literal('cancelled'),
+    ]),
     configurationVersion: Type.Integer({ minimum: 1 }),
     reason: Type.String(),
     mode: Type.Literal('full'),
@@ -113,7 +120,7 @@ export const ProjectMutationResponseSchema = Type.Object(
       Type.Literal('already_applied'),
     ]),
     project: ProjectSchema,
-    reconciliation: Type.Union([ReconciliationSchema, Type.Null()]),
+    reconciliation: Type.Union([ProjectReconciliationSchema, Type.Null()]),
   },
   { additionalProperties: false },
 )
@@ -193,6 +200,7 @@ export const ProjectChangesSchema = Type.Object(
           githubPullRequestId: Type.Integer({ minimum: 1 }),
           pullRequestNumber: Type.Integer({ minimum: 1 }),
           title: Type.String(),
+          url: Type.Union([Type.String(), Type.Null()]),
           authorId: Type.Union([Type.Integer({ minimum: 1 }), Type.Null()]),
           authorLogin: Type.Union([Type.String(), Type.Null()]),
           mergedAt: Type.String(),
@@ -202,10 +210,23 @@ export const ProjectChangesSchema = Type.Object(
             Type.Literal('rebase'),
             Type.Literal('unknown'),
           ]),
-          commitSetFingerprint: Type.String(),
+          commitCount: Type.Integer({ minimum: 0 }),
+          commitSetFingerprint: Type.Union([Type.String(), Type.Null()]),
+          synchronizationState: Type.Union([Type.Literal('known'), Type.Literal('unknown')]),
           productionPresence: Type.Union([
             Type.Literal('unreleased'),
             Type.Literal('partially_present'),
+            Type.Literal('unknown'),
+          ]),
+          checkState: Type.Union([
+            Type.Literal('not_configured'),
+            Type.Literal('not_applicable'),
+            Type.Literal('successful'),
+            Type.Literal('pending'),
+            Type.Literal('failed'),
+            Type.Literal('missing'),
+            Type.Literal('stale'),
+            Type.Literal('unknown'),
           ]),
           finalHeadSha: Type.String(),
           commitShas: Type.Array(Type.String()),

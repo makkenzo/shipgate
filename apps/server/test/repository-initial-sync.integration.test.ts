@@ -394,7 +394,6 @@ function createGitHubAuth(input: {
             title: 'Ship the projection',
             html_url: 'https://github.example/octocat/shipgate/pull/42',
             merged_at: '2026-08-04T10:00:00.000Z',
-            merge_commit_sha: sourceSha,
             commits: 2,
             user: { id: 99, login: 'octocat' },
             base: { ref: 'develop' },
@@ -410,7 +409,6 @@ function createGitHubAuth(input: {
           title: 'Ship the projection',
           html_url: 'https://github.example/octocat/shipgate/pull/42',
           merged_at: '2026-08-04T10:00:00.000Z',
-          merge_commit_sha: sourceSha,
           commits: 2,
           user: { id: 99, login: 'octocat' },
           base: { ref: 'develop' },
@@ -476,10 +474,12 @@ function createGitHubAuth(input: {
       }
 
       if (query.includes('ShipgatePullRequestCommits')) {
+        expect(query).toContain('mergeCommit')
         expect(parameters?.number).toBe(42)
         return {
           repository: {
             pullRequest: {
+              mergeCommit: { oid: sourceSha },
               commits: {
                 nodes: [{ commit: { oid: '4'.repeat(40) } }, { commit: { oid: '5'.repeat(40) } }],
                 pageInfo: { hasNextPage: false, endCursor: null },

@@ -7,8 +7,8 @@ import type {
   JsonValue,
   ProjectTable,
 } from '@shipgate/database'
-import type { Selectable, Transaction } from 'kysely'
-
+import type { Kysely, Selectable, Transaction } from 'kysely'
+import { summarizeProjectCheckState } from './dashboard.js'
 import {
   ProjectNotFoundError,
   ProjectRepositoryUnavailableError,
@@ -725,24 +725,67 @@ export async function listChangesAheadOfProduction(
 ): Promise<readonly ChangeAheadOfProduction[]> {
   assertLocalId(projectId, 'project ID')
 
-  const rows = await database.kysely
+  return database.kysely
+    .transaction()
+    .setIsolationLevel('repeatable read')
+    .execute((transaction) => listChangesAheadOfProductionSnapshot(transaction, projectId))
+}
+
+async function listChangesAheadOfProductionSnapshot(
+  database: Kysely<DatabaseSchema>,
+  projectId: string,
+): Promise<readonly ChangeAheadOfProduction[]> {
+  const project = await database
+    .selectFrom('projects')
+    .select('required_check_policy_version')
+    .where('id', '=', projectId)
+    .executeTakeFirst()
+
+  if (!project) {
+    throw new ProjectNotFoundError(projectId)
+  }
+
+  const configuredCheckCount =
+    project.required_check_policy_version === 0
+      ? 0
+      : Number(
+          (
+            await database
+              .selectFrom('required_checks')
+              .select(({ fn }) => fn.countAll().as('count'))
+              .where('project_id', '=', projectId)
+              .where('policy_version', '=', project.required_check_policy_version)
+              .executeTakeFirstOrThrow()
+          ).count,
+        )
+
+  const rows = await database
     .selectFrom('changes')
     .select([
       'id',
       'github_pull_request_id',
       'pull_request_number',
       'title',
+      'url',
       'author_id',
       'author_login',
       'merged_at',
       'merge_method',
       'commit_set_fingerprint',
+      'synchronization_state',
       'production_presence',
       'final_head_sha',
     ])
     .where('project_id', '=', projectId)
-    .where('synchronization_state', '=', 'known')
-    .where('production_presence', 'in', ['unreleased', 'partially_present'])
+    .where((expression) =>
+      expression.or([
+        expression('synchronization_state', '=', 'unknown'),
+        expression.and([
+          expression('synchronization_state', '=', 'known'),
+          expression('production_presence', 'in', ['unreleased', 'partially_present']),
+        ]),
+      ]),
+    )
     .orderBy('merged_at')
     .orderBy('pull_request_number')
     .execute()
@@ -751,7 +794,7 @@ export async function listChangesAheadOfProduction(
     return []
   }
 
-  const commitRows = await database.kysely
+  const commitRows = await database
     .selectFrom('change_commits')
     .select(['change_id', 'commit_sha', 'position'])
     .where(
@@ -776,11 +819,9 @@ export async function listChangesAheadOfProduction(
   )
 
   return rows.map((row) => {
-    const mergeMethod = row.merge_method
-    const fingerprint = row.commit_set_fingerprint
-    const productionPresence = assertAheadProductionPresence(row.production_presence)
+    const requiredChecks = requiredChecksByChange.get(row.id) ?? []
 
-    if (!fingerprint) {
+    if (row.synchronization_state === 'known' && !row.commit_set_fingerprint) {
       throw new Error(`Known change ${row.id} has no commit set fingerprint`)
     }
 
@@ -789,15 +830,24 @@ export async function listChangesAheadOfProduction(
       githubPullRequestId: row.github_pull_request_id,
       pullRequestNumber: row.pull_request_number,
       title: row.title,
+      url: row.url,
       authorId: row.author_id,
       authorLogin: row.author_login,
       mergedAt: row.merged_at,
-      mergeMethod,
-      commitSetFingerprint: fingerprint,
-      productionPresence,
+      mergeMethod: row.merge_method,
+      commitSetFingerprint: row.commit_set_fingerprint,
+      synchronizationState: row.synchronization_state,
+      productionPresence: assertDashboardProductionPresence(row.production_presence),
+      checkState: summarizeProjectCheckState({
+        configuredCheckCount,
+        hasKnownChangesAhead: row.synchronization_state === 'known',
+        expectedStateCount: configuredCheckCount,
+        synchronizationState: row.synchronization_state,
+        states: requiredChecks.map((required) => required.state),
+      }),
       finalHeadSha: row.final_head_sha,
       commitShas: commitsByChange.get(row.id) ?? [],
-      requiredChecks: requiredChecksByChange.get(row.id) ?? [],
+      requiredChecks,
     }
   })
 }
@@ -1694,11 +1744,11 @@ function serializeNullableGitHubNumericId(
   return value === null ? null : serializeGitHubNumericId(value, name)
 }
 
-function assertAheadProductionPresence(
+function assertDashboardProductionPresence(
   value: ChangeProductionPresence,
-): Extract<ChangeProductionPresence, 'unreleased' | 'partially_present'> {
-  if (value !== 'unreleased' && value !== 'partially_present') {
-    throw new Error(`Change is not ahead of production: ${value}`)
+): Extract<ChangeProductionPresence, 'unreleased' | 'partially_present' | 'unknown'> {
+  if (value !== 'unreleased' && value !== 'partially_present' && value !== 'unknown') {
+    throw new Error(`Stored change is not visible on the dashboard: ${value}`)
   }
 
   return value

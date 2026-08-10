@@ -27,8 +27,8 @@
     "clean": "pnpm --recursive --if-present run clean",
     "api:generate": "pnpm --filter @shipgate/server... build && pnpm --filter @shipgate/server openapi:generate:compiled && pnpm --filter @shipgate/web api:generate && biome format --write apps/web/openapi apps/web/src/api/generated",
     "api:generate:compiled": "pnpm --filter @shipgate/server openapi:generate:compiled && pnpm --filter @shipgate/web api:generate && biome format --write apps/web/openapi apps/web/src/api/generated",
-    "api:check": "pnpm --filter @shipgate/web api:check",
-    "routes:check": "pnpm --filter @shipgate/web routes:check",
+    "api:check": "node scripts/check-generated.mjs api",
+    "routes:check": "node scripts/check-generated.mjs routes",
     "verify": "pnpm format:check && pnpm lint && pnpm build:production && pnpm typecheck && pnpm test && pnpm api:check && pnpm routes:check"
   },
   "devDependencies": {

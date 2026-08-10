@@ -3,8 +3,8 @@
 import { queryOptions, type UseMutationOptions } from '@tanstack/react-query';
 
 import { client } from '../client.gen';
-import { createDiagnosticJob, createProject, deleteLocalAccount, deleteProject, disconnectGitHub, getAuthSession, getConnectionConfiguration, getDiagnosticJob, getHealth, getInstallation, getInstallations, getProject, getProjectChanges, getProjects, getReadiness, logout, type Options, updateProject } from '../sdk.gen';
-import type { CreateDiagnosticJobData, CreateDiagnosticJobError, CreateDiagnosticJobResponse, CreateProjectData, CreateProjectError, CreateProjectResponse, DeleteLocalAccountData, DeleteLocalAccountError, DeleteLocalAccountResponse, DeleteProjectData, DeleteProjectError, DeleteProjectResponse, DisconnectGitHubData, DisconnectGitHubError, DisconnectGitHubResponse, GetAuthSessionData, GetAuthSessionError, GetAuthSessionResponse, GetConnectionConfigurationData, GetConnectionConfigurationError, GetConnectionConfigurationResponse, GetDiagnosticJobData, GetDiagnosticJobError, GetDiagnosticJobResponse, GetHealthData, GetHealthError, GetHealthResponse, GetInstallationData, GetInstallationError, GetInstallationResponse, GetInstallationsData, GetInstallationsError, GetInstallationsResponse, GetProjectChangesData, GetProjectChangesError, GetProjectChangesResponse, GetProjectData, GetProjectError, GetProjectResponse, GetProjectsData, GetProjectsError, GetProjectsResponse, GetReadinessData, GetReadinessError, GetReadinessResponse, LogoutData, LogoutError, LogoutResponse, UpdateProjectData, UpdateProjectError, UpdateProjectResponse } from '../types.gen';
+import { createDiagnosticJob, createProject, deleteLocalAccount, deleteProject, disconnectGitHub, getAuthSession, getConnectionConfiguration, getDiagnosticJob, getHealth, getInstallation, getInstallations, getProject, getProjectChanges, getProjectOverview, getProjects, getProjectSynchronization, getReadiness, logout, type Options, reconcileProject, updateProject } from '../sdk.gen';
+import type { CreateDiagnosticJobData, CreateDiagnosticJobError, CreateDiagnosticJobResponse, CreateProjectData, CreateProjectError, CreateProjectResponse, DeleteLocalAccountData, DeleteLocalAccountError, DeleteLocalAccountResponse, DeleteProjectData, DeleteProjectError, DeleteProjectResponse, DisconnectGitHubData, DisconnectGitHubError, DisconnectGitHubResponse, GetAuthSessionData, GetAuthSessionError, GetAuthSessionResponse, GetConnectionConfigurationData, GetConnectionConfigurationError, GetConnectionConfigurationResponse, GetDiagnosticJobData, GetDiagnosticJobError, GetDiagnosticJobResponse, GetHealthData, GetHealthError, GetHealthResponse, GetInstallationData, GetInstallationError, GetInstallationResponse, GetInstallationsData, GetInstallationsError, GetInstallationsResponse, GetProjectChangesData, GetProjectChangesError, GetProjectChangesResponse, GetProjectData, GetProjectError, GetProjectOverviewData, GetProjectOverviewError, GetProjectOverviewResponse, GetProjectResponse, GetProjectsData, GetProjectsError, GetProjectsResponse, GetProjectSynchronizationData, GetProjectSynchronizationError, GetProjectSynchronizationResponse, GetReadinessData, GetReadinessError, GetReadinessResponse, LogoutData, LogoutError, LogoutResponse, ReconcileProjectData, ReconcileProjectError, ReconcileProjectResponse, UpdateProjectData, UpdateProjectError, UpdateProjectResponse } from '../types.gen';
 
 export type QueryKey<TOptions extends Options> = [
     Pick<TOptions, 'baseUrl' | 'body' | 'headers' | 'path' | 'query'> & {
@@ -328,6 +328,62 @@ export const updateProjectMutation = (options?: Partial<Options<UpdateProjectDat
             return data;
         },
         mutationKey: updateProjectMutationKey(options)
+    };
+    return mutationOptions;
+};
+
+export const getProjectOverviewQueryKey = (options: Options<GetProjectOverviewData>) => createQueryKey('getProjectOverview', options);
+
+/**
+ * Get the repository dashboard projection for a project
+ */
+export const getProjectOverviewOptions = (options: Options<GetProjectOverviewData>) => queryOptions<GetProjectOverviewResponse, GetProjectOverviewError, GetProjectOverviewResponse, ReturnType<typeof getProjectOverviewQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await getProjectOverview({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getProjectOverviewQueryKey(options)
+});
+
+export const getProjectSynchronizationQueryKey = (options: Options<GetProjectSynchronizationData>) => createQueryKey('getProjectSynchronization', options);
+
+/**
+ * Get repository synchronization history and detected issues
+ */
+export const getProjectSynchronizationOptions = (options: Options<GetProjectSynchronizationData>) => queryOptions<GetProjectSynchronizationResponse, GetProjectSynchronizationError, GetProjectSynchronizationResponse, ReturnType<typeof getProjectSynchronizationQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await getProjectSynchronization({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getProjectSynchronizationQueryKey(options)
+});
+
+export const reconcileProjectMutationKey = (options?: Partial<Options<ReconcileProjectData>>) => createMutationKey('reconcileProject', options);
+
+/**
+ * Queue an authoritative repository reconciliation
+ */
+export const reconcileProjectMutation = (options?: Partial<Options<ReconcileProjectData>>): UseMutationOptions<ReconcileProjectResponse, ReconcileProjectError, Options<ReconcileProjectData>> => {
+    const mutationOptions: UseMutationOptions<ReconcileProjectResponse, ReconcileProjectError, Options<ReconcileProjectData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await reconcileProject({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        },
+        mutationKey: reconcileProjectMutationKey(options)
     };
     return mutationOptions;
 };

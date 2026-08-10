@@ -7,6 +7,21 @@ export {
   updateProjectRequiredCheckOverrides,
 } from './configuration-store.js'
 export {
+  loadProjectOverview,
+  loadProjectSynchronizationHistory,
+  type ProjectHealth,
+  type ProjectHealthReason,
+  type ProjectHealthState,
+  type ProjectOverview,
+  type ProjectOverviewBranch,
+  type ProjectOverviewRequiredCheck,
+  type ProjectSynchronizationHistory,
+  type ProjectSynchronizationIssue,
+  type ProjectSynchronizationRun,
+  type ProjectSynchronizationSummary,
+  summarizeProjectCheckState,
+} from './dashboard.js'
+export {
   type ProjectConfigurationValidationCode,
   ProjectConfigurationValidationError,
   ProjectNotFoundError,
@@ -46,6 +61,7 @@ export type {
   CommitCheckResultProjection,
   CreateProjectInput,
   GitHubNumericId,
+  ProjectCheckState,
   ProjectRecord,
   ReconciliationRequestRecord,
   RecordRepositorySyncFailureInput,

@@ -8,7 +8,7 @@ import { attributePullRequestChanges } from './pr-attribution.js'
 const productionSha = 'a'.repeat(40)
 
 describe('commit topology and pull request attribution', () => {
-  it('attributes a merge commit from its deterministic integration window', async () => {
+  it('attributes a merge commit from GraphQL when REST omits merge_commit_sha', async () => {
     const first = 'b'.repeat(40)
     const second = 'c'.repeat(40)
     const merge = 'd'.repeat(40)
@@ -44,6 +44,7 @@ describe('commit topology and pull request attribution', () => {
     expect(result.changes).toEqual([
       expect.objectContaining({
         pullRequestNumber: 11,
+        mergeCommitSha: merge,
         mergeMethod: 'merge',
         commitShas: [first, second, merge],
         sourceIntegrationSha: merge,
@@ -214,6 +215,98 @@ describe('commit topology and pull request attribution', () => {
     ])
   })
 
+  it('keeps two sequential pull requests in source integration order', async () => {
+    const first = '1'.repeat(40)
+    const second = '2'.repeat(40)
+    const commits = [
+      createCommit(first, [productionSha], 0, 0, first),
+      createCommit(second, [first], 1, 1, second),
+    ]
+    const git = createSnapshot(commits, {
+      firstParentShas: [first, second],
+      integrationWindows: [linearWindow(first, productionSha, 0), linearWindow(second, first, 1)],
+    })
+    const client = createClient({
+      evidence: {
+        [first]: { rest: [21], graph: [21] },
+        [second]: { rest: [22], graph: [22] },
+      },
+      pulls: {
+        21: createPull(21, ['a'.repeat(40), 'b'.repeat(40)], first),
+        22: createPull(22, ['c'.repeat(40), 'd'.repeat(40)], second),
+      },
+    })
+
+    const result = await attribute(client, git, commits)
+
+    expect(result.changes.map((change) => change.pullRequestNumber)).toEqual([21, 22])
+    expect(result.changes.map((change) => change.mergeMethod)).toEqual(['squash', 'squash'])
+    expect(result.commits.map((commit) => commit.attributionState)).toEqual(['managed', 'managed'])
+  })
+
+  it('marks overlapping GitHub association results ambiguous instead of choosing a pull request', async () => {
+    const sha = '3'.repeat(40)
+    const commits = [createCommit(sha, [productionSha], 0, 0, sha)]
+    const git = createSnapshot(commits, {
+      firstParentShas: [sha],
+      integrationWindows: [linearWindow(sha, productionSha, 0)],
+    })
+    const client = createClient({
+      evidence: {
+        [sha]: { rest: [31, 32], graph: [31, 32] },
+      },
+      pulls: {
+        31: createPull(31, ['4'.repeat(40)], sha),
+        32: createPull(32, ['5'.repeat(40)], sha),
+      },
+    })
+
+    const result = await attribute(client, git, commits)
+
+    expect(result.changes).toEqual([])
+    expect(result.commits[0]?.attributionState).toBe('ambiguous')
+    expect(result.issues).toEqual([
+      expect.objectContaining({
+        code: 'ambiguous_commit_attribution',
+        details: expect.objectContaining({ reason: 'multiple_pull_request_candidates' }),
+      }),
+    ])
+  })
+
+  it('classifies a fully cherry-picked multi-commit pull request as released', async () => {
+    const first = '6'.repeat(40)
+    const second = '7'.repeat(40)
+    const commits = [
+      createCommit(first, [productionSha], 0, 0, first, true),
+      createCommit(second, [first], 1, 1, second, true),
+    ]
+    const git = createSnapshot(commits, {
+      firstParentShas: [first, second],
+      integrationWindows: [linearWindow(first, productionSha, 0), linearWindow(second, first, 1)],
+    })
+    const client = createClient({
+      evidence: {
+        [first]: { rest: [41], graph: [41] },
+        [second]: { rest: [41], graph: [41] },
+      },
+      pulls: {
+        41: createPull(41, ['8'.repeat(40), '9'.repeat(40)], second),
+      },
+    })
+
+    const result = await attribute(client, git, commits)
+
+    expect(result.changes).toEqual([
+      expect.objectContaining({
+        pullRequestNumber: 41,
+        mergeMethod: 'rebase',
+        productionPresence: 'released',
+        commitShas: [first, second],
+      }),
+    ])
+    expect(result.issues).toEqual([])
+  })
+
   it('persists unmanaged and contradictory commits as explicit issues', async () => {
     const unmanaged = '5'.repeat(40)
     const ambiguous = '6'.repeat(40)
@@ -322,7 +415,6 @@ function createClient(input: {
           title: `Pull request ${pull.number}`,
           html_url: `https://github.example/octocat/shipgate/pull/${pull.number}`,
           merged_at: pull.mergedAt,
-          merge_commit_sha: pull.mergeCommitSha,
           commits: pull.originalCommitShas.length,
           user: { id: 99, login: 'octocat' },
           base: { ref: 'develop' },
@@ -361,11 +453,13 @@ function createClient(input: {
       }
 
       if (query.includes('ShipgatePullRequestCommits')) {
+        expect(query).toContain('mergeCommit')
         const number = Number(parameters?.number)
         const pull = requirePull(input.pulls, number)
         return {
           repository: {
             pullRequest: {
+              mergeCommit: { oid: pull.mergeCommitSha },
               commits: {
                 nodes: pull.originalCommitShas.map((oid) => ({ commit: { oid } })),
                 pageInfo: { hasNextPage: false, endCursor: null },

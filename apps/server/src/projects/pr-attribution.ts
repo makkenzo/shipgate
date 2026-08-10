@@ -53,6 +53,9 @@ interface AssociatedPullRequestsQuery {
 interface PullRequestCommitsQuery {
   readonly repository: {
     readonly pullRequest: {
+      readonly mergeCommit: {
+        readonly oid: string
+      } | null
       readonly commits: {
         readonly nodes: readonly { readonly commit: { readonly oid: string } }[]
         readonly pageInfo: {
@@ -62,6 +65,11 @@ interface PullRequestCommitsQuery {
       }
     } | null
   } | null
+}
+
+interface PullRequestGitMetadata {
+  readonly mergeCommitSha: string | null
+  readonly originalCommitShas: readonly string[]
 }
 
 interface PullMetadata {
@@ -883,7 +891,7 @@ async function loadPullMetadata(input: {
     )
   }
 
-  const originalCommitShas = await listPullCommitShasGraphql(input)
+  const { mergeCommitSha, originalCommitShas } = await loadPullGitMetadataGraphql(input)
   const advertisedCommitCount = nullablePositiveInteger(pull.commits)
 
   if (advertisedCommitCount !== null && advertisedCommitCount !== originalCommitShas.length) {
@@ -907,18 +915,19 @@ async function loadPullMetadata(input: {
     baseBranch,
     mergedAt,
     finalHeadSha: requireSha(head.sha, 'pull request final head SHA'),
-    mergeCommitSha: nullableSha(pull.merge_commit_sha),
+    mergeCommitSha,
     originalCommitShas,
   }
 }
 
-async function listPullCommitShasGraphql(input: {
+async function loadPullGitMetadataGraphql(input: {
   readonly client: InstallationGitHubClient
   readonly repository: RepositoryIdentity
   readonly pullNumber: number
-}): Promise<readonly string[]> {
+}): Promise<PullRequestGitMetadata> {
   const shas: string[] = []
   let cursor: string | null = null
+  let mergeCommitSha: string | null | undefined
 
   for (let page = 1; page <= maximumPages; page += 1) {
     const response: PullRequestCommitsQuery = await input.client.graphql<PullRequestCommitsQuery>(
@@ -930,6 +939,9 @@ async function listPullCommitShasGraphql(input: {
       ) {
         repository(owner: $owner, name: $name) {
           pullRequest(number: $number) {
+            mergeCommit {
+              oid
+            }
             commits(first: 100, after: $cursor) {
               nodes {
                 commit { oid }
@@ -949,13 +961,33 @@ async function listPullCommitShasGraphql(input: {
         cursor,
       },
     )
-    const connection = response.repository?.pullRequest?.commits
+    const pullRequest = response.repository?.pullRequest
+    const connection = pullRequest?.commits
 
-    if (!connection) {
+    if (!pullRequest || !connection) {
       throw new PullAttributionConflict(
         'pull_request_commits_missing',
         `GitHub did not return commits for pull request #${input.pullNumber}`,
         { pullRequestNumber: input.pullNumber },
+      )
+    }
+
+    const pageMergeCommitSha =
+      pullRequest.mergeCommit === null
+        ? null
+        : requireSha(pullRequest.mergeCommit.oid, 'pull request merge commit SHA')
+
+    if (mergeCommitSha === undefined) {
+      mergeCommitSha = pageMergeCommitSha
+    } else if (mergeCommitSha !== pageMergeCommitSha) {
+      throw new PullAttributionConflict(
+        'pull_request_merge_commit_changed',
+        `GitHub returned inconsistent merge commit identity for pull request #${input.pullNumber}`,
+        {
+          pullRequestNumber: input.pullNumber,
+          previousMergeCommitSha: mergeCommitSha ?? 'null',
+          currentMergeCommitSha: pageMergeCommitSha ?? 'null',
+        },
       )
     }
 
@@ -964,7 +996,7 @@ async function listPullCommitShasGraphql(input: {
     }
 
     if (!connection.pageInfo.hasNextPage) {
-      return shas
+      return { mergeCommitSha: mergeCommitSha ?? null, originalCommitShas: shas }
     }
 
     if (!connection.pageInfo.endCursor) {
@@ -1134,14 +1166,6 @@ function requireSha(value: unknown, name: string): string {
   }
 
   return sha
-}
-
-function nullableSha(value: unknown): string | null {
-  if (value === null || value === undefined) {
-    return null
-  }
-
-  return requireSha(value, 'nullable commit SHA')
 }
 
 function requireDate(value: unknown, name: string): Date {

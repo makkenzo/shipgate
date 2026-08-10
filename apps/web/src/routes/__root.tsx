@@ -33,6 +33,12 @@ function RootLayout() {
           {authenticated ? (
             <nav className="flex items-center gap-5 text-sm">
               <Link
+                to="/projects"
+                className="text-muted-foreground transition-colors hover:text-foreground [&.active]:text-foreground"
+              >
+                Projects
+              </Link>
+              <Link
                 to="/installations"
                 className="text-muted-foreground transition-colors hover:text-foreground [&.active]:text-foreground"
               >

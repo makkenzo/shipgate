@@ -13,8 +13,14 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AccountRouteImport } from './routes/account'
 import { Route as InstallationsRouteImport } from './routes/installations'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as ProjectsRouteImport } from './routes/projects'
 import { Route as SetupRouteImport } from './routes/setup'
 import { Route as InstallationsInstallationIdRouteImport } from './routes/installations_.$installationId'
+import { Route as ProjectsProjectIdRouteImport } from './routes/projects_.$projectId'
+import { Route as ProjectsNewRouteImport } from './routes/projects_.new'
+import { Route as ProjectsProjectIdChangesRouteImport } from './routes/projects_.$projectId_.changes'
+import { Route as ProjectsProjectIdSettingsRouteImport } from './routes/projects_.$projectId_.settings'
+import { Route as ProjectsProjectIdSynchronizationRouteImport } from './routes/projects_.$projectId_.synchronization'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -36,6 +42,11 @@ const LoginRoute = LoginRouteImport.update({
   path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ProjectsRoute = ProjectsRouteImport.update({
+  id: '/projects',
+  path: '/projects',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SetupRoute = SetupRouteImport.update({
   id: '/setup',
   path: '/setup',
@@ -47,22 +58,62 @@ const InstallationsInstallationIdRoute =
     path: '/installations/$installationId',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ProjectsProjectIdRoute = ProjectsProjectIdRouteImport.update({
+  id: '/projects_/$projectId',
+  path: '/projects/$projectId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProjectsNewRoute = ProjectsNewRouteImport.update({
+  id: '/projects_/new',
+  path: '/projects/new',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProjectsProjectIdChangesRoute =
+  ProjectsProjectIdChangesRouteImport.update({
+    id: '/projects_/$projectId_/changes',
+    path: '/projects/$projectId/changes',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ProjectsProjectIdSettingsRoute =
+  ProjectsProjectIdSettingsRouteImport.update({
+    id: '/projects_/$projectId_/settings',
+    path: '/projects/$projectId/settings',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ProjectsProjectIdSynchronizationRoute =
+  ProjectsProjectIdSynchronizationRouteImport.update({
+    id: '/projects_/$projectId_/synchronization',
+    path: '/projects/$projectId/synchronization',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/account': typeof AccountRoute
   '/installations': typeof InstallationsRoute
   '/login': typeof LoginRoute
+  '/projects': typeof ProjectsRoute
   '/setup': typeof SetupRoute
   '/installations/$installationId': typeof InstallationsInstallationIdRoute
+  '/projects/$projectId': typeof ProjectsProjectIdRoute
+  '/projects/new': typeof ProjectsNewRoute
+  '/projects/$projectId/changes': typeof ProjectsProjectIdChangesRoute
+  '/projects/$projectId/settings': typeof ProjectsProjectIdSettingsRoute
+  '/projects/$projectId/synchronization': typeof ProjectsProjectIdSynchronizationRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/account': typeof AccountRoute
   '/installations': typeof InstallationsRoute
   '/login': typeof LoginRoute
+  '/projects': typeof ProjectsRoute
   '/setup': typeof SetupRoute
   '/installations/$installationId': typeof InstallationsInstallationIdRoute
+  '/projects/$projectId': typeof ProjectsProjectIdRoute
+  '/projects/new': typeof ProjectsNewRoute
+  '/projects/$projectId/changes': typeof ProjectsProjectIdChangesRoute
+  '/projects/$projectId/settings': typeof ProjectsProjectIdSettingsRoute
+  '/projects/$projectId/synchronization': typeof ProjectsProjectIdSynchronizationRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -70,8 +121,14 @@ export interface FileRoutesById {
   '/account': typeof AccountRoute
   '/installations': typeof InstallationsRoute
   '/login': typeof LoginRoute
+  '/projects': typeof ProjectsRoute
   '/setup': typeof SetupRoute
   '/installations_/$installationId': typeof InstallationsInstallationIdRoute
+  '/projects_/$projectId': typeof ProjectsProjectIdRoute
+  '/projects_/new': typeof ProjectsNewRoute
+  '/projects_/$projectId_/changes': typeof ProjectsProjectIdChangesRoute
+  '/projects_/$projectId_/settings': typeof ProjectsProjectIdSettingsRoute
+  '/projects_/$projectId_/synchronization': typeof ProjectsProjectIdSynchronizationRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -80,24 +137,42 @@ export interface FileRouteTypes {
     | '/account'
     | '/installations'
     | '/login'
+    | '/projects'
     | '/setup'
     | '/installations/$installationId'
+    | '/projects/$projectId'
+    | '/projects/new'
+    | '/projects/$projectId/changes'
+    | '/projects/$projectId/settings'
+    | '/projects/$projectId/synchronization'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/account'
     | '/installations'
     | '/login'
+    | '/projects'
     | '/setup'
     | '/installations/$installationId'
+    | '/projects/$projectId'
+    | '/projects/new'
+    | '/projects/$projectId/changes'
+    | '/projects/$projectId/settings'
+    | '/projects/$projectId/synchronization'
   id:
     | '__root__'
     | '/'
     | '/account'
     | '/installations'
     | '/login'
+    | '/projects'
     | '/setup'
     | '/installations_/$installationId'
+    | '/projects_/$projectId'
+    | '/projects_/new'
+    | '/projects_/$projectId_/changes'
+    | '/projects_/$projectId_/settings'
+    | '/projects_/$projectId_/synchronization'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -105,8 +180,14 @@ export interface RootRouteChildren {
   AccountRoute: typeof AccountRoute
   InstallationsRoute: typeof InstallationsRoute
   LoginRoute: typeof LoginRoute
+  ProjectsRoute: typeof ProjectsRoute
   SetupRoute: typeof SetupRoute
   InstallationsInstallationIdRoute: typeof InstallationsInstallationIdRoute
+  ProjectsProjectIdRoute: typeof ProjectsProjectIdRoute
+  ProjectsNewRoute: typeof ProjectsNewRoute
+  ProjectsProjectIdChangesRoute: typeof ProjectsProjectIdChangesRoute
+  ProjectsProjectIdSettingsRoute: typeof ProjectsProjectIdSettingsRoute
+  ProjectsProjectIdSynchronizationRoute: typeof ProjectsProjectIdSynchronizationRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -139,6 +220,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/projects': {
+      id: '/projects'
+      path: '/projects'
+      fullPath: '/projects'
+      preLoaderRoute: typeof ProjectsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/setup': {
       id: '/setup'
       path: '/setup'
@@ -153,6 +241,41 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof InstallationsInstallationIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/projects_/$projectId': {
+      id: '/projects_/$projectId'
+      path: '/projects/$projectId'
+      fullPath: '/projects/$projectId'
+      preLoaderRoute: typeof ProjectsProjectIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/projects_/new': {
+      id: '/projects_/new'
+      path: '/projects/new'
+      fullPath: '/projects/new'
+      preLoaderRoute: typeof ProjectsNewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/projects_/$projectId_/changes': {
+      id: '/projects_/$projectId_/changes'
+      path: '/projects/$projectId/changes'
+      fullPath: '/projects/$projectId/changes'
+      preLoaderRoute: typeof ProjectsProjectIdChangesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/projects_/$projectId_/settings': {
+      id: '/projects_/$projectId_/settings'
+      path: '/projects/$projectId/settings'
+      fullPath: '/projects/$projectId/settings'
+      preLoaderRoute: typeof ProjectsProjectIdSettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/projects_/$projectId_/synchronization': {
+      id: '/projects_/$projectId_/synchronization'
+      path: '/projects/$projectId/synchronization'
+      fullPath: '/projects/$projectId/synchronization'
+      preLoaderRoute: typeof ProjectsProjectIdSynchronizationRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -161,8 +284,14 @@ const rootRouteChildren: RootRouteChildren = {
   AccountRoute: AccountRoute,
   InstallationsRoute: InstallationsRoute,
   LoginRoute: LoginRoute,
+  ProjectsRoute: ProjectsRoute,
   SetupRoute: SetupRoute,
   InstallationsInstallationIdRoute: InstallationsInstallationIdRoute,
+  ProjectsProjectIdRoute: ProjectsProjectIdRoute,
+  ProjectsNewRoute: ProjectsNewRoute,
+  ProjectsProjectIdChangesRoute: ProjectsProjectIdChangesRoute,
+  ProjectsProjectIdSettingsRoute: ProjectsProjectIdSettingsRoute,
+  ProjectsProjectIdSynchronizationRoute: ProjectsProjectIdSynchronizationRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

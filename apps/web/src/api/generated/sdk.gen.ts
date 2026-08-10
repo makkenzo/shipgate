@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { CreateDiagnosticJobData, CreateDiagnosticJobErrors, CreateDiagnosticJobResponses, CreateProjectData, CreateProjectErrors, CreateProjectResponses, DeleteLocalAccountData, DeleteLocalAccountErrors, DeleteLocalAccountResponses, DeleteProjectData, DeleteProjectErrors, DeleteProjectResponses, DisconnectGitHubData, DisconnectGitHubErrors, DisconnectGitHubResponses, GetAuthSessionData, GetAuthSessionErrors, GetAuthSessionResponses, GetConnectionConfigurationData, GetConnectionConfigurationErrors, GetConnectionConfigurationResponses, GetDiagnosticJobData, GetDiagnosticJobErrors, GetDiagnosticJobResponses, GetHealthData, GetHealthErrors, GetHealthResponses, GetInstallationData, GetInstallationErrors, GetInstallationResponses, GetInstallationsData, GetInstallationsErrors, GetInstallationsResponses, GetProjectChangesData, GetProjectChangesErrors, GetProjectChangesResponses, GetProjectData, GetProjectErrors, GetProjectResponses, GetProjectsData, GetProjectsErrors, GetProjectsResponses, GetReadinessData, GetReadinessErrors, GetReadinessResponses, LogoutData, LogoutErrors, LogoutResponses, UpdateProjectData, UpdateProjectErrors, UpdateProjectResponses } from './types.gen';
+import type { CreateDiagnosticJobData, CreateDiagnosticJobErrors, CreateDiagnosticJobResponses, CreateProjectData, CreateProjectErrors, CreateProjectResponses, DeleteLocalAccountData, DeleteLocalAccountErrors, DeleteLocalAccountResponses, DeleteProjectData, DeleteProjectErrors, DeleteProjectResponses, DisconnectGitHubData, DisconnectGitHubErrors, DisconnectGitHubResponses, GetAuthSessionData, GetAuthSessionErrors, GetAuthSessionResponses, GetConnectionConfigurationData, GetConnectionConfigurationErrors, GetConnectionConfigurationResponses, GetDiagnosticJobData, GetDiagnosticJobErrors, GetDiagnosticJobResponses, GetHealthData, GetHealthErrors, GetHealthResponses, GetInstallationData, GetInstallationErrors, GetInstallationResponses, GetInstallationsData, GetInstallationsErrors, GetInstallationsResponses, GetProjectChangesData, GetProjectChangesErrors, GetProjectChangesResponses, GetProjectData, GetProjectErrors, GetProjectOverviewData, GetProjectOverviewErrors, GetProjectOverviewResponses, GetProjectResponses, GetProjectsData, GetProjectsErrors, GetProjectsResponses, GetProjectSynchronizationData, GetProjectSynchronizationErrors, GetProjectSynchronizationResponses, GetReadinessData, GetReadinessErrors, GetReadinessResponses, LogoutData, LogoutErrors, LogoutResponses, ReconcileProjectData, ReconcileProjectErrors, ReconcileProjectResponses, UpdateProjectData, UpdateProjectErrors, UpdateProjectResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -177,6 +177,49 @@ export const updateProject = <ThrowOnError extends boolean = false>(options: Opt
             type: 'apiKey'
         }],
     url: '/api/v1/projects/{projectId}',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Get the repository dashboard projection for a project
+ */
+export const getProjectOverview = <ThrowOnError extends boolean = false>(options: Options<GetProjectOverviewData, ThrowOnError>): RequestResult<GetProjectOverviewResponses, GetProjectOverviewErrors, ThrowOnError> => (options.client ?? client).get<GetProjectOverviewResponses, GetProjectOverviewErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: '__Host-shipgate_session',
+            type: 'apiKey'
+        }],
+    url: '/api/v1/projects/{projectId}/overview',
+    ...options
+});
+
+/**
+ * Get repository synchronization history and detected issues
+ */
+export const getProjectSynchronization = <ThrowOnError extends boolean = false>(options: Options<GetProjectSynchronizationData, ThrowOnError>): RequestResult<GetProjectSynchronizationResponses, GetProjectSynchronizationErrors, ThrowOnError> => (options.client ?? client).get<GetProjectSynchronizationResponses, GetProjectSynchronizationErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: '__Host-shipgate_session',
+            type: 'apiKey'
+        }],
+    url: '/api/v1/projects/{projectId}/synchronization',
+    ...options
+});
+
+/**
+ * Queue an authoritative repository reconciliation
+ */
+export const reconcileProject = <ThrowOnError extends boolean = false>(options: Options<ReconcileProjectData, ThrowOnError>): RequestResult<ReconcileProjectResponses, ReconcileProjectErrors, ThrowOnError> => (options.client ?? client).post<ReconcileProjectResponses, ReconcileProjectErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: '__Host-shipgate_session',
+            type: 'apiKey'
+        }],
+    url: '/api/v1/projects/{projectId}/reconciliation',
     ...options,
     headers: {
         'Content-Type': 'application/json',

@@ -563,7 +563,7 @@ export type CreateProjectResponses = {
         };
         reconciliation: {
             requestId: string;
-            status: 'queued';
+            status: 'queued' | 'running' | 'succeeded' | 'superseded' | 'failed' | 'cancelled';
             configurationVersion: number;
             reason: string;
             mode: 'full';
@@ -783,7 +783,7 @@ export type UpdateProjectResponses = {
         };
         reconciliation: {
             requestId: string;
-            status: 'queued';
+            status: 'queued' | 'running' | 'succeeded' | 'superseded' | 'failed' | 'cancelled';
             configurationVersion: number;
             reason: string;
             mode: 'full';
@@ -829,7 +829,7 @@ export type UpdateProjectResponses = {
         };
         reconciliation: {
             requestId: string;
-            status: 'queued';
+            status: 'queued' | 'running' | 'succeeded' | 'superseded' | 'failed' | 'cancelled';
             configurationVersion: number;
             reason: string;
             mode: 'full';
@@ -841,6 +841,298 @@ export type UpdateProjectResponses = {
 };
 
 export type UpdateProjectResponse = UpdateProjectResponses[keyof UpdateProjectResponses];
+
+export type GetProjectOverviewData = {
+    body?: never;
+    path: {
+        projectId: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{projectId}/overview';
+};
+
+export type GetProjectOverviewErrors = {
+    /**
+     * ApiError
+     *
+     * Common error response returned by the Shipgate API.
+     */
+    default: {
+        code: string;
+        message: string;
+        requestId: string;
+        details?: unknown;
+    };
+};
+
+export type GetProjectOverviewError = GetProjectOverviewErrors[keyof GetProjectOverviewErrors];
+
+export type GetProjectOverviewResponses = {
+    /**
+     * ProjectOverview
+     *
+     * Default Response
+     */
+    200: {
+        /**
+         * Project
+         */
+        project: {
+            id: string;
+            installationId: number;
+            repositoryId: number;
+            repository: {
+                ownerId: number;
+                ownerLogin: string;
+                name: string;
+                fullName: string;
+                defaultBranch: string | null;
+            };
+            sourceBranch: string;
+            productionBranch: string;
+            status: 'initializing' | 'active' | 'degraded' | 'disconnected' | 'pending_deletion' | 'deleted';
+            sourceSha: string | null;
+            productionSha: string | null;
+            lastSuccessfulSynchronization: string | null;
+            configurationVersion: number;
+            requiredCheckPolicyVersion: number;
+            requiredCheckOverrides: Array<{
+                context: string;
+                integrationId: number | null;
+            }>;
+            deletionRequestedAt: string | null;
+            createdAt: string;
+            updatedAt: string;
+        };
+        branches: {
+            source: {
+                name: string;
+                sha: string | null;
+                protected: boolean | null;
+                defaultBranch: boolean | null;
+                observedAt: string | null;
+            };
+            production: {
+                name: string;
+                sha: string | null;
+                protected: boolean | null;
+                defaultBranch: boolean | null;
+                observedAt: string | null;
+            };
+        };
+        counts: {
+            unreleasedChanges: number;
+            partiallyPresentChanges: number;
+            unknownChanges: number;
+            unmanagedCommits: number;
+            ambiguousCommits: number;
+        };
+        requiredChecks: {
+            policyVersion: number;
+            state: 'not_configured' | 'not_applicable' | 'successful' | 'pending' | 'failed' | 'missing' | 'stale' | 'unknown';
+            checks: Array<{
+                id: string;
+                context: string;
+                integrationId: number | null;
+                source: 'branch_protection' | 'repository_ruleset' | 'project_override';
+                sourceReference: string | null;
+                state: 'not_configured' | 'not_applicable' | 'successful' | 'pending' | 'failed' | 'missing' | 'stale' | 'unknown';
+                stateCounts: {
+                    pending: number;
+                    successful: number;
+                    failed: number;
+                    missing: number;
+                    stale: number;
+                };
+            }>;
+        };
+        lastSynchronization: {
+            id: string;
+            status: 'queued' | 'running' | 'succeeded' | 'superseded' | 'failed';
+            reason: string;
+            configurationVersion: number;
+            classification: 'expected_change' | 'recoverable_drift' | 'destructive_history_change' | 'permission_problem' | 'unknown_inconsistency' | null;
+            sourceSha: string | null;
+            productionSha: string | null;
+            startedAt: string;
+            completedAt: string | null;
+            durationMs: number | null;
+            errorCode: string | null;
+            errorMessage: string | null;
+            differenceSummary: unknown;
+            issueCount: number;
+        } | null;
+        health: {
+            state: 'healthy' | 'attention' | 'initializing' | 'synchronizing' | 'degraded' | 'disconnected' | 'deleting';
+            summary: string;
+            reasons: Array<{
+                severity: 'info' | 'warning' | 'error';
+                code: string;
+                message: string;
+            }>;
+        };
+    };
+};
+
+export type GetProjectOverviewResponse = GetProjectOverviewResponses[keyof GetProjectOverviewResponses];
+
+export type GetProjectSynchronizationData = {
+    body?: never;
+    path: {
+        projectId: string;
+    };
+    query?: {
+        limit?: number;
+    };
+    url: '/api/v1/projects/{projectId}/synchronization';
+};
+
+export type GetProjectSynchronizationErrors = {
+    /**
+     * ApiError
+     *
+     * Common error response returned by the Shipgate API.
+     */
+    default: {
+        code: string;
+        message: string;
+        requestId: string;
+        details?: unknown;
+    };
+};
+
+export type GetProjectSynchronizationError = GetProjectSynchronizationErrors[keyof GetProjectSynchronizationErrors];
+
+export type GetProjectSynchronizationResponses = {
+    /**
+     * ProjectSynchronization
+     *
+     * Default Response
+     */
+    200: {
+        /**
+         * Project
+         */
+        project: {
+            id: string;
+            installationId: number;
+            repositoryId: number;
+            repository: {
+                ownerId: number;
+                ownerLogin: string;
+                name: string;
+                fullName: string;
+                defaultBranch: string | null;
+            };
+            sourceBranch: string;
+            productionBranch: string;
+            status: 'initializing' | 'active' | 'degraded' | 'disconnected' | 'pending_deletion' | 'deleted';
+            sourceSha: string | null;
+            productionSha: string | null;
+            lastSuccessfulSynchronization: string | null;
+            configurationVersion: number;
+            requiredCheckPolicyVersion: number;
+            requiredCheckOverrides: Array<{
+                context: string;
+                integrationId: number | null;
+            }>;
+            deletionRequestedAt: string | null;
+            createdAt: string;
+            updatedAt: string;
+        };
+        health: {
+            state: 'healthy' | 'attention' | 'initializing' | 'synchronizing' | 'degraded' | 'disconnected' | 'deleting';
+            summary: string;
+            reasons: Array<{
+                severity: 'info' | 'warning' | 'error';
+                code: string;
+                message: string;
+            }>;
+        };
+        runs: Array<{
+            id: string;
+            status: 'queued' | 'running' | 'succeeded' | 'superseded' | 'failed';
+            reason: string;
+            configurationVersion: number;
+            classification: 'expected_change' | 'recoverable_drift' | 'destructive_history_change' | 'permission_problem' | 'unknown_inconsistency' | null;
+            sourceSha: string | null;
+            productionSha: string | null;
+            startedAt: string;
+            completedAt: string | null;
+            durationMs: number | null;
+            errorCode: string | null;
+            errorMessage: string | null;
+            differenceSummary: unknown;
+            issueCount: number;
+            requestedAt: string;
+            coalescedCount: number;
+            forcePush: boolean;
+            triggerScope: unknown;
+            issues: Array<{
+                id: string;
+                severity: 'warning' | 'error';
+                code: string;
+                scope: 'repository' | 'branch' | 'change' | 'commit' | 'check';
+                subjectId: string | null;
+                message: string;
+                details: unknown;
+                createdAt: string;
+            }>;
+        }>;
+    };
+};
+
+export type GetProjectSynchronizationResponse = GetProjectSynchronizationResponses[keyof GetProjectSynchronizationResponses];
+
+export type ReconcileProjectData = {
+    body: {
+        expectedConfigurationVersion: number;
+    };
+    headers?: {
+        'x-csrf-token'?: string;
+    };
+    path: {
+        projectId: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{projectId}/reconciliation';
+};
+
+export type ReconcileProjectErrors = {
+    /**
+     * ApiError
+     *
+     * Common error response returned by the Shipgate API.
+     */
+    default: {
+        code: string;
+        message: string;
+        requestId: string;
+        details?: unknown;
+    };
+};
+
+export type ReconcileProjectError = ReconcileProjectErrors[keyof ReconcileProjectErrors];
+
+export type ReconcileProjectResponses = {
+    /**
+     * Default Response
+     */
+    202: {
+        reconciliation: {
+            requestId: string;
+            status: 'queued' | 'running' | 'succeeded' | 'superseded' | 'failed' | 'cancelled';
+            configurationVersion: number;
+            reason: string;
+            mode: 'full';
+            sourceSha: string;
+            productionSha: string;
+            requestedAt: string;
+        };
+    };
+};
+
+export type ReconcileProjectResponse = ReconcileProjectResponses[keyof ReconcileProjectResponses];
 
 export type GetProjectChangesData = {
     body?: never;
@@ -877,12 +1169,16 @@ export type GetProjectChangesResponses = {
             githubPullRequestId: number;
             pullRequestNumber: number;
             title: string;
+            url: string | null;
             authorId: number | null;
             authorLogin: string | null;
             mergedAt: string;
             mergeMethod: 'merge' | 'squash' | 'rebase' | 'unknown';
-            commitSetFingerprint: string;
-            productionPresence: 'unreleased' | 'partially_present';
+            commitCount: number;
+            commitSetFingerprint: string | null;
+            synchronizationState: 'known' | 'unknown';
+            productionPresence: 'unreleased' | 'partially_present' | 'unknown';
+            checkState: 'not_configured' | 'not_applicable' | 'successful' | 'pending' | 'failed' | 'missing' | 'stale' | 'unknown';
             finalHeadSha: string;
             commitShas: Array<string>;
             requiredChecks: Array<{

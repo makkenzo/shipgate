@@ -18,15 +18,27 @@ import {
   updateProjectRequiredCheckOverrides,
 } from './configuration-store.js'
 import {
+  loadProjectOverview,
+  loadProjectSynchronizationHistory,
+  type ProjectOverview,
+  type ProjectSynchronizationHistory,
+} from './dashboard.js'
+import {
   ProjectConfigurationValidationError,
   ProjectNotFoundError,
   ProjectVersionConflictError,
   RepositoryAlreadyConnectedError,
 } from './errors.js'
-import type { ChangeAheadOfProduction, ProjectRecord, RequiredCheckOverride } from './model.js'
+import type {
+  ChangeAheadOfProduction,
+  ProjectRecord,
+  ReconciliationRequestRecord,
+  RequiredCheckOverride,
+} from './model.js'
 import { withRepositoryTransaction } from './repository-transaction.js'
 import { normalizeRequiredCheckOverrides } from './required-checks.js'
 import { getProject, listChangesAheadOfProduction } from './store.js'
+import { queueRepositoryReconciliationForProject } from './sync-queue.js'
 import type { ProjectTopologyValidator } from './topology.js'
 
 export interface ProjectService {
@@ -44,10 +56,25 @@ export interface ProjectService {
 
   get(actorGitHubUserId: number, projectId: string): Promise<ProjectRecord>
 
+  getOverview(actorGitHubUserId: number, projectId: string): Promise<ProjectOverview>
+
+  getSynchronization(
+    actorGitHubUserId: number,
+    projectId: string,
+    limit?: number,
+  ): Promise<ProjectSynchronizationHistory>
+
   listChanges(
     actorGitHubUserId: number,
     projectId: string,
   ): Promise<readonly ChangeAheadOfProduction[]>
+
+  reconcile(input: {
+    readonly actorGitHubUserId: number
+    readonly projectId: string
+    readonly expectedConfigurationVersion: number
+    readonly correlationId: string
+  }): Promise<ReconciliationRequestRecord>
 
   update(input: {
     readonly actorGitHubUserId: number
@@ -122,13 +149,19 @@ export function createProjectService(options: {
     },
 
     async get(actorGitHubUserId, projectId) {
-      const project = await requireStoredProject(options.database, projectId)
+      return requireReadableProject(options, actorGitHubUserId, projectId)
+    },
 
-      if (!(await canReadProject(options, actorGitHubUserId, project))) {
-        throw new ProjectNotFoundError(projectId)
-      }
+    async getOverview(actorGitHubUserId, projectId) {
+      const project = await requireReadableProject(options, actorGitHubUserId, projectId)
 
-      return project
+      return loadProjectOverview(options.database, project)
+    },
+
+    async getSynchronization(actorGitHubUserId, projectId, limit) {
+      const project = await requireReadableProject(options, actorGitHubUserId, projectId)
+
+      return loadProjectSynchronizationHistory(options.database, project, limit)
     },
 
     async listChanges(actorGitHubUserId, projectId) {
@@ -139,6 +172,65 @@ export function createProjectService(options: {
       }
 
       return listChangesAheadOfProduction(options.database, project.id)
+    },
+
+    async reconcile(input) {
+      const project = await requireStoredProject(options.database, input.projectId)
+      const installationId = parseGitHubId(project.installationId, 'installation ID')
+      const repositoryId = parseGitHubId(project.repositoryId, 'repository ID')
+
+      if (project.configurationVersion !== input.expectedConfigurationVersion) {
+        throw new ProjectVersionConflictError(
+          project.id,
+          input.expectedConfigurationVersion,
+          project.configurationVersion,
+        )
+      }
+
+      await requireRepositoryPermission(options, {
+        githubUserId: input.actorGitHubUserId,
+        installationId,
+        repositoryId,
+        permission: 'maintain',
+      })
+      await assertProjectAppPermissions(options.database, installationId)
+
+      if (!['initializing', 'active', 'degraded', 'disconnected'].includes(project.status)) {
+        throw new ProjectConfigurationValidationError(
+          'project_not_active',
+          `Project ${project.id} is ${project.status} and cannot be reconciled`,
+        )
+      }
+
+      if (!project.sourceSha || !project.productionSha) {
+        throw new ProjectConfigurationValidationError(
+          'repository_state_changed',
+          'Project branch heads have not been observed yet',
+        )
+      }
+
+      const reconciliation = await queueRepositoryReconciliationForProject(options.database, {
+        projectId: project.id,
+        reason: 'manual_reconciliation',
+        requestedByGitHubUserId: String(input.actorGitHubUserId),
+        deduplicationKey: input.correlationId,
+        correlationId: input.correlationId,
+        causationId: `http:${input.correlationId}`,
+        triggerScope: {
+          reasons: ['manual_reconciliation'],
+          branchNames: [project.sourceBranch, project.productionBranch],
+          requireReconciliation: true,
+        },
+      })
+
+      if (!reconciliation) {
+        throw new ProjectConfigurationValidationError(
+          'repository_state_changed',
+          'Project changed before reconciliation could be queued',
+        )
+      }
+
+      return reconciliation
     },
 
     async update(input) {
@@ -249,8 +341,26 @@ export function createProjectService(options: {
   }
 }
 
+async function requireReadableProject(
+  options: {
+    readonly database: DatabaseClient
+    readonly githubRepositoryAccess: GitHubRepositoryAccessService
+  },
+  githubUserId: number,
+  projectId: string,
+): Promise<ProjectRecord> {
+  const project = await requireStoredProject(options.database, projectId)
+
+  if (!(await canReadProject(options, githubUserId, project))) {
+    throw new ProjectNotFoundError(projectId)
+  }
+
+  return project
+}
+
 async function canReadProject(
   options: {
+    readonly database: DatabaseClient
     readonly githubRepositoryAccess: GitHubRepositoryAccessService
   },
   githubUserId: number,
@@ -267,7 +377,26 @@ async function canReadProject(
       },
     })
 
-    return decision.allowed
+    if (decision.allowed) {
+      return true
+    }
+
+    if (
+      decision.reason !== 'installation_suspended' &&
+      decision.reason !== 'insufficient_app_permission'
+    ) {
+      return false
+    }
+
+    const localAccess = await options.database.kysely
+      .selectFrom('github_user_installation_repositories')
+      .select('repository_id')
+      .where('github_user_id', '=', String(githubUserId))
+      .where('installation_id', '=', project.installationId)
+      .where('repository_id', '=', project.repositoryId)
+      .executeTakeFirst()
+
+    return localAccess !== undefined
   } catch (cause) {
     throw createAccessVerificationError(cause)
   }
@@ -331,7 +460,9 @@ async function assertProjectAppPermissions(
     .select(['permission_name', 'permission_level'])
     .where('installation_id', '=', String(installationId))
     .execute()
-  const actual = new Map(rows.map((row) => [row.permission_name, row.permission_level] as const))
+  const actual = new Map<string, InstallationPermissionLevel>(
+    rows.map((row) => [row.permission_name, row.permission_level] as const),
+  )
   const missing = Object.entries(GITHUB_APP_REPOSITORY_PERMISSIONS)
     .filter(([name, required]) => !permissionSatisfies(actual.get(name), required))
     .map(([name, required]) => ({ name, required, actual: actual.get(name) ?? null }))

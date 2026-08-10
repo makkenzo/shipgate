@@ -1,13 +1,12 @@
 import { randomUUID } from 'node:crypto'
 
 import type {
-  DatabaseClient,
   DatabaseSchema,
   JsonValue,
   ProjectAuditSource,
   RequiredCheckSource,
 } from '@shipgate/database'
-import type { Selectable, Transaction } from 'kysely'
+import type { Kysely, Selectable, Transaction } from 'kysely'
 
 import { ProjectNotFoundError, ProjectVersionConflictError } from './errors.js'
 import type {
@@ -125,14 +124,14 @@ export async function applyRequiredCheckProjectionInTransaction(
 }
 
 export async function loadRequiredCheckStatesForChanges(
-  database: DatabaseClient,
+  database: Kysely<DatabaseSchema>,
   changeIds: readonly string[],
 ): Promise<ReadonlyMap<string, readonly ChangeRequiredCheckState[]>> {
   if (changeIds.length === 0) {
     return new Map()
   }
 
-  const rows = await database.kysely
+  const rows = await database
     .selectFrom('change_required_check_states as state')
     .innerJoin('required_checks as required', 'required.id', 'state.required_check_id')
     .select([
@@ -158,7 +157,7 @@ export async function loadRequiredCheckStatesForChanges(
   const evidenceRows =
     evidenceIds.size === 0
       ? []
-      : await database.kysely
+      : await database
           .selectFrom('commit_check_results')
           .selectAll()
           .where('id', 'in', [...evidenceIds])

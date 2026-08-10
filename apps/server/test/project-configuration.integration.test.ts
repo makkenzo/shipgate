@@ -198,6 +198,32 @@ describe.sequential('Project configuration persistence', () => {
       }),
     ).rejects.toMatchObject({ code: 'permission_missing' })
   })
+
+  it('rejects a repository when the installation is missing required app permissions', async () => {
+    const service = createProjectService({
+      database,
+      githubRepositoryAccess: createAccessService(true),
+      topologyValidator: createTopologyValidator(),
+    })
+
+    await expect(
+      service.create({
+        actorGitHubUserId,
+        installationId: 124,
+        repositoryId: 457,
+        sourceBranch: 'develop',
+        productionBranch: 'main',
+        correlationId: 'test:app-permissions',
+      }),
+    ).rejects.toMatchObject({
+      code: 'app_permissions_missing',
+      details: {
+        missing: expect.arrayContaining([
+          expect.objectContaining({ name: 'metadata', required: 'read', actual: null }),
+        ]),
+      },
+    })
+  })
 })
 
 function createAccessService(allowed: boolean): GitHubRepositoryAccessService {
