@@ -140,6 +140,31 @@ describe('read-only Git workspace', () => {
       [fixture.rebasedSecondSha, 3, fixture.rebasedSecondSha],
     ])
   })
+
+  it('detects a cherry-picked subset after production is merged back into source', async () => {
+    const fixture = await createPartialProductionFixture()
+    const workspace = createReadOnlyGitWorkspace({
+      temporaryRoot: fixture.root,
+      allowFileProtocol: true,
+    })
+
+    const snapshot = await workspace.loadRepositorySnapshot({
+      cloneUrl: pathToFileURL(fixture.origin).href,
+      installationToken: 'installation-token',
+      sourceBranch: 'source',
+      productionBranch: 'production',
+      sourceSha: fixture.sourceSha,
+      productionSha: fixture.productionSha,
+    })
+
+    expect(
+      snapshot.commits.map((commit) => [commit.sha, commit.productionPatchEquivalent]),
+    ).toEqual([
+      [fixture.sourceFirstSha, true],
+      [fixture.sourceSecondSha, false],
+      [fixture.sourceMergeSha, false],
+    ])
+  })
 })
 
 async function createGitFixture(): Promise<{
@@ -278,8 +303,90 @@ async function createTopologyFixture(): Promise<{
   }
 }
 
-async function git(args: readonly string[]): Promise<void> {
-  await execFileAsync('git', [...args], { encoding: 'utf8' })
+async function createPartialProductionFixture(): Promise<{
+  readonly root: string
+  readonly origin: string
+  readonly productionSha: string
+  readonly sourceFirstSha: string
+  readonly sourceSecondSha: string
+  readonly sourceMergeSha: string
+  readonly sourceSha: string
+}> {
+  const root = await mkdtemp(path.join(tmpdir(), 'shipgate-git-partial-production-test-'))
+  roots.push(root)
+  const repository = path.join(root, 'repository')
+  const origin = path.join(root, 'origin.git')
+  await mkdir(repository)
+  await git(['init', repository])
+  await git(['-C', repository, 'config', 'user.name', 'Shipgate Test'])
+  await git(['-C', repository, 'config', 'user.email', 'shipgate@example.test'])
+  await writeFile(path.join(repository, 'base.txt'), 'production\n')
+  await git(['-C', repository, 'add', 'base.txt'])
+  await git(['-C', repository, 'commit', '-m', 'production'], {
+    GIT_AUTHOR_DATE: '2026-08-05T00:00:00Z',
+    GIT_COMMITTER_DATE: '2026-08-05T00:00:00Z',
+  })
+  const baseSha = await revParse(repository, 'HEAD')
+  await git(['-C', repository, 'branch', 'production', baseSha])
+  await git(['-C', repository, 'checkout', '-b', 'source'])
+  await writeFile(path.join(repository, 'partial-a.txt'), 'partial A\n')
+  await git(['-C', repository, 'add', 'partial-a.txt'])
+  await git(['-C', repository, 'commit', '-m', 'partial A'], {
+    GIT_AUTHOR_DATE: '2026-08-05T00:01:00Z',
+    GIT_COMMITTER_DATE: '2026-08-05T00:01:00Z',
+  })
+  const sourceFirstSha = await revParse(repository, 'HEAD')
+  await writeFile(path.join(repository, 'partial-b.txt'), 'partial B\n')
+  await git(['-C', repository, 'add', 'partial-b.txt'])
+  await git(['-C', repository, 'commit', '-m', 'partial B'], {
+    GIT_AUTHOR_DATE: '2026-08-05T00:02:00Z',
+    GIT_COMMITTER_DATE: '2026-08-05T00:02:00Z',
+  })
+  const sourceSecondSha = await revParse(repository, 'HEAD')
+  await git(['-C', repository, 'checkout', 'production'])
+  await git(['-C', repository, 'cherry-pick', sourceFirstSha], {
+    GIT_COMMITTER_DATE: '2026-08-05T00:03:00Z',
+  })
+  const productionSha = await revParse(repository, 'HEAD')
+
+  if (productionSha === sourceFirstSha) {
+    throw new Error('Partial-production fixture did not create a distinct cherry-pick commit')
+  }
+
+  await git(['-C', repository, 'checkout', 'source'])
+  await git(['-C', repository, 'merge', '--no-ff', 'production', '-m', 'merge production'], {
+    GIT_AUTHOR_DATE: '2026-08-05T00:04:00Z',
+    GIT_COMMITTER_DATE: '2026-08-05T00:04:00Z',
+  })
+  const sourceMergeSha = await revParse(repository, 'HEAD')
+  const sourceSha = sourceMergeSha
+  await git(['init', '--bare', origin])
+  await git(['-C', repository, 'remote', 'add', 'origin', pathToFileURL(origin).href])
+  await git([
+    '-C',
+    repository,
+    'push',
+    'origin',
+    'production:refs/heads/production',
+    'source:refs/heads/source',
+  ])
+
+  return {
+    root,
+    origin,
+    productionSha,
+    sourceFirstSha,
+    sourceSecondSha,
+    sourceMergeSha,
+    sourceSha,
+  }
+}
+
+async function git(args: readonly string[], environment: NodeJS.ProcessEnv = {}): Promise<void> {
+  await execFileAsync('git', [...args], {
+    encoding: 'utf8',
+    env: { ...process.env, ...environment },
+  })
 }
 
 async function revParse(repository: string, ref: string): Promise<string> {

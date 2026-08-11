@@ -1,8 +1,10 @@
 import { Buffer } from 'node:buffer'
-import { execFile } from 'node:child_process'
+import { type ChildProcess, execFile, spawn } from 'node:child_process'
 import { chmod, mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import type { Readable } from 'node:stream'
+import { pipeline } from 'node:stream/promises'
 import { promisify } from 'node:util'
 
 import { ProjectConfigurationValidationError } from './errors.js'
@@ -254,14 +256,18 @@ export function createReadOnlyGitWorkspace(
             timeoutMs,
             signal: input.signal,
           })
-          const productionEquivalentShas = await readProductionPatchEquivalence(
+          const productionEquivalentShas = await readProductionPatchEquivalence({
             gitCommand,
             workspace,
-            input.productionSha,
-            input.sourceSha,
+            productionSha: input.productionSha,
+            sourceSha: input.sourceSha,
+            firstParentShas,
+            commits: baseCommits,
             timeoutMs,
-            input.signal,
-          )
+            maximumCommitCount,
+            signal: input.signal,
+            environment: createAuthenticatedGitEnvironment(input.installationToken),
+          })
           const firstParentPositions = new Map(
             firstParentShas.map((sha, position) => [sha, position] as const),
           )
@@ -552,46 +558,312 @@ async function readIntroducedCommits(input: {
   return parseShaLines(result.stdout, 'introduced commit SHA')
 }
 
-async function readProductionPatchEquivalence(
-  gitCommand: string,
-  workspace: string,
-  productionSha: string,
-  sourceSha: string,
-  timeoutMs: number,
-  signal: AbortSignal | undefined,
-): Promise<ReadonlySet<string>> {
-  if (productionSha === sourceSha) {
+async function readProductionPatchEquivalence(input: {
+  readonly gitCommand: string
+  readonly workspace: string
+  readonly productionSha: string
+  readonly sourceSha: string
+  readonly firstParentShas: readonly string[]
+  readonly commits: readonly GitRepositoryCommit[]
+  readonly timeoutMs: number
+  readonly maximumCommitCount: number
+  readonly signal: AbortSignal | undefined
+  readonly environment: NodeJS.ProcessEnv
+}): Promise<ReadonlySet<string>> {
+  if (input.productionSha === input.sourceSha || input.firstParentShas.length === 0) {
     return new Set()
   }
 
-  const result = await runGit(gitCommand, ['-C', workspace, 'cherry', productionSha, sourceSha], {
-    timeoutMs,
-    signal,
+  /*
+   * `git cherry` drops production commits once production is merged back into source because
+   * those commits are then reachable from both refs. Compare explicit stable patch IDs instead.
+   */
+  const firstIntegrationSha = input.firstParentShas[0]
+  const firstIntegration = input.commits.find((commit) => commit.sha === firstIntegrationSha)
+  const sourceBaselineSha = firstIntegration?.parentShas[0]
+
+  if (!firstIntegration || !sourceBaselineSha) {
+    throw createGitWorkspaceFailure(
+      'Unable to determine the source baseline for production patch comparison',
+    )
+  }
+
+  const comparisonBaseSha = await readMergeBase(
+    input.gitCommand,
+    input.workspace,
+    input.productionSha,
+    sourceBaselineSha,
+    input.timeoutMs,
+    input.signal,
+  )
+  const productionRange = `${comparisonBaseSha}..${input.productionSha}`
+  const productionCommitCount = await countNonMergeCommits(
+    input.gitCommand,
+    input.workspace,
+    productionRange,
+    input.timeoutMs,
+    input.signal,
+  )
+
+  if (productionCommitCount > input.maximumCommitCount) {
+    throw new ProjectConfigurationValidationError(
+      'external_state_unknown',
+      `Production patch comparison exceeds the ${input.maximumCommitCount} commit safety limit`,
+      {
+        details: {
+          commitCount: productionCommitCount,
+          maximumCommitCount: input.maximumCommitCount,
+          comparisonBaseSha,
+          productionSha: input.productionSha,
+        },
+      },
+    )
+  }
+
+  if (productionCommitCount === 0) {
+    return new Set()
+  }
+
+  const productionPatchIds = await readStablePatchIdsForRange({
+    ...input,
+    range: productionRange,
   })
+  const sourcePatchIds = await readStablePatchIdsForRange({
+    ...input,
+    range: `${input.productionSha}..${input.sourceSha}`,
+  })
+  const productionPatchIdSet = new Set(productionPatchIds.values())
   const equivalents = new Set<string>()
 
-  for (const line of result.stdout.split('\n')) {
+  for (const [commitSha, patchId] of sourcePatchIds) {
+    if (productionPatchIdSet.has(patchId)) {
+      equivalents.add(commitSha)
+    }
+  }
+
+  return equivalents
+}
+
+async function countNonMergeCommits(
+  gitCommand: string,
+  workspace: string,
+  range: string,
+  timeoutMs: number,
+  signal: AbortSignal | undefined,
+): Promise<number> {
+  const result = await runGit(
+    gitCommand,
+    ['-C', workspace, 'rev-list', '--count', '--no-merges', range],
+    { timeoutMs, signal },
+  )
+  const count = Number(result.stdout.trim())
+
+  if (!Number.isSafeInteger(count) || count < 0) {
+    throw createGitWorkspaceFailure(`Git returned an invalid commit count for ${range}`)
+  }
+
+  return count
+}
+
+async function readStablePatchIdsForRange(input: {
+  readonly gitCommand: string
+  readonly workspace: string
+  readonly range: string
+  readonly timeoutMs: number
+  readonly signal: AbortSignal | undefined
+  readonly environment: NodeJS.ProcessEnv
+}): Promise<ReadonlyMap<string, string>> {
+  if (input.signal?.aborted) {
+    throw input.signal.reason instanceof Error
+      ? input.signal.reason
+      : new Error('Git workspace operation was aborted')
+  }
+
+  const environment = {
+    ...process.env,
+    ...input.environment,
+  }
+  const logProcess = spawn(
+    input.gitCommand,
+    [
+      '-C',
+      input.workspace,
+      'log',
+      '--no-merges',
+      '--no-color',
+      '--no-ext-diff',
+      '--no-textconv',
+      '--no-renames',
+      '--full-index',
+      '--binary',
+      '--diff-algorithm=myers',
+      '--pretty=format:commit %H',
+      '--patch',
+      input.range,
+    ],
+    {
+      env: environment,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      windowsHide: true,
+    },
+  )
+  const patchIdProcess = spawn(input.gitCommand, ['-C', input.workspace, 'patch-id', '--stable'], {
+    env: environment,
+    stdio: ['pipe', 'pipe', 'pipe'],
+    windowsHide: true,
+  })
+
+  if (
+    !logProcess.stdout ||
+    !logProcess.stderr ||
+    !patchIdProcess.stdin ||
+    !patchIdProcess.stdout ||
+    !patchIdProcess.stderr
+  ) {
+    terminateChildProcess(logProcess)
+    terminateChildProcess(patchIdProcess)
+    throw createGitWorkspaceFailure('Unable to create the Git patch-id comparison pipeline')
+  }
+
+  let timedOut = false
+  const terminate = () => {
+    terminateChildProcess(logProcess)
+    terminateChildProcess(patchIdProcess)
+  }
+  const timeout = setTimeout(() => {
+    timedOut = true
+    terminate()
+  }, input.timeoutMs)
+  timeout.unref()
+  const abort = () => terminate()
+  input.signal?.addEventListener('abort', abort, { once: true })
+
+  const logExit = waitForChildProcess(logProcess)
+  const patchIdExit = waitForChildProcess(patchIdProcess)
+  const pipeResult = pipeline(logProcess.stdout, patchIdProcess.stdin).then(
+    () => undefined,
+    (error: unknown) => error,
+  )
+
+  try {
+    const [logExitCode, patchIdExitCode, output, logStderr, patchIdStderr, pipeError] =
+      await Promise.all([
+        logExit,
+        patchIdExit,
+        collectChildOutput(patchIdProcess.stdout, 'Git patch-id output'),
+        collectChildOutput(logProcess.stderr, 'Git log stderr'),
+        collectChildOutput(patchIdProcess.stderr, 'Git patch-id stderr'),
+        pipeResult,
+      ])
+
+    if (input.signal?.aborted) {
+      throw input.signal.reason instanceof Error
+        ? input.signal.reason
+        : new Error('Git workspace operation was aborted')
+    }
+
+    if (timedOut) {
+      throw createGitWorkspaceFailure('Git patch-id comparison timed out')
+    }
+
+    if (logExitCode !== 0) {
+      throw createGitWorkspaceFailure('Git log failed during patch-id comparison', logStderr)
+    }
+
+    if (patchIdExitCode !== 0) {
+      throw createGitWorkspaceFailure(
+        'Git patch-id failed during production comparison',
+        patchIdStderr,
+      )
+    }
+
+    if (pipeError !== undefined) {
+      throw createGitWorkspaceFailure('Git patch-id pipeline failed', undefined, pipeError)
+    }
+
+    return parseStablePatchIds(output)
+  } catch (error) {
+    terminate()
+
+    if (input.signal?.aborted) {
+      throw input.signal.reason instanceof Error
+        ? input.signal.reason
+        : new Error('Git workspace operation was aborted')
+    }
+
+    if (timedOut) {
+      throw createGitWorkspaceFailure('Git patch-id comparison timed out')
+    }
+
+    throw error
+  } finally {
+    clearTimeout(timeout)
+    input.signal?.removeEventListener('abort', abort)
+  }
+}
+
+function parseStablePatchIds(value: string): ReadonlyMap<string, string> {
+  const patchIds = new Map<string, string>()
+
+  for (const line of value.split('\n')) {
     const trimmed = line.trim()
 
     if (trimmed.length === 0) {
       continue
     }
 
-    const match = /^([+-])\s+([0-9a-f]{40,64})$/i.exec(trimmed)
+    const match = /^([0-9a-f]{40,64})\s+([0-9a-f]{40,64})$/i.exec(trimmed)
 
     if (!match?.[1] || !match[2]) {
-      throw createGitWorkspaceFailure(`Git returned an invalid cherry record: ${trimmed}`)
+      throw createGitWorkspaceFailure(`Git returned an invalid patch-id record: ${trimmed}`)
     }
 
-    const sha = match[2].toLowerCase()
-    assertSha(sha, 'git cherry commit SHA')
+    const patchId = match[1].toLowerCase()
+    const commitSha = match[2].toLowerCase()
+    assertSha(patchId, 'stable patch ID')
+    assertSha(commitSha, 'patch-id commit SHA')
 
-    if (match[1] === '-') {
-      equivalents.add(sha)
+    const existing = patchIds.get(commitSha)
+
+    if (existing !== undefined && existing !== patchId) {
+      throw createGitWorkspaceFailure(`Git returned conflicting patch IDs for commit ${commitSha}`)
     }
+
+    patchIds.set(commitSha, patchId)
   }
 
-  return equivalents
+  return patchIds
+}
+
+async function collectChildOutput(stream: Readable, name: string): Promise<string> {
+  const chunks: Buffer[] = []
+  let size = 0
+
+  for await (const value of stream) {
+    const chunk = Buffer.isBuffer(value) ? value : Buffer.from(value)
+    size += chunk.length
+
+    if (size > gitOutputLimitBytes) {
+      throw createGitWorkspaceFailure(`${name} exceeded the ${gitOutputLimitBytes} byte limit`)
+    }
+
+    chunks.push(chunk)
+  }
+
+  return Buffer.concat(chunks, size).toString('utf8')
+}
+
+function waitForChildProcess(child: ChildProcess): Promise<number | null> {
+  return new Promise((resolve, reject) => {
+    child.once('error', reject)
+    child.once('close', (exitCode) => resolve(exitCode))
+  })
+}
+
+function terminateChildProcess(child: ChildProcess): void {
+  if (child.exitCode === null && child.signalCode === null) {
+    child.kill('SIGKILL')
+  }
 }
 
 function parseShaLines(value: string, name: string): string[] {
