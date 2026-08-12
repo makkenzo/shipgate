@@ -297,7 +297,7 @@ async function insertPolicyAuditEvent(
   },
 ): Promise<void> {
   await transaction
-    .insertInto('project_audit_events')
+    .insertInto('audit_events')
     .values({
       id: randomUUID(),
       project_id: input.projectId,
@@ -309,6 +309,18 @@ async function insertPolicyAuditEvent(
       event_type: input.eventType,
       source: input.trigger.auditSource,
       configuration_version: input.configurationVersion,
+      entity_type: 'project',
+      entity_id: input.projectId,
+      correlation_id: null,
+      reason_code: input.trigger.reason,
+      before_state: JSON.stringify({
+        policyVersion: input.previousPolicyVersion,
+        checks: input.previous,
+      }),
+      after_state: JSON.stringify({
+        policyVersion: input.policyVersion,
+        checks: input.current,
+      }),
       payload: JSON.stringify({
         reason: input.trigger.reason,
         previousPolicyVersion: input.previousPolicyVersion,

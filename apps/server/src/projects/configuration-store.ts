@@ -117,6 +117,7 @@ export async function createConfiguredProject(input: {
     actorId,
     eventType: 'project_created',
     configurationVersion: 1,
+    correlationId: input.correlationId,
     payload: {
       installationId,
       repositoryId,
@@ -234,6 +235,7 @@ export async function updateConfiguredProject(input: {
     actorId,
     eventType: 'project_configuration_changed',
     configurationVersion: nextVersion,
+    correlationId: input.correlationId,
     payload: {
       previous: {
         sourceBranch: project.source_branch,
@@ -347,6 +349,7 @@ export async function updateProjectRequiredCheckOverrides(input: {
     actorId,
     eventType: 'project_required_check_overrides_changed',
     configurationVersion: nextVersion,
+    correlationId: input.correlationId,
     payload: { previous, current },
     now,
   })
@@ -632,12 +635,13 @@ async function insertAuditEvent(
     readonly actorId: string
     readonly eventType: ProjectAuditEventType
     readonly configurationVersion: number
+    readonly correlationId?: string
     readonly payload: JsonValue
     readonly now: Date
   },
 ): Promise<void> {
   await transaction
-    .insertInto('project_audit_events')
+    .insertInto('audit_events')
     .values({
       id: randomUUID(),
       project_id: input.projectId,
@@ -646,6 +650,12 @@ async function insertAuditEvent(
       event_type: input.eventType,
       source: 'user',
       configuration_version: input.configurationVersion,
+      entity_type: 'project',
+      entity_id: input.projectId,
+      correlation_id: input.correlationId ?? null,
+      reason_code: input.eventType,
+      before_state: null,
+      after_state: null,
       payload: JSON.stringify(input.payload),
       occurred_at: input.now,
     })

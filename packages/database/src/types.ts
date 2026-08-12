@@ -45,6 +45,18 @@ export interface DatabaseSchema {
 
   change_commits: ChangeCommitTable
 
+  change_qa_assessments: ChangeQaAssessmentTable
+
+  effective_change_qa_assessments: EffectiveChangeQaAssessmentView
+
+  change_dependencies: ChangeDependencyTable
+
+  release_candidates: ReleaseCandidateTable
+
+  candidate_exclusions: CandidateExclusionTable
+
+  release_candidate_evaluations: ReleaseCandidateEvaluationTable
+
   required_checks: RequiredCheckTable
 
   commit_check_results: CommitCheckResultTable
@@ -55,7 +67,7 @@ export interface DatabaseSchema {
 
   repository_sync_issues: RepositorySyncIssueTable
 
-  project_audit_events: ProjectAuditEventTable
+  audit_events: AuditEventTable
 
   repository_reconciliation_requests: RepositoryReconciliationRequestTable
 
@@ -506,6 +518,108 @@ export interface RepositorySyncIssueTable {
   created_at: Generated<Date>
 }
 
+export type QaAssessmentStatus = 'pending' | 'passed' | 'failed'
+
+export interface ChangeQaAssessmentTable {
+  id: string
+  project_id: string
+  repository_id: string
+  change_id: string
+  final_head_sha: string
+  commit_set_fingerprint: string
+  sequence: number
+  status: QaAssessmentStatus
+  actor_github_user_id: string | null
+  comment: string | null
+  previous_status: QaAssessmentStatus | null
+  correlation_id: string
+  reason_code: string
+  created_at: Generated<Date>
+}
+
+export interface EffectiveChangeQaAssessmentView {
+  id: ColumnType<string, never, never>
+  project_id: ColumnType<string, never, never>
+  repository_id: ColumnType<string, never, never>
+  change_id: ColumnType<string, never, never>
+  final_head_sha: ColumnType<string, never, never>
+  commit_set_fingerprint: ColumnType<string, never, never>
+  sequence: ColumnType<number, never, never>
+  status: ColumnType<QaAssessmentStatus, never, never>
+  actor_github_user_id: ColumnType<string | null, never, never>
+  comment: ColumnType<string | null, never, never>
+  previous_status: ColumnType<QaAssessmentStatus | null, never, never>
+  correlation_id: ColumnType<string, never, never>
+  reason_code: ColumnType<string, never, never>
+  created_at: ColumnType<Date, never, never>
+}
+
+export type ChangeDependencySource = 'user' | 'managed_pr_body' | 'system'
+
+export interface ChangeDependencyTable {
+  project_id: string
+  repository_id: string
+  dependent_change_id: string
+  prerequisite_change_id: string
+  source: ChangeDependencySource
+  actor_github_user_id: string | null
+  comment: string | null
+  version: number
+  created_at: Generated<Date>
+  updated_at: Generated<Date>
+}
+
+export type ReleaseCandidateState = 'open' | 'revision_active' | 'completed' | 'cancelled'
+
+export interface ReleaseCandidateTable {
+  id: string
+  project_id: string
+  repository_id: string
+  sequence: number
+  state: Generated<ReleaseCandidateState>
+  version: Generated<number>
+  created_by_github_user_id: string
+  note: string | null
+  latest_evaluation_version: number | null
+  closed_at: Date | null
+  created_at: Generated<Date>
+  updated_at: Generated<Date>
+}
+
+export interface CandidateExclusionTable {
+  candidate_id: string
+  project_id: string
+  repository_id: string
+  change_id: string
+  actor_github_user_id: string
+  reason: string | null
+  candidate_version: number
+  created_at: Generated<Date>
+  updated_at: Generated<Date>
+}
+
+export type ReleaseCandidateEvaluationResult = 'ready' | 'blocked'
+
+export interface ReleaseCandidateEvaluationTable {
+  id: string
+  candidate_id: string
+  project_id: string
+  repository_id: string
+  evaluation_version: number
+  candidate_version: number
+  configuration_version: number
+  source_sha: string
+  production_sha: string
+  projection_fingerprint: string
+  required_check_policy_version: number
+  result: ReleaseCandidateEvaluationResult
+  evaluation_fingerprint: string
+  summary: ColumnType<JsonValue, string, string>
+  blockers: ColumnType<JsonValue, string, string>
+  evaluated_at: Date
+  created_at: Generated<Date>
+}
+
 export type ProjectAuditEventType =
   | 'project_created'
   | 'project_configuration_changed'
@@ -514,16 +628,44 @@ export type ProjectAuditEventType =
   | 'required_check_policy_refreshed'
   | 'project_deletion_requested'
 
-export type ProjectAuditSource = 'user' | 'system' | 'reconciliation'
+export type ReleasePlanningAuditEventType =
+  | 'qa_assessment_recorded'
+  | 'qa_assessment_reset'
+  | 'dependencies_replaced'
+  | 'release_candidate_created'
+  | 'change_excluded_from_candidate'
+  | 'change_restored_to_candidate'
+  | 'release_candidate_evaluated'
 
-export interface ProjectAuditEventTable {
+export type AuditEventType = ProjectAuditEventType | ReleasePlanningAuditEventType
+
+export type AuditEventSource = 'user' | 'webhook' | 'reconciliation' | 'system'
+
+export type ProjectAuditSource = Exclude<AuditEventSource, 'webhook'>
+
+export type AuditEntityType =
+  | 'project'
+  | 'change'
+  | 'qa_assessment'
+  | 'dependency'
+  | 'release_candidate'
+  | 'candidate_exclusion'
+  | 'release_candidate_evaluation'
+
+export interface AuditEventTable {
   id: string
   project_id: string
   repository_id: string
   actor_github_user_id: string | null
-  event_type: ProjectAuditEventType
-  source: ProjectAuditSource
-  configuration_version: number
+  event_type: AuditEventType
+  source: AuditEventSource
+  configuration_version: number | null
+  entity_type: AuditEntityType
+  entity_id: string
+  correlation_id: string | null
+  reason_code: string | null
+  before_state: ColumnType<JsonValue | null, string | null | undefined, string | null>
+  after_state: ColumnType<JsonValue | null, string | null | undefined, string | null>
   payload: ColumnType<JsonValue, string, string>
   occurred_at: Date
   created_at: Generated<Date>
