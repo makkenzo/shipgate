@@ -8,6 +8,18 @@ export class ProjectNotFoundError extends Error {
   }
 }
 
+export class ChangeNotFoundError extends Error {
+  readonly projectId: string
+  readonly changeId: string
+
+  constructor(projectId: string, changeId: string) {
+    super(`Change ${changeId} was not found in project ${projectId}`)
+    this.name = 'ChangeNotFoundError'
+    this.projectId = projectId
+    this.changeId = changeId
+  }
+}
+
 export class ProjectVersionConflictError extends Error {
   readonly projectId: string
   readonly expectedVersion: number
@@ -95,6 +107,9 @@ export type ProjectConfigurationValidationCode =
   | 'repository_state_changed'
   | 'external_state_unknown'
   | 'project_not_active'
+  | 'change_identity_unknown'
+  | 'change_not_releasable'
+  | 'invalid_qa_comment'
 
 export class ProjectConfigurationValidationError extends Error {
   readonly code: ProjectConfigurationValidationCode

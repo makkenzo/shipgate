@@ -35,6 +35,13 @@ import type {
   ReconciliationRequestRecord,
   RequiredCheckOverride,
 } from './model.js'
+import {
+  type ChangeQaMutationResult,
+  resetQaStatus as executeResetQaStatus,
+  setQaStatus as executeSetQaStatus,
+  type ResetQaStatus,
+  type SetQaStatus,
+} from './qa-workflow.js'
 import { withRepositoryTransaction } from './repository-transaction.js'
 import { normalizeRequiredCheckOverrides } from './required-checks.js'
 import { getProject, listChangesAheadOfProduction } from './store.js'
@@ -68,6 +75,10 @@ export interface ProjectService {
     actorGitHubUserId: number,
     projectId: string,
   ): Promise<readonly ChangeAheadOfProduction[]>
+
+  setQaStatus(input: SetQaStatus): Promise<ChangeQaMutationResult>
+
+  resetQaStatus(input: ResetQaStatus): Promise<ChangeQaMutationResult>
 
   reconcile(input: {
     readonly actorGitHubUserId: number
@@ -172,6 +183,42 @@ export function createProjectService(options: {
       }
 
       return listChangesAheadOfProduction(options.database, project.id)
+    },
+
+    async setQaStatus(input) {
+      const project = await requireStoredProject(options.database, input.projectId)
+      const installationId = parseGitHubId(project.installationId, 'installation ID')
+      const repositoryId = parseGitHubId(project.repositoryId, 'repository ID')
+
+      options.githubRepositoryAccess.invalidateUser(input.actorGitHubUserId)
+      await requireRepositoryPermission(options, {
+        githubUserId: input.actorGitHubUserId,
+        installationId,
+        repositoryId,
+        permission: 'triage',
+      })
+
+      return withRepositoryTransaction(options.database, repositoryId, (scope) =>
+        executeSetQaStatus(scope, input),
+      )
+    },
+
+    async resetQaStatus(input) {
+      const project = await requireStoredProject(options.database, input.projectId)
+      const installationId = parseGitHubId(project.installationId, 'installation ID')
+      const repositoryId = parseGitHubId(project.repositoryId, 'repository ID')
+
+      options.githubRepositoryAccess.invalidateUser(input.actorGitHubUserId)
+      await requireRepositoryPermission(options, {
+        githubUserId: input.actorGitHubUserId,
+        installationId,
+        repositoryId,
+        permission: 'triage',
+      })
+
+      return withRepositoryTransaction(options.database, repositoryId, (scope) =>
+        executeResetQaStatus(scope, input),
+      )
     },
 
     async reconcile(input) {
@@ -410,7 +457,7 @@ async function requireRepositoryPermission(
     readonly githubUserId: number
     readonly installationId: number
     readonly repositoryId: number
-    readonly permission: 'read' | 'maintain'
+    readonly permission: 'read' | 'triage' | 'maintain'
   },
 ): Promise<void> {
   let decision: RepositoryAccessDecision
@@ -445,10 +492,21 @@ async function requireRepositoryPermission(
   throw new ProjectConfigurationValidationError(
     code,
     code === 'permission_missing'
-      ? 'GitHub Maintain or Admin repository permission is required'
+      ? `GitHub ${requiredPermissionLabel(input.permission)} repository permission is required`
       : 'GitHub repository access validation failed',
     { details: { reason: decision.reason } },
   )
+}
+
+function requiredPermissionLabel(permission: 'read' | 'triage' | 'maintain'): string {
+  switch (permission) {
+    case 'read':
+      return 'Read or higher'
+    case 'triage':
+      return 'Triage or higher'
+    case 'maintain':
+      return 'Maintain or Admin'
+  }
 }
 
 async function assertProjectAppPermissions(

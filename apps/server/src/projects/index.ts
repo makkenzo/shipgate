@@ -22,6 +22,7 @@ export {
   summarizeProjectCheckState,
 } from './dashboard.js'
 export {
+  ChangeNotFoundError,
   type ProjectConfigurationValidationCode,
   ProjectConfigurationValidationError,
   ProjectNotFoundError,
@@ -57,6 +58,7 @@ export type {
   ApplyRepositoryProjectionResult,
   ChangeAheadOfProduction,
   ChangeProjection,
+  ChangeQaState,
   ChangeRequiredCheckState,
   CommitCheckResultProjection,
   CreateProjectInput,
@@ -75,6 +77,14 @@ export type {
   RequiredCheckState,
   UnmanagedCommitRecord,
 } from './model.js'
+export {
+  type CandidateReevaluation,
+  type ChangeQaMutationResult,
+  type ResetQaStatus,
+  resetQaStatus,
+  type SetQaStatus,
+  setQaStatus,
+} from './qa-workflow.js'
 export {
   assertRepositoryLock,
   assertRepositoryTransaction,

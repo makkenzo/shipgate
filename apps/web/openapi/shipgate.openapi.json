@@ -4728,7 +4728,7 @@
     "/api/v1/projects/{projectId}/changes": {
       "get": {
         "operationId": "getProjectChanges",
-        "summary": "List unreleased changes with required-check states",
+        "summary": "List unreleased changes with QA and required-check states",
         "tags": ["Projects"],
         "parameters": [
           {
@@ -4775,6 +4775,7 @@
                           "synchronizationState",
                           "productionPresence",
                           "checkState",
+                          "qa",
                           "finalHeadSha",
                           "commitShas",
                           "requiredChecks"
@@ -4925,6 +4926,76 @@
                                 "enum": ["unknown"]
                               }
                             ]
+                          },
+                          "qa": {
+                            "type": "object",
+                            "required": [
+                              "status",
+                              "assessmentId",
+                              "comment",
+                              "actorGitHubUserId",
+                              "assessedAt"
+                            ],
+                            "properties": {
+                              "status": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "enum": ["pending"]
+                                  },
+                                  {
+                                    "type": "string",
+                                    "enum": ["passed"]
+                                  },
+                                  {
+                                    "type": "string",
+                                    "enum": ["failed"]
+                                  }
+                                ]
+                              },
+                              "assessmentId": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "comment": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "actorGitHubUserId": {
+                                "anyOf": [
+                                  {
+                                    "type": "integer",
+                                    "minimum": 1
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "assessedAt": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              }
+                            },
+                            "additionalProperties": false
                           },
                           "finalHeadSha": {
                             "type": "string"
@@ -5205,6 +5276,233 @@
                         },
                         "additionalProperties": false
                       }
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Common error response returned by the Shipgate API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["code", "message", "requestId"],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "minLength": 1,
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "details": {}
+                  },
+                  "additionalProperties": false,
+                  "title": "ApiError",
+                  "description": "Common error response returned by the Shipgate API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{projectId}/changes/{changeId}/qa": {
+      "put": {
+        "operationId": "setProjectChangeQa",
+        "summary": "Set QA status for the current version of a change",
+        "tags": ["Projects"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["status"],
+                "properties": {
+                  "status": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": ["pending"]
+                      },
+                      {
+                        "type": "string",
+                        "enum": ["passed"]
+                      },
+                      {
+                        "type": "string",
+                        "enum": ["failed"]
+                      }
+                    ]
+                  },
+                  "comment": {
+                    "type": "string",
+                    "maxLength": 4000
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "in": "path",
+            "name": "projectId",
+            "required": true
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "in": "path",
+            "name": "changeId",
+            "required": true
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            "in": "header",
+            "name": "x-csrf-token",
+            "required": false
+          }
+        ],
+        "security": [
+          {
+            "shipgateSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["status", "qa", "candidateReevaluation"],
+                  "properties": {
+                    "status": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": ["recorded"]
+                        },
+                        {
+                          "type": "string",
+                          "enum": ["already_applied"]
+                        }
+                      ]
+                    },
+                    "qa": {
+                      "type": "object",
+                      "required": [
+                        "status",
+                        "assessmentId",
+                        "comment",
+                        "actorGitHubUserId",
+                        "assessedAt"
+                      ],
+                      "properties": {
+                        "status": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": ["pending"]
+                            },
+                            {
+                              "type": "string",
+                              "enum": ["passed"]
+                            },
+                            {
+                              "type": "string",
+                              "enum": ["failed"]
+                            }
+                          ]
+                        },
+                        "assessmentId": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "comment": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "actorGitHubUserId": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "minimum": 1
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "assessedAt": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "candidateReevaluation": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "required": ["candidateId", "candidateVersion"],
+                          "properties": {
+                            "candidateId": {
+                              "type": "string"
+                            },
+                            "candidateVersion": {
+                              "type": "integer",
+                              "minimum": 1
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
                     }
                   },
                   "additionalProperties": false

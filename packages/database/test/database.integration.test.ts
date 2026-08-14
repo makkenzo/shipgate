@@ -30,6 +30,7 @@ const expectedMigrationNames = [
   '20260805_000014_create_required_check_projection',
   '20260805_000015_create_incremental_repository_sync',
   '20260811_000016_create_release_planning_persistence',
+  '20260812_000017_create_qa_workflow',
 ] as const
 
 describe.sequential('PostgreSQL infrastructure', () => {

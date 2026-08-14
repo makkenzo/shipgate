@@ -317,6 +317,7 @@ export interface ProjectTable {
   configuration_version: Generated<number>
   required_check_policy_version: Generated<number>
   required_check_overrides: ColumnType<JsonValue, string, string>
+  qa_reset_epoch: Generated<number>
   deletion_requested_at: Date | null
   deleted_at: Date | null
   created_at: Generated<Date>
@@ -534,6 +535,7 @@ export interface ChangeQaAssessmentTable {
   previous_status: QaAssessmentStatus | null
   correlation_id: string
   reason_code: string
+  qa_reset_epoch: Generated<number>
   created_at: Generated<Date>
 }
 
@@ -551,6 +553,7 @@ export interface EffectiveChangeQaAssessmentView {
   previous_status: ColumnType<QaAssessmentStatus | null, never, never>
   correlation_id: ColumnType<string, never, never>
   reason_code: ColumnType<string, never, never>
+  qa_reset_epoch: ColumnType<number, never, never>
   created_at: ColumnType<Date, never, never>
 }
 

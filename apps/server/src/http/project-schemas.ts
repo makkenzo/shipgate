@@ -46,6 +46,57 @@ export const ProjectParamsSchema = Type.Object(
   { additionalProperties: false },
 )
 
+export const ProjectChangeParamsSchema = Type.Object(
+  {
+    projectId: Type.String({ minLength: 1, maxLength: 128 }),
+    changeId: Type.String({ minLength: 1, maxLength: 128 }),
+  },
+  { additionalProperties: false },
+)
+
+export const QaStatusSchema = Type.Union([
+  Type.Literal('pending'),
+  Type.Literal('passed'),
+  Type.Literal('failed'),
+])
+
+export const ChangeQaStateSchema = Type.Object(
+  {
+    status: QaStatusSchema,
+    assessmentId: Type.Union([Type.String(), Type.Null()]),
+    comment: Type.Union([Type.String(), Type.Null()]),
+    actorGitHubUserId: Type.Union([Type.Integer({ minimum: 1 }), Type.Null()]),
+    assessedAt: Type.Union([Type.String(), Type.Null()]),
+  },
+  { additionalProperties: false },
+)
+
+export const ProjectChangeQaBodySchema = Type.Object(
+  {
+    status: QaStatusSchema,
+    comment: Type.Optional(Type.String({ maxLength: 4_000 })),
+  },
+  { additionalProperties: false },
+)
+
+export const ProjectChangeQaResponseSchema = Type.Object(
+  {
+    status: Type.Union([Type.Literal('recorded'), Type.Literal('already_applied')]),
+    qa: ChangeQaStateSchema,
+    candidateReevaluation: Type.Union([
+      Type.Object(
+        {
+          candidateId: Type.String(),
+          candidateVersion: Type.Integer({ minimum: 1 }),
+        },
+        { additionalProperties: false },
+      ),
+      Type.Null(),
+    ]),
+  },
+  { additionalProperties: false },
+)
+
 export const DeleteProjectQuerySchema = Type.Object(
   {
     expectedConfigurationVersion: Type.Integer({ minimum: 1 }),
@@ -228,6 +279,7 @@ export const ProjectChangesSchema = Type.Object(
             Type.Literal('stale'),
             Type.Literal('unknown'),
           ]),
+          qa: ChangeQaStateSchema,
           finalHeadSha: Type.String(),
           commitShas: Type.Array(Type.String()),
           requiredChecks: Type.Array(ChangeRequiredCheckStateSchema),

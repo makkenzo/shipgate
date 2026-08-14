@@ -7,7 +7,7 @@ import type {
   JsonValue,
   ProjectTable,
 } from '@shipgate/database'
-import type { Kysely, Selectable, Transaction } from 'kysely'
+import { type Kysely, type Selectable, sql, type Transaction } from 'kysely'
 import { summarizeProjectCheckState } from './dashboard.js'
 import {
   ProjectNotFoundError,
@@ -22,6 +22,7 @@ import type {
   ApplyRepositoryProjectionResult,
   ChangeAheadOfProduction,
   ChangeProjection,
+  ChangeQaState,
   CreateProjectInput,
   ProjectRecord,
   RecordRepositorySyncFailureInput,
@@ -299,6 +300,13 @@ export async function archiveRepositoryProjectionInTransaction(
     .executeTakeFirst()
 
   if (inserted) {
+    await transaction
+      .updateTable('projects')
+      .set({ qa_reset_epoch: sql<number>`qa_reset_epoch + 1` })
+      .where('id', '=', input.projectId)
+      .where('repository_id', '=', repositoryId)
+      .executeTakeFirstOrThrow()
+
     return inserted.id
   }
 
@@ -588,6 +596,18 @@ export async function applyRepositoryProjectionInTransaction(
     input.snapshot.issues,
   )
 
+  const destructiveQaResetAlreadyApplied =
+    reconciliationClassification === 'destructive_history_change' &&
+    (await transaction
+      .selectFrom('repository_projection_archives')
+      .select('id')
+      .where('sync_run_id', '=', syncRunId)
+      .where('project_id', '=', input.projectId)
+      .where('repository_id', '=', repositoryId)
+      .executeTakeFirst()) !== undefined
+  const shouldResetQaForDestructiveHistory =
+    reconciliationClassification === 'destructive_history_change' &&
+    !destructiveQaResetAlreadyApplied
   const updated = await transaction
     .updateTable('projects')
     .set({
@@ -606,6 +626,9 @@ export async function applyRepositoryProjectionInTransaction(
       production_sha: input.snapshot.productionSha,
       merge_base_sha: input.snapshot.mergeBaseSha,
       last_successful_sync_at: input.completedAt,
+      ...(shouldResetQaForDestructiveHistory
+        ? { qa_reset_epoch: sql<number>`qa_reset_epoch + 1` }
+        : {}),
       deletion_requested_at: null,
       deleted_at: null,
       updated_at: input.completedAt,
@@ -667,6 +690,9 @@ export async function recordRepositorySyncFailure(
     }
 
     const syncRunId = randomUUID()
+    const reconciliationClassification =
+      input.reconciliationClassification ??
+      (input.disconnectProject === true ? 'permission_problem' : 'unknown_inconsistency')
 
     await transaction
       .insertInto('repository_sync_runs')
@@ -685,9 +711,7 @@ export async function recordRepositorySyncFailure(
         completed_at: input.completedAt,
         error_code: input.errorCode,
         error_message: input.errorMessage ?? null,
-        reconciliation_classification:
-          input.reconciliationClassification ??
-          (input.disconnectProject === true ? 'permission_problem' : 'unknown_inconsistency'),
+        reconciliation_classification: reconciliationClassification,
         difference_summary: JSON.stringify(input.differenceSummary ?? {}),
       })
       .execute()
@@ -700,15 +724,21 @@ export async function recordRepositorySyncFailure(
       input.issues,
     )
 
-    if (input.disconnectProject === true) {
+    if (
+      input.disconnectProject === true ||
+      reconciliationClassification === 'destructive_history_change'
+    ) {
       await transaction
         .updateTable('projects')
         .set({
-          status: 'disconnected',
+          status: input.disconnectProject === true ? 'disconnected' : 'degraded',
+          ...(reconciliationClassification === 'destructive_history_change'
+            ? { qa_reset_epoch: sql<number>`qa_reset_epoch + 1` }
+            : {}),
           updated_at: input.completedAt,
         })
         .where('id', '=', input.projectId)
-        .where('status', 'in', ['active', 'disconnected'])
+        .where('status', 'in', ['initializing', 'active', 'degraded', 'disconnected'])
         .execute()
     }
 
@@ -813,9 +843,30 @@ async function listChangesAheadOfProductionSnapshot(
     commitsByChange.set(commit.change_id, commits)
   }
 
-  const requiredChecksByChange = await loadRequiredCheckStatesForChanges(
-    database,
-    rows.map((row) => row.id),
+  const changeIds = rows.map((row) => row.id)
+  const [requiredChecksByChange, qaRows] = await Promise.all([
+    loadRequiredCheckStatesForChanges(database, changeIds),
+    database
+      .selectFrom('effective_change_qa_assessments')
+      .select(['id', 'change_id', 'status', 'comment', 'actor_github_user_id', 'created_at'])
+      .where('project_id', '=', projectId)
+      .where('change_id', 'in', changeIds)
+      .execute(),
+  ])
+  const qaByChange = new Map<string, ChangeQaState>(
+    qaRows.map(
+      (qa) =>
+        [
+          qa.change_id,
+          {
+            status: qa.status,
+            assessmentId: qa.id,
+            comment: qa.comment,
+            actorGitHubUserId: qa.actor_github_user_id,
+            assessedAt: qa.created_at,
+          },
+        ] as const,
+    ),
   )
 
   return rows.map((row) => {
@@ -845,6 +896,13 @@ async function listChangesAheadOfProductionSnapshot(
         synchronizationState: row.synchronization_state,
         states: requiredChecks.map((required) => required.state),
       }),
+      qa: qaByChange.get(row.id) ?? {
+        status: 'pending',
+        assessmentId: null,
+        comment: null,
+        actorGitHubUserId: null,
+        assessedAt: null,
+      },
       finalHeadSha: row.final_head_sha,
       commitShas: commitsByChange.get(row.id) ?? [],
       requiredChecks,

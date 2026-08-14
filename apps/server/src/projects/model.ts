@@ -7,6 +7,7 @@ import type {
   CommitCheckStatus,
   JsonValue,
   ProjectStatus,
+  QaAssessmentStatus,
   RepositoryReconciliationClassification,
   RepositorySyncIssueScope,
   RepositorySyncIssueSeverity,
@@ -268,6 +269,14 @@ export type RecordRepositorySyncFailureResult =
       readonly syncRunId: string
     }
 
+export interface ChangeQaState {
+  readonly status: QaAssessmentStatus
+  readonly assessmentId: string | null
+  readonly comment: string | null
+  readonly actorGitHubUserId: string | null
+  readonly assessedAt: Date | null
+}
+
 export interface ChangeAheadOfProduction {
   readonly id: string
   readonly githubPullRequestId: string
@@ -285,6 +294,7 @@ export interface ChangeAheadOfProduction {
     'unreleased' | 'partially_present' | 'unknown'
   >
   readonly checkState: ProjectCheckState
+  readonly qa: ChangeQaState
   readonly finalHeadSha: string
   readonly commitShas: readonly string[]
   readonly requiredChecks: readonly ChangeRequiredCheckState[]

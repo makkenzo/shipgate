@@ -4,6 +4,9 @@ import { DatabaseOperationError } from '@shipgate/database'
 import type { ApplicationContext } from '../../application-context.js'
 import type { AuthenticatedSession } from '../../auth/model.js'
 import {
+  ChangeNotFoundError,
+  type ChangeQaMutationResult,
+  type ChangeQaState,
   type ConfigureProjectResult,
   ProjectConfigurationValidationError,
   type ProjectHealth,
@@ -26,6 +29,9 @@ import {
 import {
   CreateProjectBodySchema,
   DeleteProjectQuerySchema,
+  ProjectChangeParamsSchema,
+  ProjectChangeQaBodySchema,
+  ProjectChangeQaResponseSchema,
   ProjectChangesSchema,
   ProjectListSchema,
   ProjectMutationResponseSchema,
@@ -217,7 +223,7 @@ export const projectRoutes: FastifyPluginAsyncTypebox<{
       preHandler: [requireAuthenticatedSession],
       schema: {
         operationId: 'getProjectChanges',
-        summary: 'List unreleased changes with required-check states',
+        summary: 'List unreleased changes with QA and required-check states',
         tags: ['Projects'],
         security: [{ shipgateSession: [] }],
         params: ProjectParamsSchema,
@@ -234,6 +240,47 @@ export const projectRoutes: FastifyPluginAsyncTypebox<{
         )
 
         return { changes: changes.map(mapChange) }
+      } catch (error) {
+        throw mapProjectError(error)
+      }
+    },
+  )
+
+  app.put(
+    '/projects/:projectId/changes/:changeId/qa',
+    {
+      preHandler: [requireAuthenticatedSession, requireCsrfProtection],
+      schema: {
+        operationId: 'setProjectChangeQa',
+        summary: 'Set QA status for the current version of a change',
+        tags: ['Projects'],
+        security: [{ shipgateSession: [] }],
+        headers: CsrfHeadersSchema,
+        params: ProjectChangeParamsSchema,
+        body: ProjectChangeQaBodySchema,
+        response: { 200: ProjectChangeQaResponseSchema, default: ApiErrorSchema },
+      },
+    },
+    async (request) => {
+      const session = requireSession(request.shipgateSession)
+      const common = {
+        actorGitHubUserId: session.githubUserId,
+        projectId: request.params.projectId,
+        changeId: request.params.changeId,
+        correlationId: request.id,
+        ...(request.body.comment !== undefined ? { comment: request.body.comment } : {}),
+      }
+
+      try {
+        const result =
+          request.body.status === 'pending'
+            ? await context.projects.resetQaStatus(common)
+            : await context.projects.setQaStatus({
+                ...common,
+                status: request.body.status,
+              })
+
+        return mapQaMutationResult(result)
       } catch (error) {
         throw mapProjectError(error)
       }
@@ -375,6 +422,7 @@ function mapChange(
     authorId: change.authorId === null ? null : parseSafeId(change.authorId, 'author ID'),
     mergedAt: change.mergedAt.toISOString(),
     commitCount: change.commitShas.length,
+    qa: mapQaState(change.qa),
     commitShas: [...change.commitShas],
     requiredChecks: change.requiredChecks.map((required) => ({
       ...required,
@@ -386,6 +434,25 @@ function mapChange(
         observedAt: observation.observedAt.toISOString(),
       })),
     })),
+  }
+}
+
+function mapQaMutationResult(result: ChangeQaMutationResult) {
+  return {
+    status: result.status,
+    qa: mapQaState(result.qa),
+    candidateReevaluation: result.candidateReevaluation,
+  }
+}
+
+function mapQaState(qa: ChangeQaState) {
+  return {
+    status: qa.status,
+    assessmentId: qa.assessmentId,
+    comment: qa.comment,
+    actorGitHubUserId:
+      qa.actorGitHubUserId === null ? null : parseSafeId(qa.actorGitHubUserId, 'QA actor ID'),
+    assessedAt: qa.assessedAt?.toISOString() ?? null,
   }
 }
 
@@ -502,6 +569,15 @@ function mapProjectError(error: unknown): Error {
     return new ApiHttpError({ statusCode: 404, code: 'PROJECT_NOT_FOUND', message: error.message })
   }
 
+  if (error instanceof ChangeNotFoundError) {
+    return new ApiHttpError({
+      statusCode: 404,
+      code: 'CHANGE_NOT_FOUND',
+      message: error.message,
+      details: { projectId: error.projectId, changeId: error.changeId },
+    })
+  }
+
   if (error instanceof RepositoryAlreadyConnectedError) {
     return new ApiHttpError({
       statusCode: 409,
@@ -555,6 +631,8 @@ function getValidationStatusCode(code: ProjectConfigurationValidationError['code
     case 'app_permissions_missing':
     case 'repository_state_changed':
     case 'project_not_active':
+    case 'change_identity_unknown':
+    case 'change_not_releasable':
       return 409
     case 'invalid_branch_name':
     case 'source_equals_production':
@@ -563,6 +641,7 @@ function getValidationStatusCode(code: ProjectConfigurationValidationError['code
     case 'source_ref_not_commit':
     case 'production_ref_not_commit':
     case 'production_branch_not_ancestor':
+    case 'invalid_qa_comment':
       return 422
   }
 }

@@ -130,6 +130,25 @@ export interface ProjectOverviewBranch {
   readonly observedAt: string | null
 }
 
+export type QaStatus = 'pending' | 'passed' | 'failed'
+
+export interface ChangeQaState {
+  readonly status: QaStatus
+  readonly assessmentId: string | null
+  readonly comment: string | null
+  readonly actorGitHubUserId: number | null
+  readonly assessedAt: string | null
+}
+
+export interface ProjectChangeQaMutationResult {
+  readonly status: 'recorded' | 'already_applied'
+  readonly qa: ChangeQaState
+  readonly candidateReevaluation: {
+    readonly candidateId: string
+    readonly candidateVersion: number
+  } | null
+}
+
 export interface ProjectChange {
   readonly id: string
   readonly githubPullRequestId: number
@@ -145,6 +164,7 @@ export interface ProjectChange {
   readonly synchronizationState: 'known' | 'unknown'
   readonly productionPresence: 'unreleased' | 'partially_present' | 'unknown'
   readonly checkState: ProjectCheckState
+  readonly qa: ChangeQaState
   readonly finalHeadSha: string
   readonly commitShas: readonly string[]
   readonly requiredChecks: readonly {
@@ -234,6 +254,24 @@ export async function getProjectChanges(projectId: string): Promise<readonly Pro
     `/api/v1/projects/${encodeURIComponent(projectId)}/changes`,
   )
   return result.changes
+}
+
+export function setProjectChangeQa(
+  projectId: string,
+  changeId: string,
+  input: {
+    readonly status: QaStatus
+    readonly comment?: string
+  },
+): Promise<ProjectChangeQaMutationResult> {
+  return requestJson(
+    `/api/v1/projects/${encodeURIComponent(projectId)}/changes/${encodeURIComponent(changeId)}/qa`,
+    {
+      method: 'PUT',
+      headers: mutationHeaders(),
+      body: JSON.stringify(input),
+    },
+  )
 }
 
 export function getProjectSynchronization(

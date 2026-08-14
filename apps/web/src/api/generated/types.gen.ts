@@ -1179,6 +1179,13 @@ export type GetProjectChangesResponses = {
             synchronizationState: 'known' | 'unknown';
             productionPresence: 'unreleased' | 'partially_present' | 'unknown';
             checkState: 'not_configured' | 'not_applicable' | 'successful' | 'pending' | 'failed' | 'missing' | 'stale' | 'unknown';
+            qa: {
+                status: 'pending' | 'passed' | 'failed';
+                assessmentId: string | null;
+                comment: string | null;
+                actorGitHubUserId: number | null;
+                assessedAt: string | null;
+            };
             finalHeadSha: string;
             commitShas: Array<string>;
             requiredChecks: Array<{
@@ -1210,6 +1217,60 @@ export type GetProjectChangesResponses = {
 };
 
 export type GetProjectChangesResponse = GetProjectChangesResponses[keyof GetProjectChangesResponses];
+
+export type SetProjectChangeQaData = {
+    body: {
+        status: 'pending' | 'passed' | 'failed';
+        comment?: string;
+    };
+    headers?: {
+        'x-csrf-token'?: string;
+    };
+    path: {
+        projectId: string;
+        changeId: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{projectId}/changes/{changeId}/qa';
+};
+
+export type SetProjectChangeQaErrors = {
+    /**
+     * ApiError
+     *
+     * Common error response returned by the Shipgate API.
+     */
+    default: {
+        code: string;
+        message: string;
+        requestId: string;
+        details?: unknown;
+    };
+};
+
+export type SetProjectChangeQaError = SetProjectChangeQaErrors[keyof SetProjectChangeQaErrors];
+
+export type SetProjectChangeQaResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        status: 'recorded' | 'already_applied';
+        qa: {
+            status: 'pending' | 'passed' | 'failed';
+            assessmentId: string | null;
+            comment: string | null;
+            actorGitHubUserId: number | null;
+            assessedAt: string | null;
+        };
+        candidateReevaluation: {
+            candidateId: string;
+            candidateVersion: number;
+        } | null;
+    };
+};
+
+export type SetProjectChangeQaResponse = SetProjectChangeQaResponses[keyof SetProjectChangeQaResponses];
 
 export type CreateDiagnosticJobData = {
     /**

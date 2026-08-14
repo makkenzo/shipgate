@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { CreateDiagnosticJobData, CreateDiagnosticJobErrors, CreateDiagnosticJobResponses, CreateProjectData, CreateProjectErrors, CreateProjectResponses, DeleteLocalAccountData, DeleteLocalAccountErrors, DeleteLocalAccountResponses, DeleteProjectData, DeleteProjectErrors, DeleteProjectResponses, DisconnectGitHubData, DisconnectGitHubErrors, DisconnectGitHubResponses, GetAuthSessionData, GetAuthSessionErrors, GetAuthSessionResponses, GetConnectionConfigurationData, GetConnectionConfigurationErrors, GetConnectionConfigurationResponses, GetDiagnosticJobData, GetDiagnosticJobErrors, GetDiagnosticJobResponses, GetHealthData, GetHealthErrors, GetHealthResponses, GetInstallationData, GetInstallationErrors, GetInstallationResponses, GetInstallationsData, GetInstallationsErrors, GetInstallationsResponses, GetProjectChangesData, GetProjectChangesErrors, GetProjectChangesResponses, GetProjectData, GetProjectErrors, GetProjectOverviewData, GetProjectOverviewErrors, GetProjectOverviewResponses, GetProjectResponses, GetProjectsData, GetProjectsErrors, GetProjectsResponses, GetProjectSynchronizationData, GetProjectSynchronizationErrors, GetProjectSynchronizationResponses, GetReadinessData, GetReadinessErrors, GetReadinessResponses, LogoutData, LogoutErrors, LogoutResponses, ReconcileProjectData, ReconcileProjectErrors, ReconcileProjectResponses, UpdateProjectData, UpdateProjectErrors, UpdateProjectResponses } from './types.gen';
+import type { CreateDiagnosticJobData, CreateDiagnosticJobErrors, CreateDiagnosticJobResponses, CreateProjectData, CreateProjectErrors, CreateProjectResponses, DeleteLocalAccountData, DeleteLocalAccountErrors, DeleteLocalAccountResponses, DeleteProjectData, DeleteProjectErrors, DeleteProjectResponses, DisconnectGitHubData, DisconnectGitHubErrors, DisconnectGitHubResponses, GetAuthSessionData, GetAuthSessionErrors, GetAuthSessionResponses, GetConnectionConfigurationData, GetConnectionConfigurationErrors, GetConnectionConfigurationResponses, GetDiagnosticJobData, GetDiagnosticJobErrors, GetDiagnosticJobResponses, GetHealthData, GetHealthErrors, GetHealthResponses, GetInstallationData, GetInstallationErrors, GetInstallationResponses, GetInstallationsData, GetInstallationsErrors, GetInstallationsResponses, GetProjectChangesData, GetProjectChangesErrors, GetProjectChangesResponses, GetProjectData, GetProjectErrors, GetProjectOverviewData, GetProjectOverviewErrors, GetProjectOverviewResponses, GetProjectResponses, GetProjectsData, GetProjectsErrors, GetProjectsResponses, GetProjectSynchronizationData, GetProjectSynchronizationErrors, GetProjectSynchronizationResponses, GetReadinessData, GetReadinessErrors, GetReadinessResponses, LogoutData, LogoutErrors, LogoutResponses, ReconcileProjectData, ReconcileProjectErrors, ReconcileProjectResponses, SetProjectChangeQaData, SetProjectChangeQaErrors, SetProjectChangeQaResponses, UpdateProjectData, UpdateProjectErrors, UpdateProjectResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -228,7 +228,7 @@ export const reconcileProject = <ThrowOnError extends boolean = false>(options: 
 });
 
 /**
- * List unreleased changes with required-check states
+ * List unreleased changes with QA and required-check states
  */
 export const getProjectChanges = <ThrowOnError extends boolean = false>(options: Options<GetProjectChangesData, ThrowOnError>): RequestResult<GetProjectChangesResponses, GetProjectChangesErrors, ThrowOnError> => (options.client ?? client).get<GetProjectChangesResponses, GetProjectChangesErrors, ThrowOnError>({
     security: [{
@@ -238,6 +238,23 @@ export const getProjectChanges = <ThrowOnError extends boolean = false>(options:
         }],
     url: '/api/v1/projects/{projectId}/changes',
     ...options
+});
+
+/**
+ * Set QA status for the current version of a change
+ */
+export const setProjectChangeQa = <ThrowOnError extends boolean = false>(options: Options<SetProjectChangeQaData, ThrowOnError>): RequestResult<SetProjectChangeQaResponses, SetProjectChangeQaErrors, ThrowOnError> => (options.client ?? client).put<SetProjectChangeQaResponses, SetProjectChangeQaErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: '__Host-shipgate_session',
+            type: 'apiKey'
+        }],
+    url: '/api/v1/projects/{projectId}/changes/{changeId}/qa',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
 });
 
 /**
