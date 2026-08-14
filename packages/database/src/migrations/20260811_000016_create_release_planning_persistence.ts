@@ -82,9 +82,19 @@ export const up: Migration['up'] = async (database) => {
     .execute()
 
   await sql`
+    alter table audit_events disable trigger audit_events_append_only;
+    alter table audit_events disable trigger audit_events_repository_projection_write_guard
+  `.execute(database)
+
+  await sql`
     update audit_events
     set entity_id = project_id
     where entity_id is null
+  `.execute(database)
+
+  await sql`
+    alter table audit_events enable trigger audit_events_repository_projection_write_guard;
+    alter table audit_events enable trigger audit_events_append_only
   `.execute(database)
 
   await database.schema

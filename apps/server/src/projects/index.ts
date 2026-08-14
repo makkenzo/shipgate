@@ -22,6 +22,36 @@ export {
   summarizeProjectCheckState,
 } from './dashboard.js'
 export {
+  assertAcyclicDependencyGraph,
+  type ChangeDependencyEdge,
+  DependencyCycleError,
+  findDependencyCycle,
+} from './dependency-graph.js'
+export {
+  DEPENDENCY_BLOCK_END,
+  DEPENDENCY_BLOCK_START,
+  ManagedDependencyBlockError,
+  type ManagedDependencyBlockParseResult,
+  parseManagedDependencyBlock,
+  synchronizeManagedDependencyBlock,
+} from './dependency-managed-block.js'
+export {
+  createDependencyService,
+  DependencyAuthorizationError,
+  type DependencyService,
+  DependencySynchronizationError,
+} from './dependency-service.js'
+export {
+  type ChangeDependencyState,
+  type DependencyMutationResult,
+  type DependencyValidationCode,
+  DependencyValidationError,
+  importDependenciesFromPullRequestWebhook,
+  listChangeDependencies,
+  type RemoveDependency,
+  type SetDependencies,
+} from './dependency-workflow.js'
+export {
   ChangeNotFoundError,
   type ProjectConfigurationValidationCode,
   ProjectConfigurationValidationError,
@@ -85,6 +115,18 @@ export {
   type SetQaStatus,
   setQaStatus,
 } from './qa-workflow.js'
+export {
+  type ChangeId,
+  type EvaluatedChange,
+  evaluateRelease,
+  type ReleaseBlocker,
+  type ReleaseBlockerCode,
+  type ReleaseDependencyInput,
+  type ReleaseEvaluation,
+  type ReleaseEvaluationChangeInput,
+  type ReleaseEvaluationInput,
+  type ReleaseEvaluationReference,
+} from './release-evaluation.js'
 export {
   assertRepositoryLock,
   assertRepositoryTransaction,

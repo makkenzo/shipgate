@@ -3,8 +3,8 @@
 import { queryOptions, type UseMutationOptions } from '@tanstack/react-query';
 
 import { client } from '../client.gen';
-import { createDiagnosticJob, createProject, deleteLocalAccount, deleteProject, disconnectGitHub, getAuthSession, getConnectionConfiguration, getDiagnosticJob, getHealth, getInstallation, getInstallations, getProject, getProjectChanges, getProjectOverview, getProjects, getProjectSynchronization, getReadiness, logout, type Options, reconcileProject, setProjectChangeQa, updateProject } from '../sdk.gen';
-import type { CreateDiagnosticJobData, CreateDiagnosticJobError, CreateDiagnosticJobResponse, CreateProjectData, CreateProjectError, CreateProjectResponse, DeleteLocalAccountData, DeleteLocalAccountError, DeleteLocalAccountResponse, DeleteProjectData, DeleteProjectError, DeleteProjectResponse, DisconnectGitHubData, DisconnectGitHubError, DisconnectGitHubResponse, GetAuthSessionData, GetAuthSessionError, GetAuthSessionResponse, GetConnectionConfigurationData, GetConnectionConfigurationError, GetConnectionConfigurationResponse, GetDiagnosticJobData, GetDiagnosticJobError, GetDiagnosticJobResponse, GetHealthData, GetHealthError, GetHealthResponse, GetInstallationData, GetInstallationError, GetInstallationResponse, GetInstallationsData, GetInstallationsError, GetInstallationsResponse, GetProjectChangesData, GetProjectChangesError, GetProjectChangesResponse, GetProjectData, GetProjectError, GetProjectOverviewData, GetProjectOverviewError, GetProjectOverviewResponse, GetProjectResponse, GetProjectsData, GetProjectsError, GetProjectsResponse, GetProjectSynchronizationData, GetProjectSynchronizationError, GetProjectSynchronizationResponse, GetReadinessData, GetReadinessError, GetReadinessResponse, LogoutData, LogoutError, LogoutResponse, ReconcileProjectData, ReconcileProjectError, ReconcileProjectResponse, SetProjectChangeQaData, SetProjectChangeQaError, SetProjectChangeQaResponse, UpdateProjectData, UpdateProjectError, UpdateProjectResponse } from '../types.gen';
+import { createDiagnosticJob, createProject, deleteLocalAccount, deleteProject, disconnectGitHub, getAuthSession, getConnectionConfiguration, getDiagnosticJob, getHealth, getInstallation, getInstallations, getProject, getProjectChangeDependencies, getProjectChanges, getProjectOverview, getProjects, getProjectSynchronization, getReadiness, logout, type Options, reconcileProject, removeProjectChangeDependency, setProjectChangeDependencies, setProjectChangeQa, updateProject } from '../sdk.gen';
+import type { CreateDiagnosticJobData, CreateDiagnosticJobError, CreateDiagnosticJobResponse, CreateProjectData, CreateProjectError, CreateProjectResponse, DeleteLocalAccountData, DeleteLocalAccountError, DeleteLocalAccountResponse, DeleteProjectData, DeleteProjectError, DeleteProjectResponse, DisconnectGitHubData, DisconnectGitHubError, DisconnectGitHubResponse, GetAuthSessionData, GetAuthSessionError, GetAuthSessionResponse, GetConnectionConfigurationData, GetConnectionConfigurationError, GetConnectionConfigurationResponse, GetDiagnosticJobData, GetDiagnosticJobError, GetDiagnosticJobResponse, GetHealthData, GetHealthError, GetHealthResponse, GetInstallationData, GetInstallationError, GetInstallationResponse, GetInstallationsData, GetInstallationsError, GetInstallationsResponse, GetProjectChangeDependenciesData, GetProjectChangeDependenciesError, GetProjectChangeDependenciesResponse, GetProjectChangesData, GetProjectChangesError, GetProjectChangesResponse, GetProjectData, GetProjectError, GetProjectOverviewData, GetProjectOverviewError, GetProjectOverviewResponse, GetProjectResponse, GetProjectsData, GetProjectsError, GetProjectsResponse, GetProjectSynchronizationData, GetProjectSynchronizationError, GetProjectSynchronizationResponse, GetReadinessData, GetReadinessError, GetReadinessResponse, LogoutData, LogoutError, LogoutResponse, ReconcileProjectData, ReconcileProjectError, ReconcileProjectResponse, RemoveProjectChangeDependencyData, RemoveProjectChangeDependencyError, RemoveProjectChangeDependencyResponse, SetProjectChangeDependenciesData, SetProjectChangeDependenciesError, SetProjectChangeDependenciesResponse, SetProjectChangeQaData, SetProjectChangeQaError, SetProjectChangeQaResponse, UpdateProjectData, UpdateProjectError, UpdateProjectResponse } from '../types.gen';
 
 export type QueryKey<TOptions extends Options> = [
     Pick<TOptions, 'baseUrl' | 'body' | 'headers' | 'path' | 'query'> & {
@@ -422,6 +422,64 @@ export const setProjectChangeQaMutation = (options?: Partial<Options<SetProjectC
             return data;
         },
         mutationKey: setProjectChangeQaMutationKey(options)
+    };
+    return mutationOptions;
+};
+
+export const getProjectChangeDependenciesQueryKey = (options: Options<GetProjectChangeDependenciesData>) => createQueryKey('getProjectChangeDependencies', options);
+
+/**
+ * List Shipgate dependencies for a change
+ */
+export const getProjectChangeDependenciesOptions = (options: Options<GetProjectChangeDependenciesData>) => queryOptions<GetProjectChangeDependenciesResponse, GetProjectChangeDependenciesError, GetProjectChangeDependenciesResponse, ReturnType<typeof getProjectChangeDependenciesQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await getProjectChangeDependencies({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getProjectChangeDependenciesQueryKey(options)
+});
+
+export const setProjectChangeDependenciesMutationKey = (options?: Partial<Options<SetProjectChangeDependenciesData>>) => createMutationKey('setProjectChangeDependencies', options);
+
+/**
+ * Replace dependencies and synchronize the PR managed block
+ */
+export const setProjectChangeDependenciesMutation = (options?: Partial<Options<SetProjectChangeDependenciesData>>): UseMutationOptions<SetProjectChangeDependenciesResponse, SetProjectChangeDependenciesError, Options<SetProjectChangeDependenciesData>> => {
+    const mutationOptions: UseMutationOptions<SetProjectChangeDependenciesResponse, SetProjectChangeDependenciesError, Options<SetProjectChangeDependenciesData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await setProjectChangeDependencies({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        },
+        mutationKey: setProjectChangeDependenciesMutationKey(options)
+    };
+    return mutationOptions;
+};
+
+export const removeProjectChangeDependencyMutationKey = (options?: Partial<Options<RemoveProjectChangeDependencyData>>) => createMutationKey('removeProjectChangeDependency', options);
+
+/**
+ * Remove one dependency and synchronize the PR managed block
+ */
+export const removeProjectChangeDependencyMutation = (options?: Partial<Options<RemoveProjectChangeDependencyData>>): UseMutationOptions<RemoveProjectChangeDependencyResponse, RemoveProjectChangeDependencyError, Options<RemoveProjectChangeDependencyData>> => {
+    const mutationOptions: UseMutationOptions<RemoveProjectChangeDependencyResponse, RemoveProjectChangeDependencyError, Options<RemoveProjectChangeDependencyData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await removeProjectChangeDependency({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        },
+        mutationKey: removeProjectChangeDependencyMutationKey(options)
     };
     return mutationOptions;
 };

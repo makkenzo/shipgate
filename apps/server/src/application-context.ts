@@ -178,7 +178,7 @@ export function createApplicationContext(
     githubAuth,
     repositoryRequiredChecksSync,
   })
-  const githubWebhookProjection = createRepositoryWebhookProjectionHandler()
+  const githubWebhookProjection = createRepositoryWebhookProjectionHandler({ database })
 
   return {
     processKind: options.processKind,

@@ -5543,6 +5543,572 @@
         }
       }
     },
+    "/api/v1/projects/{projectId}/changes/{changeId}/dependencies": {
+      "get": {
+        "operationId": "getProjectChangeDependencies",
+        "summary": "List Shipgate dependencies for a change",
+        "tags": ["Release planning"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "in": "path",
+            "name": "projectId",
+            "required": true
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "in": "path",
+            "name": "changeId",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "shipgateSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["dependencies"],
+                  "properties": {
+                    "dependencies": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "changeId",
+                          "pullRequestNumber",
+                          "source",
+                          "actorGitHubUserId",
+                          "version",
+                          "updatedAt"
+                        ],
+                        "properties": {
+                          "changeId": {
+                            "type": "string"
+                          },
+                          "pullRequestNumber": {
+                            "type": "integer",
+                            "minimum": 1
+                          },
+                          "source": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "enum": ["user"]
+                              },
+                              {
+                                "type": "string",
+                                "enum": ["managed_pr_body"]
+                              },
+                              {
+                                "type": "string",
+                                "enum": ["system"]
+                              }
+                            ]
+                          },
+                          "actorGitHubUserId": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": 1
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "version": {
+                            "type": "integer",
+                            "minimum": 1
+                          },
+                          "updatedAt": {
+                            "type": "string"
+                          }
+                        },
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Common error response returned by the Shipgate API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["code", "message", "requestId"],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "minLength": 1,
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "details": {}
+                  },
+                  "additionalProperties": false,
+                  "title": "ApiError",
+                  "description": "Common error response returned by the Shipgate API."
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "operationId": "setProjectChangeDependencies",
+        "summary": "Replace dependencies and synchronize the PR managed block",
+        "tags": ["Release planning"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["dependencyChangeIds"],
+                "properties": {
+                  "dependencyChangeIds": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128
+                    },
+                    "maxItems": 100,
+                    "uniqueItems": true
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "in": "path",
+            "name": "projectId",
+            "required": true
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "in": "path",
+            "name": "changeId",
+            "required": true
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            "in": "header",
+            "name": "x-csrf-token",
+            "required": false
+          }
+        ],
+        "security": [
+          {
+            "shipgateSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "status",
+                    "dependentChangeId",
+                    "dependentPullRequestNumber",
+                    "dependencies",
+                    "candidateReevaluation",
+                    "githubBodyUpdated"
+                  ],
+                  "properties": {
+                    "status": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": ["recorded"]
+                        },
+                        {
+                          "type": "string",
+                          "enum": ["already_applied"]
+                        }
+                      ]
+                    },
+                    "dependentChangeId": {
+                      "type": "string"
+                    },
+                    "dependentPullRequestNumber": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "dependencies": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "changeId",
+                          "pullRequestNumber",
+                          "source",
+                          "actorGitHubUserId",
+                          "version",
+                          "updatedAt"
+                        ],
+                        "properties": {
+                          "changeId": {
+                            "type": "string"
+                          },
+                          "pullRequestNumber": {
+                            "type": "integer",
+                            "minimum": 1
+                          },
+                          "source": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "enum": ["user"]
+                              },
+                              {
+                                "type": "string",
+                                "enum": ["managed_pr_body"]
+                              },
+                              {
+                                "type": "string",
+                                "enum": ["system"]
+                              }
+                            ]
+                          },
+                          "actorGitHubUserId": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": 1
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "version": {
+                            "type": "integer",
+                            "minimum": 1
+                          },
+                          "updatedAt": {
+                            "type": "string"
+                          }
+                        },
+                        "additionalProperties": false
+                      }
+                    },
+                    "candidateReevaluation": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "required": ["candidateId", "candidateVersion"],
+                          "properties": {
+                            "candidateId": {
+                              "type": "string"
+                            },
+                            "candidateVersion": {
+                              "type": "integer",
+                              "minimum": 1
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "githubBodyUpdated": {
+                      "type": "boolean"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Common error response returned by the Shipgate API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["code", "message", "requestId"],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "minLength": 1,
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "details": {}
+                  },
+                  "additionalProperties": false,
+                  "title": "ApiError",
+                  "description": "Common error response returned by the Shipgate API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{projectId}/changes/{changeId}/dependencies/{dependencyChangeId}": {
+      "delete": {
+        "operationId": "removeProjectChangeDependency",
+        "summary": "Remove one dependency and synchronize the PR managed block",
+        "tags": ["Release planning"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "in": "path",
+            "name": "projectId",
+            "required": true
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "in": "path",
+            "name": "changeId",
+            "required": true
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "in": "path",
+            "name": "dependencyChangeId",
+            "required": true
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            "in": "header",
+            "name": "x-csrf-token",
+            "required": false
+          }
+        ],
+        "security": [
+          {
+            "shipgateSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "status",
+                    "dependentChangeId",
+                    "dependentPullRequestNumber",
+                    "dependencies",
+                    "candidateReevaluation",
+                    "githubBodyUpdated"
+                  ],
+                  "properties": {
+                    "status": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": ["recorded"]
+                        },
+                        {
+                          "type": "string",
+                          "enum": ["already_applied"]
+                        }
+                      ]
+                    },
+                    "dependentChangeId": {
+                      "type": "string"
+                    },
+                    "dependentPullRequestNumber": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "dependencies": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "changeId",
+                          "pullRequestNumber",
+                          "source",
+                          "actorGitHubUserId",
+                          "version",
+                          "updatedAt"
+                        ],
+                        "properties": {
+                          "changeId": {
+                            "type": "string"
+                          },
+                          "pullRequestNumber": {
+                            "type": "integer",
+                            "minimum": 1
+                          },
+                          "source": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "enum": ["user"]
+                              },
+                              {
+                                "type": "string",
+                                "enum": ["managed_pr_body"]
+                              },
+                              {
+                                "type": "string",
+                                "enum": ["system"]
+                              }
+                            ]
+                          },
+                          "actorGitHubUserId": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": 1
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "version": {
+                            "type": "integer",
+                            "minimum": 1
+                          },
+                          "updatedAt": {
+                            "type": "string"
+                          }
+                        },
+                        "additionalProperties": false
+                      }
+                    },
+                    "candidateReevaluation": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "required": ["candidateId", "candidateVersion"],
+                          "properties": {
+                            "candidateId": {
+                              "type": "string"
+                            },
+                            "candidateVersion": {
+                              "type": "integer",
+                              "minimum": 1
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "githubBodyUpdated": {
+                      "type": "boolean"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Common error response returned by the Shipgate API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["code", "message", "requestId"],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "minLength": 1,
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "details": {}
+                  },
+                  "additionalProperties": false,
+                  "title": "ApiError",
+                  "description": "Common error response returned by the Shipgate API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/_diagnostics/jobs": {
       "post": {
         "operationId": "createDiagnosticJob",

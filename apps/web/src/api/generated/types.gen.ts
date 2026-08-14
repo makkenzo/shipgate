@@ -1272,6 +1272,163 @@ export type SetProjectChangeQaResponses = {
 
 export type SetProjectChangeQaResponse = SetProjectChangeQaResponses[keyof SetProjectChangeQaResponses];
 
+export type GetProjectChangeDependenciesData = {
+    body?: never;
+    path: {
+        projectId: string;
+        changeId: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{projectId}/changes/{changeId}/dependencies';
+};
+
+export type GetProjectChangeDependenciesErrors = {
+    /**
+     * ApiError
+     *
+     * Common error response returned by the Shipgate API.
+     */
+    default: {
+        code: string;
+        message: string;
+        requestId: string;
+        details?: unknown;
+    };
+};
+
+export type GetProjectChangeDependenciesError = GetProjectChangeDependenciesErrors[keyof GetProjectChangeDependenciesErrors];
+
+export type GetProjectChangeDependenciesResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        dependencies: Array<{
+            changeId: string;
+            pullRequestNumber: number;
+            source: 'user' | 'managed_pr_body' | 'system';
+            actorGitHubUserId: number | null;
+            version: number;
+            updatedAt: string;
+        }>;
+    };
+};
+
+export type GetProjectChangeDependenciesResponse = GetProjectChangeDependenciesResponses[keyof GetProjectChangeDependenciesResponses];
+
+export type SetProjectChangeDependenciesData = {
+    body: {
+        dependencyChangeIds: Array<string>;
+    };
+    headers?: {
+        'x-csrf-token'?: string;
+    };
+    path: {
+        projectId: string;
+        changeId: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{projectId}/changes/{changeId}/dependencies';
+};
+
+export type SetProjectChangeDependenciesErrors = {
+    /**
+     * ApiError
+     *
+     * Common error response returned by the Shipgate API.
+     */
+    default: {
+        code: string;
+        message: string;
+        requestId: string;
+        details?: unknown;
+    };
+};
+
+export type SetProjectChangeDependenciesError = SetProjectChangeDependenciesErrors[keyof SetProjectChangeDependenciesErrors];
+
+export type SetProjectChangeDependenciesResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        status: 'recorded' | 'already_applied';
+        dependentChangeId: string;
+        dependentPullRequestNumber: number;
+        dependencies: Array<{
+            changeId: string;
+            pullRequestNumber: number;
+            source: 'user' | 'managed_pr_body' | 'system';
+            actorGitHubUserId: number | null;
+            version: number;
+            updatedAt: string;
+        }>;
+        candidateReevaluation: {
+            candidateId: string;
+            candidateVersion: number;
+        } | null;
+        githubBodyUpdated: boolean;
+    };
+};
+
+export type SetProjectChangeDependenciesResponse = SetProjectChangeDependenciesResponses[keyof SetProjectChangeDependenciesResponses];
+
+export type RemoveProjectChangeDependencyData = {
+    body?: never;
+    headers?: {
+        'x-csrf-token'?: string;
+    };
+    path: {
+        projectId: string;
+        changeId: string;
+        dependencyChangeId: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{projectId}/changes/{changeId}/dependencies/{dependencyChangeId}';
+};
+
+export type RemoveProjectChangeDependencyErrors = {
+    /**
+     * ApiError
+     *
+     * Common error response returned by the Shipgate API.
+     */
+    default: {
+        code: string;
+        message: string;
+        requestId: string;
+        details?: unknown;
+    };
+};
+
+export type RemoveProjectChangeDependencyError = RemoveProjectChangeDependencyErrors[keyof RemoveProjectChangeDependencyErrors];
+
+export type RemoveProjectChangeDependencyResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        status: 'recorded' | 'already_applied';
+        dependentChangeId: string;
+        dependentPullRequestNumber: number;
+        dependencies: Array<{
+            changeId: string;
+            pullRequestNumber: number;
+            source: 'user' | 'managed_pr_body' | 'system';
+            actorGitHubUserId: number | null;
+            version: number;
+            updatedAt: string;
+        }>;
+        candidateReevaluation: {
+            candidateId: string;
+            candidateVersion: number;
+        } | null;
+        githubBodyUpdated: boolean;
+    };
+};
+
+export type RemoveProjectChangeDependencyResponse = RemoveProjectChangeDependencyResponses[keyof RemoveProjectChangeDependencyResponses];
+
 export type CreateDiagnosticJobData = {
     /**
      * DiagnosticJobRequest

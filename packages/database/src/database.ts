@@ -43,9 +43,6 @@ export function createDatabase(options: CreateDatabaseOptions): DatabaseClient {
   const kysely = new Kysely<DatabaseSchema>({
     dialect: new PostgresDialect({
       pool,
-
-      // Kysely 0.29 использует отдельный control connection
-      // для server-side cancellation запросов.
       controlClient: Client,
     }),
   })

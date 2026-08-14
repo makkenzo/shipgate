@@ -1,11 +1,17 @@
-import type { DatabaseSchema, JsonValue } from '@shipgate/database'
+import type { DatabaseClient, DatabaseSchema, JsonValue } from '@shipgate/database'
 import type { GitHubWebhookProjectionHandler } from '@shipgate/jobs'
 import type { Transaction } from 'kysely'
 
+import { importDependenciesFromPullRequestWebhook } from './dependency-workflow.js'
 import { queueRepositoryIncrementalSync } from './incremental-sync-queue.js'
 
-export function createRepositoryWebhookProjectionHandler(): GitHubWebhookProjectionHandler {
+export function createRepositoryWebhookProjectionHandler(
+  options: { readonly database?: DatabaseClient } = {},
+): GitHubWebhookProjectionHandler {
   return async (execution) => {
+    if (options.database) {
+      await importDependenciesFromPullRequestWebhook(options.database, execution)
+    }
     if (
       execution.event === 'installation' &&
       (execution.action === 'unsuspend' || execution.action === 'new_permissions_accepted')
