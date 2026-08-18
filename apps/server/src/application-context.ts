@@ -9,6 +9,7 @@ import { createDatabase, type DatabaseClient } from '@shipgate/database'
 import type { GitHubAuthenticationService } from '@shipgate/github'
 import type {
   GitHubWebhookProjectionHandler,
+  ReleaseCandidateEvaluationHandler,
   RepositoryIncrementalSyncHandler,
   RepositoryInitialSyncHandler,
   RepositoryRequiredChecksSyncHandler,
@@ -25,6 +26,7 @@ import {
   createProjectService,
   createProjectTopologyValidator,
   createReadOnlyGitWorkspace,
+  createReleaseCandidateEvaluationHandler,
   createRepositoryIncrementalSyncHandler,
   createRepositoryInitialSyncHandler,
   createRepositoryRequiredChecksSyncHandler,
@@ -47,6 +49,7 @@ export interface ApplicationContext {
   readonly repositoryIncrementalSync: RepositoryIncrementalSyncHandler
   readonly repositoryRequiredChecksSync: RepositoryRequiredChecksSyncHandler
   readonly githubWebhookProjection: GitHubWebhookProjectionHandler
+  readonly releaseCandidateEvaluation: ReleaseCandidateEvaluationHandler
   readonly shutdown: ShutdownManager
 
   createCorrelationId(): string
@@ -179,6 +182,7 @@ export function createApplicationContext(
     repositoryRequiredChecksSync,
   })
   const githubWebhookProjection = createRepositoryWebhookProjectionHandler({ database })
+  const releaseCandidateEvaluation = createReleaseCandidateEvaluationHandler({ database })
 
   return {
     processKind: options.processKind,
@@ -194,6 +198,7 @@ export function createApplicationContext(
     repositoryIncrementalSync,
     repositoryRequiredChecksSync,
     githubWebhookProjection,
+    releaseCandidateEvaluation,
     shutdown,
     createCorrelationId,
 

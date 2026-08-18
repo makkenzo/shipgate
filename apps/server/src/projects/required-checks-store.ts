@@ -8,6 +8,7 @@ import type {
 } from '@shipgate/database'
 import type { Kysely, Selectable, Transaction } from 'kysely'
 
+import { touchProjectReleaseStateAndQueueEvaluation } from './candidate-evaluation-queue.js'
 import { ProjectNotFoundError, ProjectVersionConflictError } from './errors.js'
 import type {
   ChangeRequiredCheckState,
@@ -40,6 +41,7 @@ export interface ApplyRequiredCheckProjectionInput {
   readonly recomputeAllChanges: boolean
   readonly observedAt: Date
   readonly trigger: RequiredCheckProjectionTrigger
+  readonly suppressCandidateReevaluation?: boolean
 }
 
 export interface ApplyRequiredCheckProjectionResult {
@@ -80,6 +82,9 @@ export async function applyRequiredCheckProjectionInTransaction(
     )
   }
 
+  const previousEvaluationFingerprint = input.suppressCandidateReevaluation
+    ? null
+    : await loadRequiredCheckEvaluationFingerprint(transaction, project.id)
   const policy = await applyPolicySnapshot(transaction, {
     projectId: project.id,
     repositoryId,
@@ -114,6 +119,22 @@ export async function applyRequiredCheckProjectionInTransaction(
     requiredChecks,
     observedAt: input.observedAt,
   })
+
+  if (!input.suppressCandidateReevaluation) {
+    const currentEvaluationFingerprint = await loadRequiredCheckEvaluationFingerprint(
+      transaction,
+      project.id,
+    )
+
+    if (previousEvaluationFingerprint !== currentEvaluationFingerprint) {
+      await touchProjectReleaseStateAndQueueEvaluation(scope, {
+        projectId: project.id,
+        repositoryId,
+        reason: policy.changed ? 'required_checks_changed' : 'check_result_changed',
+        now: input.observedAt,
+      })
+    }
+  }
 
   return {
     policyVersion: policy.version,
@@ -524,6 +545,40 @@ async function replaceChangeStates(
 
   await transaction.insertInto('change_required_check_states').values(rows).execute()
   return rows.length
+}
+
+async function loadRequiredCheckEvaluationFingerprint(
+  transaction: Transaction<DatabaseSchema>,
+  projectId: string,
+): Promise<string> {
+  const project = await transaction
+    .selectFrom('projects')
+    .select('required_check_policy_version')
+    .where('id', '=', projectId)
+    .executeTakeFirstOrThrow()
+  const checks = await transaction
+    .selectFrom('required_checks')
+    .select(['id', 'context', 'integration_id', 'source', 'source_reference'])
+    .where('project_id', '=', projectId)
+    .where('policy_version', '=', project.required_check_policy_version)
+    .orderBy('context')
+    .orderBy('integration_id')
+    .orderBy('source')
+    .execute()
+  const states = await transaction
+    .selectFrom('change_required_check_states')
+    .select(['change_id', 'required_check_id', 'policy_version', 'commit_sha', 'state'])
+    .where('project_id', '=', projectId)
+    .where('policy_version', '=', project.required_check_policy_version)
+    .orderBy('change_id')
+    .orderBy('required_check_id')
+    .execute()
+
+  return JSON.stringify({
+    policyVersion: project.required_check_policy_version,
+    checks,
+    states,
+  })
 }
 
 function mapResult(

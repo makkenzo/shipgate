@@ -57,6 +57,8 @@ export interface DatabaseSchema {
 
   release_candidate_evaluations: ReleaseCandidateEvaluationTable
 
+  release_candidate_evaluation_requests: ReleaseCandidateEvaluationRequestTable
+
   required_checks: RequiredCheckTable
 
   commit_check_results: CommitCheckResultTable
@@ -318,6 +320,8 @@ export interface ProjectTable {
   required_check_policy_version: Generated<number>
   required_check_overrides: ColumnType<JsonValue, string, string>
   qa_reset_epoch: Generated<number>
+  release_state_version: Generated<number>
+  projection_version: Generated<number>
   deletion_requested_at: Date | null
   deleted_at: Date | null
   created_at: Generated<Date>
@@ -574,6 +578,8 @@ export interface ChangeDependencyTable {
 
 export type ReleaseCandidateState = 'open' | 'revision_active' | 'completed' | 'cancelled'
 
+export type ReleaseCandidateEvaluationStatus = 'evaluating' | 'ready' | 'blocked'
+
 export interface ReleaseCandidateTable {
   id: string
   project_id: string
@@ -581,9 +587,10 @@ export interface ReleaseCandidateTable {
   sequence: number
   state: Generated<ReleaseCandidateState>
   version: Generated<number>
-  created_by_github_user_id: string
+  created_by_github_user_id: string | null
   note: string | null
   latest_evaluation_version: number | null
+  evaluation_status: Generated<ReleaseCandidateEvaluationStatus>
   closed_at: Date | null
   created_at: Generated<Date>
   updated_at: Generated<Date>
@@ -610,6 +617,9 @@ export interface ReleaseCandidateEvaluationTable {
   repository_id: string
   evaluation_version: number
   candidate_version: number
+  request_id: Generated<string | null>
+  project_state_version: Generated<number>
+  projection_version: Generated<number>
   configuration_version: number
   source_sha: string
   production_sha: string
@@ -623,6 +633,38 @@ export interface ReleaseCandidateEvaluationTable {
   created_at: Generated<Date>
 }
 
+export type ReleaseCandidateEvaluationRequestStatus =
+  | 'queued'
+  | 'running'
+  | 'succeeded'
+  | 'superseded'
+  | 'failed'
+
+export interface ReleaseCandidateEvaluationRequestTable {
+  id: string
+  project_id: string
+  repository_id: string
+  candidate_id: string
+  status: Generated<ReleaseCandidateEvaluationRequestStatus>
+  project_state_version: number
+  projection_version: number
+  candidate_version: number
+  configuration_version: number
+  required_check_policy_version: number
+  source_sha: string
+  production_sha: string
+  reasons: ColumnType<JsonValue, string, string>
+  coalesced_count: Generated<number>
+  attempt_count: Generated<number>
+  last_error_code: string | null
+  last_error_message: string | null
+  requested_at: Date
+  claimed_at: Date | null
+  completed_at: Date | null
+  created_at: Generated<Date>
+  updated_at: Generated<Date>
+}
+
 export type ProjectAuditEventType =
   | 'project_created'
   | 'project_configuration_changed'
@@ -632,6 +674,11 @@ export type ProjectAuditEventType =
   | 'project_deletion_requested'
 
 export type ReleasePlanningAuditEventType =
+  | 'qa_status_changed'
+  | 'dependencies_changed'
+  | 'change_excluded'
+  | 'change_restored'
+  | 'candidate_status_changed'
   | 'qa_assessment_recorded'
   | 'qa_assessment_reset'
   | 'dependencies_replaced'

@@ -74,6 +74,13 @@ export type RepositoryRequiredChecksSyncJobPayload = z.output<
   typeof repositoryRequiredChecksSyncPayloadSchema
 >
 
+export const releaseCandidateEvaluationPayloadSchema = z
+  .object({ requestId: z.string().uuid() })
+  .strict()
+export type ReleaseCandidateEvaluationJobPayload = z.output<
+  typeof releaseCandidateEvaluationPayloadSchema
+>
+
 function defineTask<Schema extends z.ZodTypeAny>(
   definition: JobTaskDefinition<Schema>,
 ): JobTaskDefinition<Schema> {
@@ -109,6 +116,27 @@ function createIncrementalSyncTask(
 }
 
 export const taskDefinitions = {
+  'release.evaluate-candidate': defineTask({
+    dataSchema: releaseCandidateEvaluationPayloadSchema,
+    retry: { maxAttempts: 10 },
+    async execute(payload, context) {
+      if (!context.releaseCandidateEvaluation) {
+        throw new PermanentJobError('Release candidate evaluation handler is not configured', {
+          code: 'RELEASE_CANDIDATE_EVALUATION_HANDLER_MISSING',
+        })
+      }
+
+      return context.releaseCandidateEvaluation({
+        requestId: payload.requestId,
+        attempt: context.job.attempt,
+        maxAttempts: context.job.maxAttempts,
+        correlationId: context.correlationId,
+        causationId: context.causationId,
+        signal: context.signal,
+        logger: context.logger,
+      })
+    },
+  }),
   'repository.refresh-branches': defineTask({
     dataSchema: repositoryIncrementalSyncPayloadSchema,
     retry: { maxAttempts: 10 },

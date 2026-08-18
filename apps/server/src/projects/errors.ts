@@ -110,6 +110,7 @@ export type ProjectConfigurationValidationCode =
   | 'change_identity_unknown'
   | 'change_not_releasable'
   | 'invalid_qa_comment'
+  | 'invalid_exclusion_reason'
 
 export class ProjectConfigurationValidationError extends Error {
   readonly code: ProjectConfigurationValidationCode

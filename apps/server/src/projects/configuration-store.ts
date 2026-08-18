@@ -8,7 +8,7 @@ import type {
   ProjectTable,
 } from '@shipgate/database'
 import type { Selectable, Transaction } from 'kysely'
-
+import { touchProjectReleaseStateAndQueueEvaluation } from './candidate-evaluation-queue.js'
 import {
   ProjectConfigurationValidationError,
   ProjectNotFoundError,
@@ -229,6 +229,15 @@ export async function updateConfiguredProject(input: {
     )
   }
 
+  await touchProjectReleaseStateAndQueueEvaluation(input.scope, {
+    projectId: project.id,
+    repositoryId,
+    reason: 'source_topology_changed',
+    projectionChanged: true,
+    clearLatestEvaluation: true,
+    now,
+  })
+
   await insertAuditEvent(transaction, {
     projectId: project.id,
     repositoryId,
@@ -342,6 +351,14 @@ export async function updateProjectRequiredCheckOverrides(input: {
       actual.configuration_version,
     )
   }
+
+  await touchProjectReleaseStateAndQueueEvaluation(input.scope, {
+    projectId: project.id,
+    repositoryId,
+    reason: 'required_checks_changed',
+    deferEvaluation: true,
+    now,
+  })
 
   await insertAuditEvent(transaction, {
     projectId: project.id,

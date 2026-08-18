@@ -28,6 +28,8 @@ export {
 export type {
   GitHubWebhookProjectionExecution,
   GitHubWebhookProjectionHandler,
+  ReleaseCandidateEvaluationExecution,
+  ReleaseCandidateEvaluationHandler,
   RepositoryIncrementalSyncExecution,
   RepositoryIncrementalSyncHandler,
   RepositoryIncrementalSyncType,

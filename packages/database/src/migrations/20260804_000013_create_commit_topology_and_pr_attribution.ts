@@ -28,11 +28,6 @@ export const up: Migration['up'] = async (database) => {
     .addColumn('attribution_state', 'text', (column) => column.notNull().defaultTo('unmanaged'))
     .execute()
 
-  /*
-   * Stage 4.3 did not persist first-parent windows. Remove the old positional
-   * claim before enabling topology checks; the next full sync restores the
-   * complete ordered range atomically.
-   */
   await sql`
     update repository_commits
     set source_delta_position = null
@@ -114,12 +109,6 @@ export const up: Migration['up'] = async (database) => {
     .addColumn('integration_second_parent_sha', 'text')
     .execute()
 
-  /*
-   * Existing Stage 4.3 snapshots do not contain enough topology evidence to
-   * satisfy the new attribution invariants. Preserve their immutable PR
-   * identity, but stop presenting the old heuristic attribution as known.
-   * The next full synchronization will rebuild these rows deterministically.
-   */
   await sql`
     update changes
     set

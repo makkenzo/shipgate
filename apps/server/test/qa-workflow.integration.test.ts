@@ -1,4 +1,5 @@
 import { createDatabase, type DatabaseClient, migrateToLatest } from '@shipgate/database'
+import { migrateJobQueue } from '@shipgate/jobs'
 import { type PostgresTestDatabase, startPostgresTestDatabase } from '@shipgate/testing'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
@@ -48,6 +49,7 @@ describe.sequential('QA workflow', () => {
       onPoolError: () => undefined,
     })
 
+    await migrateJobQueue(database)
     await migrateToLatest(database.kysely)
   }, 60_000)
 
@@ -56,7 +58,7 @@ describe.sequential('QA workflow', () => {
     await postgres.stop()
   })
 
-  it('records QA against the current code version and invalidates the active candidate once', async () => {
+  it('records QA against the current code version and queues one candidate reevaluation', async () => {
     const fixture = await seedQaFixture(database, 1, { candidate: true })
     const candidateId = requireCandidateId(fixture)
     const requiredPermissions: string[] = []
@@ -109,13 +111,26 @@ describe.sequential('QA workflow', () => {
     await expect(
       database.kysely
         .selectFrom('release_candidates')
-        .select(['state', 'version', 'latest_evaluation_version'])
+        .select(['state', 'version', 'evaluation_status', 'latest_evaluation_version'])
         .where('id', '=', candidateId)
         .executeTakeFirstOrThrow(),
     ).resolves.toEqual({
       state: 'open',
       version: 1,
-      latest_evaluation_version: null,
+      evaluation_status: 'evaluating',
+      latest_evaluation_version: 1,
+    })
+
+    await expect(
+      database.kysely
+        .selectFrom('release_candidate_evaluation_requests')
+        .select(['status', 'reasons', 'coalesced_count'])
+        .where('candidate_id', '=', candidateId)
+        .executeTakeFirstOrThrow(),
+    ).resolves.toEqual({
+      status: 'queued',
+      reasons: ['qa_changed'],
+      coalesced_count: 0,
     })
 
     await expect(
@@ -136,7 +151,7 @@ describe.sequential('QA workflow', () => {
         .where('entity_id', '=', assessment.id)
         .executeTakeFirstOrThrow(),
     ).resolves.toEqual({
-      event_type: 'qa_assessment_recorded',
+      event_type: 'qa_status_changed',
       entity_type: 'qa_assessment',
       entity_id: assessment.id,
       reason_code: 'qa_status_set',

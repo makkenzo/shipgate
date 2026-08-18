@@ -161,7 +161,7 @@ describe.sequential('Project configuration persistence', () => {
       production_presence: 'unknown',
       commit_set_fingerprint: null,
     })
-    expect(await count(database, 'audit_events')).toBe(3)
+    expect(await count(database, 'audit_events')).toBe(4)
     expect(await count(database, 'repository_reconciliation_requests')).toBe(2)
 
     const deleted = await service.delete({
@@ -170,7 +170,7 @@ describe.sequential('Project configuration persistence', () => {
       expectedConfigurationVersion: 3,
     })
     expect(deleted).toMatchObject({ status: 'pending_deletion', configurationVersion: 4 })
-    expect(await count(database, 'audit_events')).toBe(4)
+    expect(await count(database, 'audit_events')).toBe(5)
     const activeRequests = await database.kysely
       .selectFrom('repository_reconciliation_requests')
       .select('id')

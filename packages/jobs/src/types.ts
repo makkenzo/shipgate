@@ -91,6 +91,20 @@ export type RepositoryRequiredChecksSyncHandler = (
   execution: RepositoryRequiredChecksSyncExecution,
 ) => Promise<JsonValue | undefined>
 
+export interface ReleaseCandidateEvaluationExecution {
+  readonly requestId: string
+  readonly attempt: number
+  readonly maxAttempts: number
+  readonly correlationId: string
+  readonly causationId: string | undefined
+  readonly signal: AbortSignal
+  readonly logger: StructuredLogger
+}
+
+export type ReleaseCandidateEvaluationHandler = (
+  execution: ReleaseCandidateEvaluationExecution,
+) => Promise<JsonValue | undefined>
+
 export interface GitHubWebhookProjectionExecution {
   readonly transaction: Transaction<DatabaseSchema>
   readonly deliveryId: string
@@ -118,6 +132,7 @@ export interface JobTaskContext {
   readonly repositoryRequiredChecksSync: RepositoryRequiredChecksSyncHandler | undefined
   readonly repositoryIncrementalSync: RepositoryIncrementalSyncHandler | undefined
   readonly githubWebhookProjection: GitHubWebhookProjectionHandler | undefined
+  readonly releaseCandidateEvaluation: ReleaseCandidateEvaluationHandler | undefined
 }
 
 export interface JobTaskDependencies {
@@ -127,6 +142,7 @@ export interface JobTaskDependencies {
   readonly repositoryRequiredChecksSync?: RepositoryRequiredChecksSyncHandler
   readonly repositoryIncrementalSync?: RepositoryIncrementalSyncHandler
   readonly githubWebhookProjection?: GitHubWebhookProjectionHandler
+  readonly releaseCandidateEvaluation?: ReleaseCandidateEvaluationHandler
 }
 
 export interface JobRetryPolicy {

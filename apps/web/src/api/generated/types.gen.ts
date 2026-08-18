@@ -1272,6 +1272,171 @@ export type SetProjectChangeQaResponses = {
 
 export type SetProjectChangeQaResponse = SetProjectChangeQaResponses[keyof SetProjectChangeQaResponses];
 
+export type GetProjectReleaseCandidateData = {
+    body?: never;
+    path: {
+        projectId: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{projectId}/release-candidate';
+};
+
+export type GetProjectReleaseCandidateErrors = {
+    /**
+     * ApiError
+     *
+     * Common error response returned by the Shipgate API.
+     */
+    default: {
+        code: string;
+        message: string;
+        requestId: string;
+        details?: unknown;
+    };
+};
+
+export type GetProjectReleaseCandidateError = GetProjectReleaseCandidateErrors[keyof GetProjectReleaseCandidateErrors];
+
+export type GetProjectReleaseCandidateResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        candidate: {
+            id: string;
+            sequence: number;
+            version: number;
+            status: 'evaluating' | 'ready' | 'blocked';
+            createdByGitHubUserId: number | null;
+            latestEvaluationVersion: number | null;
+            latestEvaluation: {
+                id: string;
+                version: number;
+                result: 'ready' | 'blocked';
+                summary: unknown;
+                blockers: unknown;
+                evaluatedAt: string;
+                projectStateVersion: number;
+                projectionVersion: number;
+            } | null;
+            pendingEvaluation: {
+                requestId: string;
+                status: 'queued' | 'running';
+                reasons: Array<string>;
+                coalescedCount: number;
+                requestedAt: string;
+                claimedAt: string | null;
+            } | null;
+            exclusions: Array<{
+                changeId: string;
+                pullRequestNumber: number | null;
+                title: string | null;
+                actorGitHubUserId: number;
+                reason: string | null;
+                candidateVersion: number;
+                excludedAt: string;
+                updatedAt: string;
+            }>;
+            createdAt: string;
+            updatedAt: string;
+        } | null;
+    };
+};
+
+export type GetProjectReleaseCandidateResponse = GetProjectReleaseCandidateResponses[keyof GetProjectReleaseCandidateResponses];
+
+export type RestoreProjectChangeToCandidateData = {
+    body?: never;
+    headers?: {
+        'x-csrf-token'?: string;
+    };
+    path: {
+        projectId: string;
+        changeId: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{projectId}/changes/{changeId}/exclusion';
+};
+
+export type RestoreProjectChangeToCandidateErrors = {
+    /**
+     * ApiError
+     *
+     * Common error response returned by the Shipgate API.
+     */
+    default: {
+        code: string;
+        message: string;
+        requestId: string;
+        details?: unknown;
+    };
+};
+
+export type RestoreProjectChangeToCandidateError = RestoreProjectChangeToCandidateErrors[keyof RestoreProjectChangeToCandidateErrors];
+
+export type RestoreProjectChangeToCandidateResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        status: 'recorded' | 'already_applied';
+        candidateId: string;
+        candidateVersion: number;
+        changeId: string;
+        excluded: boolean;
+        evaluationRequestId: string | null;
+    };
+};
+
+export type RestoreProjectChangeToCandidateResponse = RestoreProjectChangeToCandidateResponses[keyof RestoreProjectChangeToCandidateResponses];
+
+export type ExcludeProjectChangeFromCandidateData = {
+    body: {
+        reason?: string;
+    };
+    headers?: {
+        'x-csrf-token'?: string;
+    };
+    path: {
+        projectId: string;
+        changeId: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{projectId}/changes/{changeId}/exclusion';
+};
+
+export type ExcludeProjectChangeFromCandidateErrors = {
+    /**
+     * ApiError
+     *
+     * Common error response returned by the Shipgate API.
+     */
+    default: {
+        code: string;
+        message: string;
+        requestId: string;
+        details?: unknown;
+    };
+};
+
+export type ExcludeProjectChangeFromCandidateError = ExcludeProjectChangeFromCandidateErrors[keyof ExcludeProjectChangeFromCandidateErrors];
+
+export type ExcludeProjectChangeFromCandidateResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        status: 'recorded' | 'already_applied';
+        candidateId: string;
+        candidateVersion: number;
+        changeId: string;
+        excluded: boolean;
+        evaluationRequestId: string | null;
+    };
+};
+
+export type ExcludeProjectChangeFromCandidateResponse = ExcludeProjectChangeFromCandidateResponses[keyof ExcludeProjectChangeFromCandidateResponses];
+
 export type GetProjectChangeDependenciesData = {
     body?: never;
     path: {

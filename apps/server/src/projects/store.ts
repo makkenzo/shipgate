@@ -8,6 +8,7 @@ import type {
   ProjectTable,
 } from '@shipgate/database'
 import { type Kysely, type Selectable, sql, type Transaction } from 'kysely'
+import { queueActiveCandidateEvaluationInTransaction } from './candidate-evaluation-queue.js'
 import { summarizeProjectCheckState } from './dashboard.js'
 import {
   ProjectNotFoundError,
@@ -300,12 +301,34 @@ export async function archiveRepositoryProjectionInTransaction(
     .executeTakeFirst()
 
   if (inserted) {
-    await transaction
+    const resetProject = await transaction
       .updateTable('projects')
-      .set({ qa_reset_epoch: sql<number>`qa_reset_epoch + 1` })
+      .set({
+        qa_reset_epoch: sql<number>`qa_reset_epoch + 1`,
+        release_state_version: sql<number>`release_state_version + 1`,
+        updated_at: input.archivedAt,
+      })
       .where('id', '=', input.projectId)
       .where('repository_id', '=', repositoryId)
+      .returning([
+        'id',
+        'repository_id',
+        'status',
+        'source_sha',
+        'production_sha',
+        'last_successful_sync_at',
+        'configuration_version',
+        'required_check_policy_version',
+        'release_state_version',
+        'projection_version',
+      ])
       .executeTakeFirstOrThrow()
+
+    await queueActiveCandidateEvaluationInTransaction(transaction, {
+      project: resetProject,
+      reason: 'project_degraded',
+      now: input.archivedAt,
+    })
 
     return inserted.id
   }
@@ -386,6 +409,15 @@ export async function applyRepositoryProjectionInTransaction(
   if (existingRun && ['failed', 'superseded'].includes(existingRun.status)) {
     throw new RepositoryProjectionIdempotencyConflictError(input.projectId, input.idempotencyKey)
   }
+
+  const previousSuccessfulRun = await transaction
+    .selectFrom('repository_sync_runs')
+    .select(['projection_fingerprint', 'source_sha', 'production_sha'])
+    .where('project_id', '=', input.projectId)
+    .where('status', '=', 'succeeded')
+    .orderBy('completed_at', 'desc')
+    .orderBy('created_at', 'desc')
+    .executeTakeFirst()
 
   const storedChanges = await prepareStoredChanges(
     transaction,
@@ -586,6 +618,7 @@ export async function applyRepositoryProjectionInTransaction(
       auditSource: 'reconciliation',
       actorGitHubUserId: null,
     },
+    suppressCandidateReevaluation: true,
   })
 
   await insertSynchronizationIssues(
@@ -608,6 +641,22 @@ export async function applyRepositoryProjectionInTransaction(
   const shouldResetQaForDestructiveHistory =
     reconciliationClassification === 'destructive_history_change' &&
     !destructiveQaResetAlreadyApplied
+  const nextProjectStatus = ['destructive_history_change', 'unknown_inconsistency'].includes(
+    reconciliationClassification,
+  )
+    ? ('degraded' as const)
+    : ('active' as const)
+  const projectionChanged =
+    project.last_successful_sync_at === null ||
+    previousSuccessfulRun === undefined ||
+    previousSuccessfulRun.projection_fingerprint !== input.projectionFingerprint ||
+    previousSuccessfulRun.source_sha !== input.snapshot.sourceSha ||
+    previousSuccessfulRun.production_sha !== input.snapshot.productionSha
+  const releaseStateChanged =
+    projectionChanged ||
+    project.status !== nextProjectStatus ||
+    shouldResetQaForDestructiveHistory ||
+    reconciliationClassification === 'recoverable_drift'
   const updated = await transaction
     .updateTable('projects')
     .set({
@@ -617,11 +666,7 @@ export async function applyRepositoryProjectionInTransaction(
       repository_name: input.snapshot.repositoryName,
       repository_full_name: input.snapshot.repositoryFullName,
       default_branch: input.snapshot.defaultBranch,
-      status: ['destructive_history_change', 'unknown_inconsistency'].includes(
-        reconciliationClassification,
-      )
-        ? 'degraded'
-        : 'active',
+      status: nextProjectStatus,
       source_sha: input.snapshot.sourceSha,
       production_sha: input.snapshot.productionSha,
       merge_base_sha: input.snapshot.mergeBaseSha,
@@ -629,6 +674,10 @@ export async function applyRepositoryProjectionInTransaction(
       ...(shouldResetQaForDestructiveHistory
         ? { qa_reset_epoch: sql<number>`qa_reset_epoch + 1` }
         : {}),
+      ...(releaseStateChanged
+        ? { release_state_version: sql<number>`release_state_version + 1` }
+        : {}),
+      ...(projectionChanged ? { projection_version: sql<number>`projection_version + 1` } : {}),
       deletion_requested_at: null,
       deleted_at: null,
       updated_at: input.completedAt,
@@ -644,6 +693,27 @@ export async function applyRepositoryProjectionInTransaction(
       input.expectedConfigurationVersion,
       project.configuration_version,
     )
+  }
+
+  if (releaseStateChanged) {
+    const evaluationReason =
+      project.last_successful_sync_at === null
+        ? 'first_projection'
+        : nextProjectStatus !== 'active'
+          ? 'project_degraded'
+          : project.status !== 'active'
+            ? 'reconciliation_corrected'
+            : project.production_sha !== input.snapshot.productionSha
+              ? 'production_changed'
+              : project.source_sha !== input.snapshot.sourceSha
+                ? 'source_topology_changed'
+                : 'reconciliation_corrected'
+
+    await queueActiveCandidateEvaluationInTransaction(transaction, {
+      project: updated,
+      reason: evaluationReason,
+      now: input.completedAt,
+    })
   }
 
   return {
@@ -728,18 +798,39 @@ export async function recordRepositorySyncFailure(
       input.disconnectProject === true ||
       reconciliationClassification === 'destructive_history_change'
     ) {
-      await transaction
+      const degradedProject = await transaction
         .updateTable('projects')
         .set({
           status: input.disconnectProject === true ? 'disconnected' : 'degraded',
           ...(reconciliationClassification === 'destructive_history_change'
             ? { qa_reset_epoch: sql<number>`qa_reset_epoch + 1` }
             : {}),
+          release_state_version: sql<number>`release_state_version + 1`,
           updated_at: input.completedAt,
         })
         .where('id', '=', input.projectId)
         .where('status', 'in', ['initializing', 'active', 'degraded', 'disconnected'])
-        .execute()
+        .returning([
+          'id',
+          'repository_id',
+          'status',
+          'source_sha',
+          'production_sha',
+          'last_successful_sync_at',
+          'configuration_version',
+          'required_check_policy_version',
+          'release_state_version',
+          'projection_version',
+        ])
+        .executeTakeFirst()
+
+      if (degradedProject) {
+        await queueActiveCandidateEvaluationInTransaction(transaction, {
+          project: degradedProject,
+          reason: 'project_degraded',
+          now: input.completedAt,
+        })
+      }
     }
 
     return {

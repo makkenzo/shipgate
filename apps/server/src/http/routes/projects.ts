@@ -441,7 +441,12 @@ function mapQaMutationResult(result: ChangeQaMutationResult) {
   return {
     status: result.status,
     qa: mapQaState(result.qa),
-    candidateReevaluation: result.candidateReevaluation,
+    candidateReevaluation: result.candidateReevaluation
+      ? {
+          candidateId: result.candidateReevaluation.candidateId,
+          candidateVersion: result.candidateReevaluation.candidateVersion,
+        }
+      : null,
   }
 }
 
@@ -642,6 +647,7 @@ function getValidationStatusCode(code: ProjectConfigurationValidationError['code
     case 'production_ref_not_commit':
     case 'production_branch_not_ancestor':
     case 'invalid_qa_comment':
+    case 'invalid_exclusion_reason':
       return 422
   }
 }

@@ -5543,6 +5543,617 @@
         }
       }
     },
+    "/api/v1/projects/{projectId}/release-candidate": {
+      "get": {
+        "operationId": "getProjectReleaseCandidate",
+        "summary": "Get the active dynamic draft release candidate",
+        "tags": ["Release planning"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "in": "path",
+            "name": "projectId",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "shipgateSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["candidate"],
+                  "properties": {
+                    "candidate": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "required": [
+                            "id",
+                            "sequence",
+                            "version",
+                            "status",
+                            "createdByGitHubUserId",
+                            "latestEvaluationVersion",
+                            "latestEvaluation",
+                            "pendingEvaluation",
+                            "exclusions",
+                            "createdAt",
+                            "updatedAt"
+                          ],
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "sequence": {
+                              "type": "integer",
+                              "minimum": 1
+                            },
+                            "version": {
+                              "type": "integer",
+                              "minimum": 1
+                            },
+                            "status": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "enum": ["evaluating"]
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": ["ready"]
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": ["blocked"]
+                                }
+                              ]
+                            },
+                            "createdByGitHubUserId": {
+                              "anyOf": [
+                                {
+                                  "type": "integer",
+                                  "minimum": 1
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "latestEvaluationVersion": {
+                              "anyOf": [
+                                {
+                                  "type": "integer",
+                                  "minimum": 1
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "latestEvaluation": {
+                              "anyOf": [
+                                {
+                                  "type": "object",
+                                  "required": [
+                                    "id",
+                                    "version",
+                                    "result",
+                                    "summary",
+                                    "blockers",
+                                    "evaluatedAt",
+                                    "projectStateVersion",
+                                    "projectionVersion"
+                                  ],
+                                  "properties": {
+                                    "id": {
+                                      "type": "string"
+                                    },
+                                    "version": {
+                                      "type": "integer",
+                                      "minimum": 1
+                                    },
+                                    "result": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "enum": ["ready"]
+                                        },
+                                        {
+                                          "type": "string",
+                                          "enum": ["blocked"]
+                                        }
+                                      ]
+                                    },
+                                    "summary": {},
+                                    "blockers": {},
+                                    "evaluatedAt": {
+                                      "type": "string"
+                                    },
+                                    "projectStateVersion": {
+                                      "type": "integer",
+                                      "minimum": 0
+                                    },
+                                    "projectionVersion": {
+                                      "type": "integer",
+                                      "minimum": 0
+                                    }
+                                  },
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "pendingEvaluation": {
+                              "anyOf": [
+                                {
+                                  "type": "object",
+                                  "required": [
+                                    "requestId",
+                                    "status",
+                                    "reasons",
+                                    "coalescedCount",
+                                    "requestedAt",
+                                    "claimedAt"
+                                  ],
+                                  "properties": {
+                                    "requestId": {
+                                      "type": "string"
+                                    },
+                                    "status": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "enum": ["queued"]
+                                        },
+                                        {
+                                          "type": "string",
+                                          "enum": ["running"]
+                                        }
+                                      ]
+                                    },
+                                    "reasons": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "coalescedCount": {
+                                      "type": "integer",
+                                      "minimum": 0
+                                    },
+                                    "requestedAt": {
+                                      "type": "string"
+                                    },
+                                    "claimedAt": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    }
+                                  },
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "exclusions": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "required": [
+                                  "changeId",
+                                  "pullRequestNumber",
+                                  "title",
+                                  "actorGitHubUserId",
+                                  "reason",
+                                  "candidateVersion",
+                                  "excludedAt",
+                                  "updatedAt"
+                                ],
+                                "properties": {
+                                  "changeId": {
+                                    "type": "string"
+                                  },
+                                  "pullRequestNumber": {
+                                    "anyOf": [
+                                      {
+                                        "type": "integer",
+                                        "minimum": 1
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "title": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "actorGitHubUserId": {
+                                    "type": "integer",
+                                    "minimum": 1
+                                  },
+                                  "reason": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "candidateVersion": {
+                                    "type": "integer",
+                                    "minimum": 1
+                                  },
+                                  "excludedAt": {
+                                    "type": "string"
+                                  },
+                                  "updatedAt": {
+                                    "type": "string"
+                                  }
+                                },
+                                "additionalProperties": false
+                              }
+                            },
+                            "createdAt": {
+                              "type": "string"
+                            },
+                            "updatedAt": {
+                              "type": "string"
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Common error response returned by the Shipgate API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["code", "message", "requestId"],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "minLength": 1,
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "details": {}
+                  },
+                  "additionalProperties": false,
+                  "title": "ApiError",
+                  "description": "Common error response returned by the Shipgate API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{projectId}/changes/{changeId}/exclusion": {
+      "put": {
+        "operationId": "excludeProjectChangeFromCandidate",
+        "summary": "Exclude one change from the active draft candidate",
+        "tags": ["Release planning"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "reason": {
+                    "type": "string",
+                    "maxLength": 4000
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "in": "path",
+            "name": "projectId",
+            "required": true
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "in": "path",
+            "name": "changeId",
+            "required": true
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            "in": "header",
+            "name": "x-csrf-token",
+            "required": false
+          }
+        ],
+        "security": [
+          {
+            "shipgateSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "status",
+                    "candidateId",
+                    "candidateVersion",
+                    "changeId",
+                    "excluded",
+                    "evaluationRequestId"
+                  ],
+                  "properties": {
+                    "status": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": ["recorded"]
+                        },
+                        {
+                          "type": "string",
+                          "enum": ["already_applied"]
+                        }
+                      ]
+                    },
+                    "candidateId": {
+                      "type": "string"
+                    },
+                    "candidateVersion": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "changeId": {
+                      "type": "string"
+                    },
+                    "excluded": {
+                      "type": "boolean"
+                    },
+                    "evaluationRequestId": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Common error response returned by the Shipgate API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["code", "message", "requestId"],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "minLength": 1,
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "details": {}
+                  },
+                  "additionalProperties": false,
+                  "title": "ApiError",
+                  "description": "Common error response returned by the Shipgate API."
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "restoreProjectChangeToCandidate",
+        "summary": "Restore one explicitly excluded change to the active draft candidate",
+        "tags": ["Release planning"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "in": "path",
+            "name": "projectId",
+            "required": true
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "in": "path",
+            "name": "changeId",
+            "required": true
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            "in": "header",
+            "name": "x-csrf-token",
+            "required": false
+          }
+        ],
+        "security": [
+          {
+            "shipgateSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "status",
+                    "candidateId",
+                    "candidateVersion",
+                    "changeId",
+                    "excluded",
+                    "evaluationRequestId"
+                  ],
+                  "properties": {
+                    "status": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": ["recorded"]
+                        },
+                        {
+                          "type": "string",
+                          "enum": ["already_applied"]
+                        }
+                      ]
+                    },
+                    "candidateId": {
+                      "type": "string"
+                    },
+                    "candidateVersion": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "changeId": {
+                      "type": "string"
+                    },
+                    "excluded": {
+                      "type": "boolean"
+                    },
+                    "evaluationRequestId": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Common error response returned by the Shipgate API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["code", "message", "requestId"],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "minLength": 1,
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "details": {}
+                  },
+                  "additionalProperties": false,
+                  "title": "ApiError",
+                  "description": "Common error response returned by the Shipgate API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/projects/{projectId}/changes/{changeId}/dependencies": {
       "get": {
         "operationId": "getProjectChangeDependencies",

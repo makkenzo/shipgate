@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 
 import type { JsonValue, QaAssessmentStatus } from '@shipgate/database'
 
+import { touchProjectReleaseStateAndQueueEvaluation } from './candidate-evaluation-queue.js'
 import {
   ChangeNotFoundError,
   ProjectConfigurationValidationError,
@@ -203,9 +204,10 @@ async function recordQaAssessment(
     })
     .execute()
 
-  const candidateReevaluation = await markActiveCandidateForReevaluation(scope, {
+  const candidateReevaluation = await touchProjectReleaseStateAndQueueEvaluation(scope, {
     projectId: project.id,
     repositoryId,
+    reason: 'qa_changed',
     now,
   })
   const qa: ChangeQaState = {
@@ -223,7 +225,7 @@ async function recordQaAssessment(
       project_id: project.id,
       repository_id: repositoryId,
       actor_github_user_id: actorGitHubUserId,
-      event_type: input.reason === 'reset' ? 'qa_assessment_reset' : 'qa_assessment_recorded',
+      event_type: 'qa_status_changed',
       source: 'user',
       configuration_version: project.configuration_version,
       entity_type: 'qa_assessment',
@@ -253,44 +255,6 @@ async function recordQaAssessment(
     status: 'recorded',
     qa,
     candidateReevaluation,
-  }
-}
-
-async function markActiveCandidateForReevaluation(
-  scope: RepositoryTransaction,
-  input: {
-    readonly projectId: string
-    readonly repositoryId: string
-    readonly now: Date
-  },
-): Promise<CandidateReevaluation | null> {
-  const candidate = await scope.transaction
-    .selectFrom('release_candidates')
-    .select(['id', 'version'])
-    .where('project_id', '=', input.projectId)
-    .where('repository_id', '=', input.repositoryId)
-    .where('state', '=', 'open')
-    .forUpdate()
-    .executeTakeFirst()
-
-  if (!candidate) {
-    return null
-  }
-
-  await scope.transaction
-    .updateTable('release_candidates')
-    .set({
-      latest_evaluation_version: null,
-      updated_at: input.now,
-    })
-    .where('id', '=', candidate.id)
-    .where('version', '=', candidate.version)
-    .returning('id')
-    .executeTakeFirstOrThrow()
-
-  return {
-    candidateId: candidate.id,
-    candidateVersion: candidate.version,
   }
 }
 

@@ -1,6 +1,7 @@
 import type {
   DiagnosticJobPayload,
   GitHubWebhookProcessPayload,
+  ReleaseCandidateEvaluationJobPayload,
   RepositoryIncrementalSyncJobPayload,
   RepositoryInitialSyncJobPayload,
   RepositoryRequiredChecksSyncJobPayload,
@@ -11,6 +12,7 @@ declare global {
   namespace GraphileWorker {
     interface Tasks {
       diagnostic_echo: JobEnvelope<DiagnosticJobPayload>
+      'release.evaluate-candidate': JobEnvelope<ReleaseCandidateEvaluationJobPayload>
       github_webhook_process: JobEnvelope<GitHubWebhookProcessPayload>
       'repository.initial-sync': JobEnvelope<RepositoryInitialSyncJobPayload>
       'repository.reconcile': JobEnvelope<RepositoryInitialSyncJobPayload>

@@ -5,6 +5,7 @@ import type { ApplicationContext } from './application-context.js'
 import {
   queueDueRepositoryReconciliations,
   queueRepositoryReconciliationForProject,
+  recoverActiveDraftCandidateEvaluations,
   recoverRepositoryIncrementalSyncJobs,
   recoverRepositoryInitialSyncJobs,
 } from './projects/index.js'
@@ -18,6 +19,9 @@ export async function startWorker(context: ApplicationContext): Promise<StartedA
 
   const recoveredRepositorySyncJobs = await recoverRepositoryInitialSyncJobs(context.database)
   const recoveredIncrementalSyncProjects = await recoverRepositoryIncrementalSyncJobs(
+    context.database,
+  )
+  const recoveredCandidateEvaluations = await recoverActiveDraftCandidateEvaluations(
     context.database,
   )
   const recoveryReconciliations = await queueRecoveryReconciliations(
@@ -43,6 +47,17 @@ export async function startWorker(context: ApplicationContext): Promise<StartedA
         recoveredProjects: recoveredIncrementalSyncProjects.length,
       },
       'Recovered repository incremental synchronization jobs',
+    )
+  }
+
+  if (recoveredCandidateEvaluations.jobs > 0) {
+    context.logger.info(
+      {
+        event: 'release.candidate_evaluation.jobs_recovered',
+        recoveredProjects: recoveredCandidateEvaluations.projects,
+        recoveredJobs: recoveredCandidateEvaluations.jobs,
+      },
+      'Recovered active draft candidate evaluation jobs',
     )
   }
 
@@ -75,6 +90,7 @@ export async function startWorker(context: ApplicationContext): Promise<StartedA
       repositoryIncrementalSync: context.repositoryIncrementalSync,
       repositoryRequiredChecksSync: context.repositoryRequiredChecksSync,
       githubWebhookProjection: context.githubWebhookProjection,
+      releaseCandidateEvaluation: context.releaseCandidateEvaluation,
     },
 
     appVersion: context.runtimeConfig.appVersion,

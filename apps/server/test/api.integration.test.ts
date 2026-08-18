@@ -142,6 +142,16 @@ describe.sequential('Fastify API', () => {
       'setProjectChangeQa',
     )
 
+    expect(paths['/api/v1/projects/{projectId}/release-candidate']?.get?.operationId).toBe(
+      'getProjectReleaseCandidate',
+    )
+    expect(
+      paths['/api/v1/projects/{projectId}/changes/{changeId}/exclusion']?.put?.operationId,
+    ).toBe('excludeProjectChangeFromCandidate')
+    expect(
+      paths['/api/v1/projects/{projectId}/changes/{changeId}/exclusion']?.delete?.operationId,
+    ).toBe('restoreProjectChangeToCandidate')
+
     expect(paths['/api/v1/auth/github']).toBeUndefined()
     expect(paths['/api/v1/auth/github/callback']).toBeUndefined()
     expect(paths['/api/v1/github/webhooks']).toBeUndefined()

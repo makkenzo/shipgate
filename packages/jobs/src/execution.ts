@@ -174,6 +174,7 @@ async function executeJobAttempt(options: ExecuteJobAttemptOptions): Promise<Job
       repositoryRequiredChecksSync: dependencies.repositoryRequiredChecksSync,
       repositoryIncrementalSync: dependencies.repositoryIncrementalSync,
       githubWebhookProjection: dependencies.githubWebhookProjection,
+      releaseCandidateEvaluation: dependencies.releaseCandidateEvaluation,
     })
 
     if (persist) {

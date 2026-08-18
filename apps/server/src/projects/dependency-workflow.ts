@@ -4,6 +4,7 @@ import { createHash, randomUUID } from 'node:crypto'
 import type { DatabaseClient, JsonValue } from '@shipgate/database'
 import type { GitHubWebhookProjectionExecution } from '@shipgate/jobs'
 import { sql } from 'kysely'
+import { touchProjectReleaseStateAndQueueEvaluation } from './candidate-evaluation-queue.js'
 import { type ChangeDependencyEdge, findDependencyCycle } from './dependency-graph.js'
 import { parseManagedDependencyBlock } from './dependency-managed-block.js'
 import { ChangeNotFoundError, ProjectNotFoundError } from './errors.js'
@@ -466,9 +467,10 @@ export async function persistPreparedDependencyMutation(
       .execute()
   }
 
-  const candidateReevaluation = await markActiveCandidateForReevaluation(scope, {
+  const candidateReevaluation = await touchProjectReleaseStateAndQueueEvaluation(scope, {
     projectId: plan.projectId,
     repositoryId,
+    reason: 'dependencies_changed',
     now,
   })
   const dependencies: readonly ChangeDependencyState[] = plan.desiredDependencies.map(
@@ -489,7 +491,7 @@ export async function persistPreparedDependencyMutation(
     dependencyChangeIds: dependencies.map((dependency) => dependency.changeId),
     dependencyPullRequestNumbers: dependencies.map((dependency) => dependency.pullRequestNumber),
   }
-  const eventType = 'dependencies_replaced' as const
+  const eventType = 'dependencies_changed' as const
   const reasonCode =
     plan.commandKind === 'import'
       ? 'dependency_managed_block_imported'
@@ -706,33 +708,6 @@ export async function importDependenciesFromPullRequestWebhook(
       }),
     )
   }
-}
-
-async function markActiveCandidateForReevaluation(
-  scope: RepositoryTransaction,
-  input: { readonly projectId: string; readonly repositoryId: string; readonly now: Date },
-): Promise<CandidateDependencyReevaluation | null> {
-  const candidate = await scope.transaction
-    .selectFrom('release_candidates')
-    .select(['id', 'version'])
-    .where('project_id', '=', input.projectId)
-    .where('repository_id', '=', input.repositoryId)
-    .where('state', '=', 'open')
-    .forUpdate()
-    .executeTakeFirst()
-
-  if (!candidate) {
-    return null
-  }
-
-  await scope.transaction
-    .updateTable('release_candidates')
-    .set({ latest_evaluation_version: null, updated_at: input.now })
-    .where('id', '=', candidate.id)
-    .where('version', '=', candidate.version)
-    .executeTakeFirstOrThrow()
-
-  return { candidateId: candidate.id, candidateVersion: candidate.version }
 }
 
 async function recordDependencyImportIssue(

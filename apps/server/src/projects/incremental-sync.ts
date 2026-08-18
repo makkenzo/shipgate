@@ -7,8 +7,9 @@ import {
   type RepositoryRequiredChecksSyncHandler,
   RetryableJobError,
 } from '@shipgate/jobs'
-import type { Transaction } from 'kysely'
+import { sql, type Transaction } from 'kysely'
 
+import { queueActiveCandidateEvaluationInTransaction } from './candidate-evaluation-queue.js'
 import { ProjectConfigurationValidationError } from './errors.js'
 import {
   parseRepositoryIncrementalSyncScope,
@@ -307,7 +308,7 @@ async function commitObservedRepositoryState(
       return { status: 'ignored', reason: 'project_changed_during_refresh' }
     }
 
-    await transaction
+    const observedProject = await transaction
       .updateTable('projects')
       .set({
         installation_id: input.claimed.installationId,
@@ -316,12 +317,37 @@ async function commitObservedRepositoryState(
         repository_name: input.metadata.name,
         repository_full_name: input.metadata.fullName,
         default_branch: input.metadata.defaultBranch,
-        ...(input.claimed.scope.forced ? { status: 'degraded' as const } : {}),
+        ...(input.claimed.scope.forced
+          ? {
+              status: 'degraded' as const,
+              release_state_version: sql<number>`release_state_version + 1`,
+            }
+          : {}),
         updated_at: input.now,
       })
       .where('id', '=', project.id)
       .where('configuration_version', '=', project.configuration_version)
+      .returning([
+        'id',
+        'repository_id',
+        'status',
+        'source_sha',
+        'production_sha',
+        'last_successful_sync_at',
+        'configuration_version',
+        'required_check_policy_version',
+        'release_state_version',
+        'projection_version',
+      ])
       .executeTakeFirstOrThrow()
+
+    if (input.claimed.scope.forced) {
+      await queueActiveCandidateEvaluationInTransaction(transaction, {
+        project: observedProject,
+        reason: 'project_degraded',
+        now: input.now,
+      })
+    }
 
     const headsChanged =
       project.source_sha !== input.heads.sourceSha ||
@@ -615,12 +641,35 @@ async function markIncrementalSynchronizationFailed(
 
       const project = await transaction
         .updateTable('projects')
-        .set({ status: permissionProblem ? 'disconnected' : 'degraded', updated_at: now })
+        .set({
+          status: permissionProblem ? 'disconnected' : 'degraded',
+          release_state_version: sql<number>`release_state_version + 1`,
+          updated_at: now,
+        })
         .where('id', '=', claimed.projectId)
         .where('configuration_version', '=', claimed.configurationVersion)
         .where('status', 'in', ['initializing', 'active', 'degraded', 'disconnected'])
-        .returning(['source_sha', 'production_sha'])
+        .returning([
+          'id',
+          'repository_id',
+          'status',
+          'source_sha',
+          'production_sha',
+          'last_successful_sync_at',
+          'configuration_version',
+          'required_check_policy_version',
+          'release_state_version',
+          'projection_version',
+        ])
         .executeTakeFirst()
+
+      if (project) {
+        await queueActiveCandidateEvaluationInTransaction(transaction, {
+          project,
+          reason: 'project_degraded',
+          now,
+        })
+      }
 
       let reconciliationRequestId: string | null = null
 

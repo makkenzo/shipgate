@@ -1,4 +1,25 @@
 export {
+  type CandidateEvaluationReason,
+  type CandidateReevaluationReference,
+  ensureActiveDraftCandidateInTransaction,
+  parseCandidateEvaluationReasons,
+  queueActiveCandidateEvaluationInTransaction,
+  recoverActiveDraftCandidateEvaluations,
+  touchProjectReleaseStateAndQueueEvaluation,
+} from './candidate-evaluation-queue.js'
+export { createReleaseCandidateEvaluationHandler } from './candidate-evaluation-worker.js'
+export {
+  type ActiveDraftCandidate,
+  type ActiveDraftCandidateEvaluation,
+  type ActiveDraftCandidateExclusion,
+  type ActiveDraftCandidatePendingEvaluation,
+  type CandidateExclusionMutationResult,
+  type CandidateService,
+  createCandidateService,
+  type ExcludeChange,
+  type RestoreChange,
+} from './candidate-service.js'
+export {
   type ConfigureProjectResult,
   createConfiguredProject,
   listStoredProjects,

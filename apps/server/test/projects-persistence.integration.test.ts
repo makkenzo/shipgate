@@ -6,6 +6,7 @@ import {
   DatabaseOperationError,
   migrateToLatest,
 } from '@shipgate/database'
+import { migrateJobQueue } from '@shipgate/jobs'
 import { type PostgresTestDatabase, startPostgresTestDatabase } from '@shipgate/testing'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
@@ -59,6 +60,7 @@ describe.sequential('Project repository projection persistence', () => {
       onPoolError: () => undefined,
     })
 
+    await migrateJobQueue(database)
     await migrateToLatest(database.kysely)
     await seedRepositoryAccess(database)
   }, 60_000)

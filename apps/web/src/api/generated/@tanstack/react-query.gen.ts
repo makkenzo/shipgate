@@ -3,8 +3,8 @@
 import { queryOptions, type UseMutationOptions } from '@tanstack/react-query';
 
 import { client } from '../client.gen';
-import { createDiagnosticJob, createProject, deleteLocalAccount, deleteProject, disconnectGitHub, getAuthSession, getConnectionConfiguration, getDiagnosticJob, getHealth, getInstallation, getInstallations, getProject, getProjectChangeDependencies, getProjectChanges, getProjectOverview, getProjects, getProjectSynchronization, getReadiness, logout, type Options, reconcileProject, removeProjectChangeDependency, setProjectChangeDependencies, setProjectChangeQa, updateProject } from '../sdk.gen';
-import type { CreateDiagnosticJobData, CreateDiagnosticJobError, CreateDiagnosticJobResponse, CreateProjectData, CreateProjectError, CreateProjectResponse, DeleteLocalAccountData, DeleteLocalAccountError, DeleteLocalAccountResponse, DeleteProjectData, DeleteProjectError, DeleteProjectResponse, DisconnectGitHubData, DisconnectGitHubError, DisconnectGitHubResponse, GetAuthSessionData, GetAuthSessionError, GetAuthSessionResponse, GetConnectionConfigurationData, GetConnectionConfigurationError, GetConnectionConfigurationResponse, GetDiagnosticJobData, GetDiagnosticJobError, GetDiagnosticJobResponse, GetHealthData, GetHealthError, GetHealthResponse, GetInstallationData, GetInstallationError, GetInstallationResponse, GetInstallationsData, GetInstallationsError, GetInstallationsResponse, GetProjectChangeDependenciesData, GetProjectChangeDependenciesError, GetProjectChangeDependenciesResponse, GetProjectChangesData, GetProjectChangesError, GetProjectChangesResponse, GetProjectData, GetProjectError, GetProjectOverviewData, GetProjectOverviewError, GetProjectOverviewResponse, GetProjectResponse, GetProjectsData, GetProjectsError, GetProjectsResponse, GetProjectSynchronizationData, GetProjectSynchronizationError, GetProjectSynchronizationResponse, GetReadinessData, GetReadinessError, GetReadinessResponse, LogoutData, LogoutError, LogoutResponse, ReconcileProjectData, ReconcileProjectError, ReconcileProjectResponse, RemoveProjectChangeDependencyData, RemoveProjectChangeDependencyError, RemoveProjectChangeDependencyResponse, SetProjectChangeDependenciesData, SetProjectChangeDependenciesError, SetProjectChangeDependenciesResponse, SetProjectChangeQaData, SetProjectChangeQaError, SetProjectChangeQaResponse, UpdateProjectData, UpdateProjectError, UpdateProjectResponse } from '../types.gen';
+import { createDiagnosticJob, createProject, deleteLocalAccount, deleteProject, disconnectGitHub, excludeProjectChangeFromCandidate, getAuthSession, getConnectionConfiguration, getDiagnosticJob, getHealth, getInstallation, getInstallations, getProject, getProjectChangeDependencies, getProjectChanges, getProjectOverview, getProjectReleaseCandidate, getProjects, getProjectSynchronization, getReadiness, logout, type Options, reconcileProject, removeProjectChangeDependency, restoreProjectChangeToCandidate, setProjectChangeDependencies, setProjectChangeQa, updateProject } from '../sdk.gen';
+import type { CreateDiagnosticJobData, CreateDiagnosticJobError, CreateDiagnosticJobResponse, CreateProjectData, CreateProjectError, CreateProjectResponse, DeleteLocalAccountData, DeleteLocalAccountError, DeleteLocalAccountResponse, DeleteProjectData, DeleteProjectError, DeleteProjectResponse, DisconnectGitHubData, DisconnectGitHubError, DisconnectGitHubResponse, ExcludeProjectChangeFromCandidateData, ExcludeProjectChangeFromCandidateError, ExcludeProjectChangeFromCandidateResponse, GetAuthSessionData, GetAuthSessionError, GetAuthSessionResponse, GetConnectionConfigurationData, GetConnectionConfigurationError, GetConnectionConfigurationResponse, GetDiagnosticJobData, GetDiagnosticJobError, GetDiagnosticJobResponse, GetHealthData, GetHealthError, GetHealthResponse, GetInstallationData, GetInstallationError, GetInstallationResponse, GetInstallationsData, GetInstallationsError, GetInstallationsResponse, GetProjectChangeDependenciesData, GetProjectChangeDependenciesError, GetProjectChangeDependenciesResponse, GetProjectChangesData, GetProjectChangesError, GetProjectChangesResponse, GetProjectData, GetProjectError, GetProjectOverviewData, GetProjectOverviewError, GetProjectOverviewResponse, GetProjectReleaseCandidateData, GetProjectReleaseCandidateError, GetProjectReleaseCandidateResponse, GetProjectResponse, GetProjectsData, GetProjectsError, GetProjectsResponse, GetProjectSynchronizationData, GetProjectSynchronizationError, GetProjectSynchronizationResponse, GetReadinessData, GetReadinessError, GetReadinessResponse, LogoutData, LogoutError, LogoutResponse, ReconcileProjectData, ReconcileProjectError, ReconcileProjectResponse, RemoveProjectChangeDependencyData, RemoveProjectChangeDependencyError, RemoveProjectChangeDependencyResponse, RestoreProjectChangeToCandidateData, RestoreProjectChangeToCandidateError, RestoreProjectChangeToCandidateResponse, SetProjectChangeDependenciesData, SetProjectChangeDependenciesError, SetProjectChangeDependenciesResponse, SetProjectChangeQaData, SetProjectChangeQaError, SetProjectChangeQaResponse, UpdateProjectData, UpdateProjectError, UpdateProjectResponse } from '../types.gen';
 
 export type QueryKey<TOptions extends Options> = [
     Pick<TOptions, 'baseUrl' | 'body' | 'headers' | 'path' | 'query'> & {
@@ -422,6 +422,64 @@ export const setProjectChangeQaMutation = (options?: Partial<Options<SetProjectC
             return data;
         },
         mutationKey: setProjectChangeQaMutationKey(options)
+    };
+    return mutationOptions;
+};
+
+export const getProjectReleaseCandidateQueryKey = (options: Options<GetProjectReleaseCandidateData>) => createQueryKey('getProjectReleaseCandidate', options);
+
+/**
+ * Get the active dynamic draft release candidate
+ */
+export const getProjectReleaseCandidateOptions = (options: Options<GetProjectReleaseCandidateData>) => queryOptions<GetProjectReleaseCandidateResponse, GetProjectReleaseCandidateError, GetProjectReleaseCandidateResponse, ReturnType<typeof getProjectReleaseCandidateQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await getProjectReleaseCandidate({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getProjectReleaseCandidateQueryKey(options)
+});
+
+export const restoreProjectChangeToCandidateMutationKey = (options?: Partial<Options<RestoreProjectChangeToCandidateData>>) => createMutationKey('restoreProjectChangeToCandidate', options);
+
+/**
+ * Restore one explicitly excluded change to the active draft candidate
+ */
+export const restoreProjectChangeToCandidateMutation = (options?: Partial<Options<RestoreProjectChangeToCandidateData>>): UseMutationOptions<RestoreProjectChangeToCandidateResponse, RestoreProjectChangeToCandidateError, Options<RestoreProjectChangeToCandidateData>> => {
+    const mutationOptions: UseMutationOptions<RestoreProjectChangeToCandidateResponse, RestoreProjectChangeToCandidateError, Options<RestoreProjectChangeToCandidateData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await restoreProjectChangeToCandidate({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        },
+        mutationKey: restoreProjectChangeToCandidateMutationKey(options)
+    };
+    return mutationOptions;
+};
+
+export const excludeProjectChangeFromCandidateMutationKey = (options?: Partial<Options<ExcludeProjectChangeFromCandidateData>>) => createMutationKey('excludeProjectChangeFromCandidate', options);
+
+/**
+ * Exclude one change from the active draft candidate
+ */
+export const excludeProjectChangeFromCandidateMutation = (options?: Partial<Options<ExcludeProjectChangeFromCandidateData>>): UseMutationOptions<ExcludeProjectChangeFromCandidateResponse, ExcludeProjectChangeFromCandidateError, Options<ExcludeProjectChangeFromCandidateData>> => {
+    const mutationOptions: UseMutationOptions<ExcludeProjectChangeFromCandidateResponse, ExcludeProjectChangeFromCandidateError, Options<ExcludeProjectChangeFromCandidateData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await excludeProjectChangeFromCandidate({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        },
+        mutationKey: excludeProjectChangeFromCandidateMutationKey(options)
     };
     return mutationOptions;
 };
