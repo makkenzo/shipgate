@@ -9,7 +9,7 @@ import { shortSha } from '@/lib/project-format'
 import { toSafeHttpUrl } from '@/lib/safe-url'
 import { cn } from '@/lib/utils'
 
-type ProjectSection = 'overview' | 'changes' | 'synchronization' | 'settings'
+type ProjectSection = 'overview' | 'changes' | 'release' | 'synchronization' | 'settings'
 
 export function ProjectShell({
   overview,
@@ -67,6 +67,7 @@ export function ProjectShell({
       <nav className="mt-8 flex gap-1 overflow-x-auto border-b" aria-label="Project sections">
         <ProjectTab projectId={project.id} section={section} target="overview" label="Overview" />
         <ProjectTab projectId={project.id} section={section} target="changes" label="Changes" />
+        <ProjectTab projectId={project.id} section={section} target="release" label="Release" />
         <ProjectTab
           projectId={project.id}
           section={section}
@@ -109,6 +110,12 @@ function ProjectTab({
     case 'changes':
       return (
         <Link to="/projects/$projectId/changes" params={{ projectId }} className={className}>
+          {label}
+        </Link>
+      )
+    case 'release':
+      return (
+        <Link to="/projects/$projectId/release" params={{ projectId }} className={className}>
           {label}
         </Link>
       )

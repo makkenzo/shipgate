@@ -89,6 +89,19 @@ async function mockProjectApi(page: Page, calls: string[]): Promise<void> {
       return
     }
 
+    if (path === `/api/v1/projects/${projectId}/release-candidate` && method === 'GET') {
+      await json(route, { candidate: candidateFixture() })
+      return
+    }
+
+    if (
+      path === `/api/v1/projects/${projectId}/changes/change-42/dependencies` &&
+      method === 'GET'
+    ) {
+      await json(route, { dependencies: [] })
+      return
+    }
+
     if (path === `/api/v1/projects/${projectId}/synchronization` && method === 'GET') {
       await json(route, synchronizationFixture())
       return
@@ -285,6 +298,67 @@ function changeFixture() {
     finalHeadSha: sourceSha,
     commitShas: [sourceSha],
     requiredChecks: [],
+    qa: {
+      status: 'pending',
+      assessmentId: null,
+      comment: null,
+      actorGitHubUserId: null,
+      assessedAt: null,
+    },
+  }
+}
+
+function candidateFixture() {
+  const blocker = {
+    code: 'partially_released_change',
+    changeId: 'change-42',
+    dependencyChangeId: null,
+    checkName: null,
+    commitSha: null,
+  }
+  const summary = {
+    status: 'blocked',
+    includedChanges: [
+      {
+        changeId: 'change-42',
+        pullRequestNumber: 42,
+        mergedAt: '2026-08-05T09:45:00.000Z',
+        status: 'blocked',
+        blockers: [blocker],
+      },
+    ],
+    excludedChanges: [],
+    orderedChanges: ['change-42'],
+    blockers: [blocker],
+    evaluatedAgainst: {
+      sourceSha,
+      productionSha,
+      configurationVersion: 3,
+      projectionVersion: 1,
+    },
+  }
+
+  return {
+    id: 'candidate-1',
+    sequence: 1,
+    version: 1,
+    status: 'blocked',
+    createdByGitHubUserId: null,
+    latestEvaluationVersion: 1,
+    latestEvaluation: {
+      id: 'evaluation-1',
+      version: 1,
+      result: 'blocked',
+      summary,
+      blockers: summary.blockers,
+      evaluatedAt: '2026-08-05T10:00:02.000Z',
+      projectStateVersion: 1,
+      projectionVersion: 1,
+    },
+    pendingEvaluation: null,
+    exclusions: [],
+    createdAt: '2026-08-05T10:00:00.000Z',
+    updatedAt: '2026-08-05T10:00:02.000Z',
   }
 }
 

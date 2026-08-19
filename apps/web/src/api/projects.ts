@@ -181,6 +181,126 @@ export interface ProjectChange {
   }[]
 }
 
+export type ReleaseCandidateStatus = 'evaluating' | 'ready' | 'blocked'
+
+export type ReleaseBlockerCode =
+  | 'qa_pending'
+  | 'qa_failed'
+  | 'required_check_pending'
+  | 'required_check_failed'
+  | 'required_check_missing'
+  | 'dependency_not_ready'
+  | 'dependency_excluded'
+  | 'dependency_unknown'
+  | 'dependency_cycle'
+  | 'unmanaged_change'
+  | 'ambiguous_change'
+  | 'partially_released_change'
+  | 'commit_set_unknown'
+  | 'source_changed'
+  | 'production_changed'
+  | 'project_degraded'
+  | 'permission_missing'
+
+export interface ReleaseBlocker {
+  readonly code: ReleaseBlockerCode
+  readonly changeId: string | null
+  readonly dependencyChangeId: string | null
+  readonly checkName: string | null
+  readonly commitSha: string | null
+}
+
+export interface ReleaseEvaluationChange {
+  readonly changeId: string
+  readonly pullRequestNumber: number
+  readonly mergedAt: string
+  readonly status: 'ready' | 'blocked' | 'excluded'
+  readonly blockers: readonly ReleaseBlocker[]
+}
+
+export interface ReleaseEvaluationSummary {
+  readonly status: 'ready' | 'blocked'
+  readonly includedChanges: readonly ReleaseEvaluationChange[]
+  readonly excludedChanges: readonly ReleaseEvaluationChange[]
+  readonly orderedChanges: readonly string[]
+  readonly blockers: readonly ReleaseBlocker[]
+  readonly evaluatedAgainst: {
+    readonly sourceSha: string
+    readonly productionSha: string
+    readonly configurationVersion: number
+    readonly projectionVersion: number
+  }
+}
+
+export interface ProjectReleaseCandidate {
+  readonly id: string
+  readonly sequence: number
+  readonly version: number
+  readonly status: ReleaseCandidateStatus
+  readonly createdByGitHubUserId: number | null
+  readonly latestEvaluationVersion: number | null
+  readonly latestEvaluation: {
+    readonly id: string
+    readonly version: number
+    readonly result: 'ready' | 'blocked'
+    readonly summary: unknown
+    readonly blockers: unknown
+    readonly evaluatedAt: string
+    readonly projectStateVersion: number
+    readonly projectionVersion: number
+  } | null
+  readonly pendingEvaluation: {
+    readonly requestId: string
+    readonly status: 'queued' | 'running'
+    readonly reasons: readonly string[]
+    readonly coalescedCount: number
+    readonly requestedAt: string
+    readonly claimedAt: string | null
+  } | null
+  readonly exclusions: readonly {
+    readonly changeId: string
+    readonly pullRequestNumber: number | null
+    readonly title: string | null
+    readonly actorGitHubUserId: number
+    readonly reason: string | null
+    readonly candidateVersion: number
+    readonly excludedAt: string
+    readonly updatedAt: string
+  }[]
+  readonly createdAt: string
+  readonly updatedAt: string
+}
+
+export interface ProjectChangeDependency {
+  readonly changeId: string
+  readonly pullRequestNumber: number
+  readonly source: 'user' | 'managed_pr_body' | 'system'
+  readonly actorGitHubUserId: number | null
+  readonly version: number
+  readonly updatedAt: string
+}
+
+export interface ProjectChangeDependencyMutationResult {
+  readonly status: 'recorded' | 'already_applied'
+  readonly dependentChangeId: string
+  readonly dependentPullRequestNumber: number
+  readonly dependencies: readonly ProjectChangeDependency[]
+  readonly candidateReevaluation: {
+    readonly candidateId: string
+    readonly candidateVersion: number
+  } | null
+  readonly githubBodyUpdated: boolean
+}
+
+export interface CandidateExclusionMutationResult {
+  readonly status: 'recorded' | 'already_applied'
+  readonly candidateId: string
+  readonly candidateVersion: number
+  readonly changeId: string
+  readonly excluded: boolean
+  readonly evaluationRequestId: string | null
+}
+
 export interface ProjectSynchronizationRun extends ProjectSynchronizationSummary {
   readonly requestedAt: string
   readonly coalescedCount: number
@@ -270,6 +390,68 @@ export function setProjectChangeQa(
       method: 'PUT',
       headers: mutationHeaders(),
       body: JSON.stringify(input),
+    },
+  )
+}
+
+export async function getProjectReleaseCandidate(
+  projectId: string,
+): Promise<ProjectReleaseCandidate | null> {
+  const result = await requestJson<{ readonly candidate: ProjectReleaseCandidate | null }>(
+    `/api/v1/projects/${encodeURIComponent(projectId)}/release-candidate`,
+  )
+  return result.candidate
+}
+
+export async function getProjectChangeDependencies(
+  projectId: string,
+  changeId: string,
+): Promise<readonly ProjectChangeDependency[]> {
+  const result = await requestJson<{ readonly dependencies: readonly ProjectChangeDependency[] }>(
+    `/api/v1/projects/${encodeURIComponent(projectId)}/changes/${encodeURIComponent(changeId)}/dependencies`,
+  )
+  return result.dependencies
+}
+
+export function setProjectChangeDependencies(
+  projectId: string,
+  changeId: string,
+  dependencyChangeIds: readonly string[],
+): Promise<ProjectChangeDependencyMutationResult> {
+  return requestJson(
+    `/api/v1/projects/${encodeURIComponent(projectId)}/changes/${encodeURIComponent(changeId)}/dependencies`,
+    {
+      method: 'PUT',
+      headers: mutationHeaders(),
+      body: JSON.stringify({ dependencyChangeIds }),
+    },
+  )
+}
+
+export function excludeProjectChangeFromCandidate(
+  projectId: string,
+  changeId: string,
+  reason?: string,
+): Promise<CandidateExclusionMutationResult> {
+  return requestJson(
+    `/api/v1/projects/${encodeURIComponent(projectId)}/changes/${encodeURIComponent(changeId)}/exclusion`,
+    {
+      method: 'PUT',
+      headers: mutationHeaders(),
+      body: JSON.stringify(reason === undefined ? {} : { reason }),
+    },
+  )
+}
+
+export function restoreProjectChangeToCandidate(
+  projectId: string,
+  changeId: string,
+): Promise<CandidateExclusionMutationResult> {
+  return requestJson(
+    `/api/v1/projects/${encodeURIComponent(projectId)}/changes/${encodeURIComponent(changeId)}/exclusion`,
+    {
+      method: 'DELETE',
+      headers: createCsrfHeaders(),
     },
   )
 }

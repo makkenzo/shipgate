@@ -19,6 +19,7 @@ import { Route as InstallationsInstallationIdRouteImport } from './routes/instal
 import { Route as ProjectsProjectIdRouteImport } from './routes/projects_.$projectId'
 import { Route as ProjectsNewRouteImport } from './routes/projects_.new'
 import { Route as ProjectsProjectIdChangesRouteImport } from './routes/projects_.$projectId_.changes'
+import { Route as ProjectsProjectIdReleaseRouteImport } from './routes/projects_.$projectId_.release'
 import { Route as ProjectsProjectIdSettingsRouteImport } from './routes/projects_.$projectId_.settings'
 import { Route as ProjectsProjectIdSynchronizationRouteImport } from './routes/projects_.$projectId_.synchronization'
 
@@ -74,6 +75,12 @@ const ProjectsProjectIdChangesRoute =
     path: '/projects/$projectId/changes',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ProjectsProjectIdReleaseRoute =
+  ProjectsProjectIdReleaseRouteImport.update({
+    id: '/projects_/$projectId_/release',
+    path: '/projects/$projectId/release',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ProjectsProjectIdSettingsRoute =
   ProjectsProjectIdSettingsRouteImport.update({
     id: '/projects_/$projectId_/settings',
@@ -98,6 +105,7 @@ export interface FileRoutesByFullPath {
   '/projects/$projectId': typeof ProjectsProjectIdRoute
   '/projects/new': typeof ProjectsNewRoute
   '/projects/$projectId/changes': typeof ProjectsProjectIdChangesRoute
+  '/projects/$projectId/release': typeof ProjectsProjectIdReleaseRoute
   '/projects/$projectId/settings': typeof ProjectsProjectIdSettingsRoute
   '/projects/$projectId/synchronization': typeof ProjectsProjectIdSynchronizationRoute
 }
@@ -112,6 +120,7 @@ export interface FileRoutesByTo {
   '/projects/$projectId': typeof ProjectsProjectIdRoute
   '/projects/new': typeof ProjectsNewRoute
   '/projects/$projectId/changes': typeof ProjectsProjectIdChangesRoute
+  '/projects/$projectId/release': typeof ProjectsProjectIdReleaseRoute
   '/projects/$projectId/settings': typeof ProjectsProjectIdSettingsRoute
   '/projects/$projectId/synchronization': typeof ProjectsProjectIdSynchronizationRoute
 }
@@ -127,6 +136,7 @@ export interface FileRoutesById {
   '/projects_/$projectId': typeof ProjectsProjectIdRoute
   '/projects_/new': typeof ProjectsNewRoute
   '/projects_/$projectId_/changes': typeof ProjectsProjectIdChangesRoute
+  '/projects_/$projectId_/release': typeof ProjectsProjectIdReleaseRoute
   '/projects_/$projectId_/settings': typeof ProjectsProjectIdSettingsRoute
   '/projects_/$projectId_/synchronization': typeof ProjectsProjectIdSynchronizationRoute
 }
@@ -143,6 +153,7 @@ export interface FileRouteTypes {
     | '/projects/$projectId'
     | '/projects/new'
     | '/projects/$projectId/changes'
+    | '/projects/$projectId/release'
     | '/projects/$projectId/settings'
     | '/projects/$projectId/synchronization'
   fileRoutesByTo: FileRoutesByTo
@@ -157,6 +168,7 @@ export interface FileRouteTypes {
     | '/projects/$projectId'
     | '/projects/new'
     | '/projects/$projectId/changes'
+    | '/projects/$projectId/release'
     | '/projects/$projectId/settings'
     | '/projects/$projectId/synchronization'
   id:
@@ -171,6 +183,7 @@ export interface FileRouteTypes {
     | '/projects_/$projectId'
     | '/projects_/new'
     | '/projects_/$projectId_/changes'
+    | '/projects_/$projectId_/release'
     | '/projects_/$projectId_/settings'
     | '/projects_/$projectId_/synchronization'
   fileRoutesById: FileRoutesById
@@ -186,6 +199,7 @@ export interface RootRouteChildren {
   ProjectsProjectIdRoute: typeof ProjectsProjectIdRoute
   ProjectsNewRoute: typeof ProjectsNewRoute
   ProjectsProjectIdChangesRoute: typeof ProjectsProjectIdChangesRoute
+  ProjectsProjectIdReleaseRoute: typeof ProjectsProjectIdReleaseRoute
   ProjectsProjectIdSettingsRoute: typeof ProjectsProjectIdSettingsRoute
   ProjectsProjectIdSynchronizationRoute: typeof ProjectsProjectIdSynchronizationRoute
 }
@@ -262,6 +276,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProjectsProjectIdChangesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/projects_/$projectId_/release': {
+      id: '/projects_/$projectId_/release'
+      path: '/projects/$projectId/release'
+      fullPath: '/projects/$projectId/release'
+      preLoaderRoute: typeof ProjectsProjectIdReleaseRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/projects_/$projectId_/settings': {
       id: '/projects_/$projectId_/settings'
       path: '/projects/$projectId/settings'
@@ -290,6 +311,7 @@ const rootRouteChildren: RootRouteChildren = {
   ProjectsProjectIdRoute: ProjectsProjectIdRoute,
   ProjectsNewRoute: ProjectsNewRoute,
   ProjectsProjectIdChangesRoute: ProjectsProjectIdChangesRoute,
+  ProjectsProjectIdReleaseRoute: ProjectsProjectIdReleaseRoute,
   ProjectsProjectIdSettingsRoute: ProjectsProjectIdSettingsRoute,
   ProjectsProjectIdSynchronizationRoute: ProjectsProjectIdSynchronizationRoute,
 }

@@ -16,6 +16,8 @@ import {
   createCandidateService,
   createReleaseCandidateEvaluationHandler,
   recoverActiveDraftCandidateEvaluations,
+  resetQaStatus,
+  setQaStatus,
   touchProjectReleaseStateAndQueueEvaluation,
   withRepositoryTransaction,
 } from '../src/projects/index.js'
@@ -216,7 +218,7 @@ describe.sequential('Active draft release candidate', () => {
     ])
   })
 
-  it('discards a stale worker result and publishes only the successor request', async () => {
+  it('discards an evaluation when a check webhook changes state before publish', async () => {
     await withRepositoryTransaction(database, repositoryId, async (scope) => {
       await touchProjectReleaseStateAndQueueEvaluation(scope, {
         projectId,
@@ -276,7 +278,7 @@ describe.sequential('Active draft release candidate', () => {
     })
   })
 
-  it('does not enqueue a redundant evaluation when a newer worker already published current state', async () => {
+  it('lets two workers race while only the newer evaluation becomes current', async () => {
     await withRepositoryTransaction(database, repositoryId, async (scope) => {
       await touchProjectReleaseStateAndQueueEvaluation(scope, {
         projectId,
@@ -343,6 +345,122 @@ describe.sequential('Active draft release candidate', () => {
 
     expect(activeRequests).toEqual([])
     expect(evaluations.map((evaluation) => evaluation.evaluation_version)).toEqual([1, 2, 3, 4])
+  })
+
+  it('runs evaluation concurrently with a real QA reset and publishes the successor state', async () => {
+    await withRepositoryTransaction(database, repositoryId, async (scope) => {
+      await touchProjectReleaseStateAndQueueEvaluation(scope, {
+        projectId,
+        repositoryId: String(repositoryId),
+        reason: 'worker_recovery',
+      })
+    })
+
+    const staleRequestId = await loadQueuedRequestId(database)
+    let resetApplied = false
+    const staleHandler = createReleaseCandidateEvaluationHandler({
+      database,
+      async beforePublish() {
+        if (resetApplied) return
+        resetApplied = true
+        await withRepositoryTransaction(database, repositoryId, async (scope) => {
+          await resetQaStatus(scope, {
+            actorGitHubUserId,
+            projectId,
+            changeId: changeAId,
+            correlationId: 'candidate:test:qa-reset-during-evaluation',
+          })
+        })
+      },
+    })
+
+    await expect(staleHandler(execution(staleRequestId))).resolves.toMatchObject({
+      status: 'discarded',
+      reason: 'state_changed_during_evaluation',
+    })
+
+    const blockedRequestId = await loadQueuedRequestId(database)
+    await expect(
+      createReleaseCandidateEvaluationHandler({ database })(execution(blockedRequestId)),
+    ).resolves.toMatchObject({ status: 'published', result: 'blocked' })
+
+    const blockedEvaluation = await database.kysely
+      .selectFrom('release_candidate_evaluations')
+      .select('blockers')
+      .where('project_id', '=', projectId)
+      .orderBy('evaluation_version', 'desc')
+      .executeTakeFirstOrThrow()
+    expect(asArray(blockedEvaluation.blockers)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: 'qa_pending', changeId: changeAId }),
+      ]),
+    )
+
+    await withRepositoryTransaction(database, repositoryId, async (scope) => {
+      await setQaStatus(scope, {
+        actorGitHubUserId,
+        projectId,
+        changeId: changeAId,
+        status: 'passed',
+        correlationId: 'candidate:test:qa-pass-after-concurrent-reset',
+      })
+    })
+    const readyRequestId = await loadQueuedRequestId(database)
+    await expect(
+      createReleaseCandidateEvaluationHandler({ database })(execution(readyRequestId)),
+    ).resolves.toMatchObject({ status: 'published', result: 'ready' })
+  })
+
+  it('supersedes an in-flight evaluation when a source push changes candidate coordinates', async () => {
+    await withRepositoryTransaction(database, repositoryId, async (scope) => {
+      await touchProjectReleaseStateAndQueueEvaluation(scope, {
+        projectId,
+        repositoryId: String(repositoryId),
+        reason: 'worker_recovery',
+      })
+    })
+
+    const staleRequestId = await loadQueuedRequestId(database)
+    const pushedSourceSha = 'e'.repeat(40)
+    let pushApplied = false
+    const staleHandler = createReleaseCandidateEvaluationHandler({
+      database,
+      async beforePublish() {
+        if (pushApplied) return
+        pushApplied = true
+        await withRepositoryTransaction(database, repositoryId, async (scope) => {
+          await scope.transaction
+            .updateTable('projects')
+            .set({ source_sha: pushedSourceSha, updated_at: new Date() })
+            .where('id', '=', projectId)
+            .executeTakeFirstOrThrow()
+          await touchProjectReleaseStateAndQueueEvaluation(scope, {
+            projectId,
+            repositoryId: String(repositoryId),
+            reason: 'source_topology_changed',
+            projectionChanged: true,
+          })
+        })
+      },
+    })
+
+    await expect(staleHandler(execution(staleRequestId))).resolves.toMatchObject({
+      status: 'discarded',
+      reason: 'state_changed_during_evaluation',
+    })
+
+    const successorRequestId = await loadQueuedRequestId(database)
+    await expect(
+      createReleaseCandidateEvaluationHandler({ database })(execution(successorRequestId)),
+    ).resolves.toMatchObject({ status: 'published', result: 'ready' })
+    await expect(
+      database.kysely
+        .selectFrom('release_candidate_evaluations')
+        .select('source_sha')
+        .where('project_id', '=', projectId)
+        .orderBy('evaluation_version', 'desc')
+        .executeTakeFirstOrThrow(),
+    ).resolves.toEqual({ source_sha: pushedSourceSha })
   })
 })
 

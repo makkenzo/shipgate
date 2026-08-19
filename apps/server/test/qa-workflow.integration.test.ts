@@ -256,6 +256,102 @@ describe.sequential('QA workflow', () => {
     ).resolves.toEqual({ status: 'pending', sequence: 2 })
   })
 
+  it('starts pending and records the explicit pending -> passed -> failed transition', async () => {
+    const fixture = await seedQaFixture(database, 7)
+    const service = createProjectService({
+      database,
+      githubRepositoryAccess: createAccessService('allowed'),
+      topologyValidator: unusedTopologyValidator(),
+    })
+
+    await expect(loadQa(service, fixture)).resolves.toEqual({
+      status: 'pending',
+      assessmentId: null,
+      comment: null,
+      actorGitHubUserId: null,
+      assessedAt: null,
+    })
+
+    await service.setQaStatus({
+      actorGitHubUserId,
+      projectId: fixture.projectId,
+      changeId: fixture.changeId,
+      status: 'passed',
+      correlationId: 'qa:transition:passed',
+    })
+    const failed = await service.setQaStatus({
+      actorGitHubUserId,
+      projectId: fixture.projectId,
+      changeId: fixture.changeId,
+      status: 'failed',
+      comment: 'Regression found after the first pass.',
+      correlationId: 'qa:transition:failed',
+    })
+
+    expect(failed.qa).toMatchObject({
+      status: 'failed',
+      comment: 'Regression found after the first pass.',
+    })
+    await expect(
+      database.kysely
+        .selectFrom('change_qa_assessments')
+        .select(['sequence', 'status', 'previous_status'])
+        .where('change_id', '=', fixture.changeId)
+        .orderBy('sequence')
+        .execute(),
+    ).resolves.toEqual([
+      { sequence: 1, status: 'passed', previous_status: 'pending' },
+      { sequence: 2, status: 'failed', previous_status: 'passed' },
+    ])
+  })
+
+  it('serializes concurrent QA updates without losing either append-only assessment', async () => {
+    const fixture = await seedQaFixture(database, 8)
+    const service = createProjectService({
+      database,
+      githubRepositoryAccess: createAccessService('allowed'),
+      topologyValidator: unusedTopologyValidator(),
+    })
+
+    const results = await Promise.all([
+      service.setQaStatus({
+        actorGitHubUserId,
+        projectId: fixture.projectId,
+        changeId: fixture.changeId,
+        status: 'passed',
+        comment: 'Concurrent pass.',
+        correlationId: 'qa:concurrent:passed',
+      }),
+      service.setQaStatus({
+        actorGitHubUserId,
+        projectId: fixture.projectId,
+        changeId: fixture.changeId,
+        status: 'failed',
+        comment: 'Concurrent failure.',
+        correlationId: 'qa:concurrent:failed',
+      }),
+    ])
+
+    expect(results.every((result) => result.status === 'recorded')).toBe(true)
+    const history = await database.kysely
+      .selectFrom('change_qa_assessments')
+      .select(['sequence', 'status', 'previous_status'])
+      .where('change_id', '=', fixture.changeId)
+      .orderBy('sequence')
+      .execute()
+
+    expect(history).toHaveLength(2)
+    expect(history.map((assessment) => assessment.sequence)).toEqual([1, 2])
+    expect(new Set(history.map((assessment) => assessment.status))).toEqual(
+      new Set(['passed', 'failed']),
+    )
+    expect(history[0]?.previous_status).toBe('pending')
+    expect(history[1]?.previous_status).toBe(history[0]?.status)
+    await expect(loadQa(service, fixture)).resolves.toMatchObject({
+      status: history[1]?.status,
+    })
+  })
+
   it('requires current Triage access and a stable current release-queue projection', async () => {
     const deniedFixture = await seedQaFixture(database, 3)
     const deniedService = createProjectService({

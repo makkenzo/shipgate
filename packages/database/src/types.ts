@@ -51,6 +51,8 @@ export interface DatabaseSchema {
 
   change_dependencies: ChangeDependencyTable
 
+  release_planning_issues: ReleasePlanningIssueTable
+
   release_candidates: ReleaseCandidateTable
 
   candidate_exclusions: CandidateExclusionTable
@@ -574,6 +576,27 @@ export interface ChangeDependencyTable {
   version: number
   created_at: Generated<Date>
   updated_at: Generated<Date>
+}
+
+export type ReleasePlanningIssueCategory = 'dependency_managed_block'
+
+export type ReleasePlanningIssueSource = 'github_webhook' | 'user' | 'system'
+
+export interface ReleasePlanningIssueTable {
+  id: string
+  project_id: string
+  repository_id: string
+  category: ReleasePlanningIssueCategory
+  entity_type: string
+  entity_id: string
+  pull_request_number: number | null
+  code: string
+  message: string
+  body_hash: string | null
+  source: ReleasePlanningIssueSource
+  source_reference: string
+  payload: ColumnType<JsonValue, string, string>
+  created_at: Generated<Date>
 }
 
 export type ReleaseCandidateState = 'open' | 'revision_active' | 'completed' | 'cancelled'

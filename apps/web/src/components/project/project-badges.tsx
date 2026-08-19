@@ -3,6 +3,8 @@ import type {
   ProjectHealthState,
   ProjectStatus,
   ProjectSynchronizationSummary,
+  QaStatus,
+  ReleaseCandidateStatus,
 } from '@/api/projects'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -78,4 +80,47 @@ export function SynchronizationStatusBadge({
           : 'secondary'
 
   return <Badge variant={variant}>{synchronizationStatusLabel(state)}</Badge>
+}
+
+export function QaStatusBadge({ status }: { readonly status: QaStatus }) {
+  const variant =
+    status === 'passed' ? 'default' : status === 'failed' ? 'destructive' : 'secondary'
+  const label = status === 'passed' ? 'Passed' : status === 'failed' ? 'Failed' : 'Pending'
+
+  return <Badge variant={variant}>{label}</Badge>
+}
+
+export function CandidateStateBadge({
+  state,
+}: {
+  readonly state: ReleaseCandidateStatus | 'excluded' | 'unknown'
+}) {
+  const variant =
+    state === 'ready'
+      ? 'default'
+      : state === 'blocked'
+        ? 'destructive'
+        : state === 'excluded' || state === 'unknown'
+          ? 'outline'
+          : 'secondary'
+  const label =
+    state === 'ready'
+      ? 'Ready'
+      : state === 'blocked'
+        ? 'Blocked'
+        : state === 'excluded'
+          ? 'Excluded'
+          : state === 'evaluating'
+            ? 'Evaluating'
+            : 'Unknown'
+
+  return <Badge variant={variant}>{label}</Badge>
+}
+
+export function ReleaseCandidateStatusBadge({
+  status,
+}: {
+  readonly status: ReleaseCandidateStatus
+}) {
+  return <CandidateStateBadge state={status} />
 }
